@@ -4325,6 +4325,118 @@
         ]
       }
     },
+    "/api/v1/edge/device-users/reader-names": {
+      "post": {
+        "operationId": "EdgeLegacyLinkController_nomesDoLeitor",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "EdgeLegacyLink"
+        ]
+      }
+    },
+    "/api/v1/students/{id}/turnstile-number": {
+      "post": {
+        "operationId": "StudentTurnstileNumberController_definir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "linkedReaders": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "externalId",
+                    "linkedReaders"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentTurnstileNumber"
+        ]
+      }
+    },
+    "/api/v1/device-reader-numbers/unlinked": {
+      "get": {
+        "operationId": "StudentTurnstileNumberController_semAluno",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "externalId": {
+                        "type": "string"
+                      },
+                      "readerName": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "deviceSerial": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "externalId",
+                      "readerName",
+                      "deviceSerial"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StudentTurnstileNumber"
+        ]
+      }
+    },
     "/api/v1/engagement/aliases": {
       "get": {
         "operationId": "EngagementController_listar",

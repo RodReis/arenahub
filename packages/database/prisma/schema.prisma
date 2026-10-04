@@ -2725,6 +2725,9 @@ model DeviceReaderNumber {
   deviceId       String   @map("device_id") @db.Uuid
   /// O `enrollid` dentro do leitor -- mesmo espaco de `DeviceUser.externalUserId`.
   externalUserId String   @map("external_user_id")
+  /// Nome que o leitor guarda para este numero (`getuserinfo`). So para a
+  /// recepcao reconhecer cadastro sem aluno -- nunca usado em decisao.
+  readerName     String?  @map("reader_name") @db.VarChar(100)
   seenAt         DateTime @map("seen_at")
   createdAt      DateTime @default(now()) @map("created_at")
 

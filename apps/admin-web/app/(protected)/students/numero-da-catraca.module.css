@@ -1,0 +1,72 @@
+/**
+ * Conteudo do dialogo "Numero da catraca". A caixa vem de
+ * `../dialogo.module.css` (DS-PAINEL.md §4.15); aqui so o miolo das abas.
+ */
+.aba {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--ah-border-default);
+  border-radius: 6px;
+}
+
+.legenda {
+  padding: 8px 12px 4px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-top: 1px solid var(--ah-border-subtle);
+  cursor: pointer;
+}
+
+.opcao:hover {
+  background: var(--ah-surface-canvas);
+}
+
+.opcao:has(input:checked) {
+  background: color-mix(in srgb, var(--ah-action-solid) 10%, var(--ah-surface-raised));
+}
+
+.opcao input {
+  accent-color: var(--ah-action-solid);
+}
+
+.numeroDaOpcao {
+  flex: none;
+  font-family: var(--ah-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-strong);
+}
+
+/* Nome do leitor: texto nao confiavel e de tamanho livre -- uma linha so. */
+.nomeDaOpcao {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ah-text-secondary);
+}
+
+.falha {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

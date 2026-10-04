@@ -633,9 +633,35 @@ export async function definirCredencial(
     };
   }
 
+  const { kind, externalId } = validado.data;
+
+  /*
+   * Identificador facial vai pela rota do numero da catraca (spec
+   * 2026-10-03): ela grava E vincula ao leitor na hora. O PUT gravava so a
+   * credencial, e o vinculo esperava o proximo sync. Cartao segue no PUT.
+   */
+  if (kind === 'FACIAL_ENROLL_ID') {
+    if (!/^\d{1,12}$/.test(externalId)) {
+      return { erro: 'O identificador facial tem de 1 a 12 dígitos.', valores };
+    }
+
+    const facial = await chamarApi<{ externalId: string; linkedReaders: number }>(
+      `/api/v1/students/${studentId}/turnstile-number`,
+      { metodo: 'POST', corpo: { externalId } },
+    );
+
+    if (!facial.ok || !facial.dados) {
+      return { erro: frase(facial.erro?.code ?? '', 'Não foi possível vincular o número'), valores };
+    }
+
+    revalidatePath(`/students/${studentId}`);
+
+    return { sucesso: { kind, externalId: facial.dados.externalId } };
+  }
+
   const resposta = await chamarApi<{ kind: string; externalId: string }>(
     `/api/v1/students/${studentId}/credentials`,
-    { metodo: 'PUT', corpo: { kind: validado.data.kind, externalId: validado.data.externalId } },
+    { metodo: 'PUT', corpo: { kind, externalId } },
   );
 
   if (!resposta.ok || !resposta.dados) {

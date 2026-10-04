@@ -541,3 +541,66 @@ test.describe('navegação da recepção', () => {
     await expect(page).toHaveURL(/\/biometrics$/);
   });
 });
+
+/*
+ * NUMERO DA CATRACA AUTOMATICO (spec 2026-10-03).
+ *
+ * O aluno nasce com o numero que a recepcao digita no leitor facial. Dois
+ * pontos de contato: a ficha o mostra em destaque, e a acao de linha da lista
+ * "Numero da catraca" -> aba "Gerar novo" mostra o MESMO numero (idempotente:
+ * nunca cria um segundo). A aba "Do leitor" depende de DeviceReaderNumber
+ * semeado e e coberta pelos testes de integracao da API.
+ *
+ * Test ids da lista sao DUPLICADOS por linha (`dialogo-numero-catraca`,
+ * `gerar-numero-catraca`). Por isso o clique usa o botao da linha, que e
+ * por aluno (`acao-numero-catraca-<id>`), e o dialogo e escopado a
+ * `dialog[open]`.
+ */
+test.describe('numero da catraca automatico', () => {
+  /** Os 12 digitos do visor, depois de provar que vem em quatro blocos de tres. */
+  async function lerVisor(visor: import('@playwright/test').Locator): Promise<string> {
+    const blocos = visor.getByTestId('numero-em-destaque-valor').locator('span');
+
+    await expect(blocos).toHaveCount(4);
+    for (let i = 0; i < 4; i += 1) {
+      await expect(blocos.nth(i)).toHaveText(/^\d{3}$/);
+    }
+
+    return (await visor.getByTestId('numero-em-destaque-valor').textContent()) ?? '';
+  }
+
+  test('a ficha do aluno novo mostra o numero em destaque e a lista mostra o mesmo', async ({
+    page,
+  }) => {
+    await entrar(page);
+    const nome = nomeUnico('Numero Automatico');
+
+    await cadastrarAluno(page, { nome, nascimento: '1990-02-10' });
+    await page.getByTestId('abrir-ficha').click();
+    await expect(page).toHaveURL(/\/students\/[0-9a-f-]{36}/);
+
+    const studentId = new URL(page.url()).pathname.split('/').pop() ?? '';
+
+    // O numero mora na aba Plano, junto de "Direitos de acesso".
+    await page.getByTestId('aba-plano').click();
+    const numeroDaFicha = await lerVisor(page.getByTestId('numero-em-destaque'));
+    expect(numeroDaFicha).toMatch(/^\d{12}$/);
+
+    // Lista -> acao de linha -> "Gerar novo": o MESMO numero, nenhum outro.
+    await page.goto('/students');
+    const urlAntes = page.url();
+    await page.getByLabel('Buscar por nome, matrícula, contato ou ID da catraca').fill(nome);
+    await page.waitForFunction((anterior) => window.location.href !== anterior, urlAntes);
+
+    await page.getByTestId(`acao-numero-catraca-${studentId}`).click();
+
+    const dialogo = page.locator('dialog[open]');
+    await expect(dialogo).toBeVisible();
+    await dialogo.getByRole('tab', { name: 'Gerar novo' }).click();
+    await dialogo.getByTestId('gerar-numero-catraca').click();
+
+    const numeroDaLista = await lerVisor(dialogo.getByTestId('numero-em-destaque'));
+
+    expect(numeroDaLista).toBe(numeroDaFicha);
+  });
+});

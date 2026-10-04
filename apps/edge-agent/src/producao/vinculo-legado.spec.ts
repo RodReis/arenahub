@@ -3,7 +3,12 @@ import pino from 'pino';
 
 import type { SignedCloudClient } from '../cloud/signed-client.js';
 import type { FacialDeviceAdapter, IdentidadeNoDispositivo } from '../domain/facial-device.js';
-import { ligarVinculoLegado, TAMANHO_DO_LOTE } from './vinculo-legado.js';
+import {
+  ligarVinculoLegado,
+  MAXIMO_DE_FALHAS_SEGUIDAS,
+  MAXIMO_DE_NOMES,
+  TAMANHO_DO_LOTE,
+} from './vinculo-legado.js';
 
 /**
  * #468 -- a base do leitor vai para a nuvem vincular os alunos legados.
@@ -31,8 +36,11 @@ function montar(
     intervaloEntreTentativasMs?: number;
     agoraMs?: () => number;
     aposVincular?: (serial: string) => void;
+    /** Presente = o adapter sabe ler o nome que o leitor guarda do numero. */
+    lerNome?: (numero: string) => Promise<string | null>;
   } = {},
 ) {
+  const { lerNome, ...opcoes } = extra;
   let aoRegistrar: ((serial: string) => void) | undefined;
   let aoInformar: ((c: { serial: string; externalUserId: string }) => void) | undefined;
 
@@ -44,6 +52,7 @@ function montar(
   const facial = {
     nome: 'facial-falso',
     listar,
+    ...(lerNome ? { lerNome } : {}),
     aoRegistrar: (o: (serial: string) => void) => {
       aoRegistrar = o;
     },
@@ -69,7 +78,7 @@ function montar(
     logger,
     janelaMs,
     intervaloEntreTentativasMs: 0,
-    ...extra,
+    ...opcoes,
   });
 
   return {
@@ -329,6 +338,301 @@ describe('ligarVinculoLegado', () => {
     expect(post).toHaveBeenCalledTimes(1);
 
     ligado.encerrar();
+  });
+
+  /*
+   * Spec 2026-10-03: o numero sem aluno chega ao painel com o nome que o
+   * leitor guarda dele, para a recepcao reconhecer o cadastro.
+   */
+  describe('nome do leitor para numeros sem aluno', () => {
+    const CAMINHO_NOMES = '/api/v1/edge/device-users/reader-names';
+
+    /** legacy-links responde `withoutStudent`; reader-names responde `updated`. */
+    function responderComSemAluno(post: jest.Mock, semAluno: string[]) {
+      post.mockImplementation((caminho: unknown, corpo: unknown) => {
+        if (caminho === CAMINHO_NOMES) {
+          return Promise.resolve({ ok: true, status: 200, body: { updated: 1 }, errorCode: null });
+        }
+        // Como a API: so devolve, do lote enviado, os numeros sem aluno.
+        const lote = (corpo as { externalUserIds: string[] }).externalUserIds;
+        const withoutStudent = lote.filter((n) => semAluno.includes(n));
+        return Promise.resolve({ ok: true, status: 201, body: { ...RESPOSTA, withoutStudent }, errorCode: null });
+      });
+    }
+
+    const lotesDe99 = (post: jest.Mock) =>
+      post.mock.calls.filter(
+        (c) => (c[1] as { externalUserIds?: string[] } | undefined)?.externalUserIds?.[0] === '99',
+      );
+
+    const chamadasDeNomes = (post: jest.Mock) =>
+      post.mock.calls.filter((c) => c[0] === CAMINHO_NOMES);
+
+    it('depois da listagem, manda o nome dos numeros sem aluno', async () => {
+      const lerNome = jest.fn((n: string) => Promise.resolve(n === '1' ? 'ANA' : null));
+      const { post, registrar, ligado } = montar(['1', '2'], 20, { lerNome });
+      responderComSemAluno(post, ['1', '2']);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(chamadasDeNomes(post)).toEqual([
+        [CAMINHO_NOMES, { deviceSerial: 'SER', names: [{ externalUserId: '1', name: 'ANA' }] }],
+      ]);
+      // So os numeros sem aluno sao lidos no leitor.
+      expect(lerNome).toHaveBeenCalledTimes(2);
+
+      ligado.encerrar();
+    });
+
+    it('nao le nome de numero que tem aluno', async () => {
+      const lerNome = jest.fn(() => Promise.resolve('ANA'));
+      const { post, registrar, ligado } = montar(['1', '2'], 20, { lerNome });
+      responderComSemAluno(post, ['2']);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(lerNome).toHaveBeenCalledTimes(1);
+      expect(lerNome).toHaveBeenCalledWith('2');
+
+      ligado.encerrar();
+    });
+
+    it('sem nome nenhum lido, nao chama reader-names', async () => {
+      const lerNome = jest.fn(() => Promise.resolve(null));
+      const aposVincular = jest.fn();
+      const { post, registrar, ligado } = montar(['1'], 20, { lerNome, aposVincular });
+      responderComSemAluno(post, ['1']);
+
+      registrar('SER');
+      await ate(() => lerNome.mock.calls.length === 1);
+      await esperar(40);
+
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+
+      ligado.encerrar();
+    });
+
+    it('adapter sem lerNome: nao chama reader-names', async () => {
+      const aposVincular = jest.fn();
+      const { post, registrar, ligado } = montar(['1', '2'], 20, { aposVincular });
+      responderComSemAluno(post, ['1', '2']);
+
+      registrar('SER');
+      await ate(() => aposVincular.mock.calls.length === 1);
+      await esperar(40);
+
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+
+      ligado.encerrar();
+    });
+
+    it('lerNome que falha e pulado, sem derrubar o envio dos outros', async () => {
+      const lerNome = jest.fn((n: string) =>
+        n === '1' ? Promise.reject(new Error('leitor sem resposta')) : Promise.resolve('BIA'),
+      );
+      const { post, registrar, ligado } = montar(['1', '2'], 20, { lerNome });
+      responderComSemAluno(post, ['1', '2']);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(chamadasDeNomes(post)[0]![1]).toEqual({
+        deviceSerial: 'SER',
+        names: [{ externalUserId: '2', name: 'BIA' }],
+      });
+
+      ligado.encerrar();
+    });
+
+    it('aborta apos 3 leituras seguidas sem nome e nao chama reader-names', async () => {
+      const base = Array.from({ length: 10 }, (_, i) => String(i + 1));
+      const lerNome = jest.fn(() => Promise.resolve(null));
+      const { post, linhas, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => linhas.some((l) => l['abortou'] === true));
+      await esperar(40);
+
+      expect(lerNome).toHaveBeenCalledTimes(MAXIMO_DE_FALHAS_SEGUIDAS);
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ lidos: 3, coletados: 0, abortou: true }),
+      );
+
+      ligado.encerrar();
+    });
+
+    it('duas falhas seguidas e depois um nome: continua lendo e envia o nome', async () => {
+      const respostas: (string | null)[] = [null, null, 'ANA'];
+      const lerNome = jest.fn(() => Promise.resolve(respostas.shift() ?? null));
+      const { post, registrar, ligado } = montar(['1', '2', '3'], 20, { lerNome });
+      responderComSemAluno(post, ['1', '2', '3']);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(lerNome).toHaveBeenCalledTimes(3);
+      expect(chamadasDeNomes(post)[0]![1]).toEqual({
+        deviceSerial: 'SER',
+        names: [{ externalUserId: '3', name: 'ANA' }],
+      });
+
+      ligado.encerrar();
+    });
+
+    it('3 falhas seguidas depois de 2 nomes: aborta e envia os 2 coletados, sem nomes no log', async () => {
+      const respostas: (string | null)[] = ['ANA', 'BIA', null, null, null];
+      const base = ['1', '2', '3', '4', '5', '6', '7'];
+      const lerNome = jest.fn(() => Promise.resolve(respostas.length > 0 ? respostas.shift()! : 'NUNCA-LIDO'));
+      const { post, linhas, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0);
+
+      expect(lerNome).toHaveBeenCalledTimes(5);
+      expect(chamadasDeNomes(post)[0]![1]).toEqual({
+        deviceSerial: 'SER',
+        names: [
+          { externalUserId: '1', name: 'ANA' },
+          { externalUserId: '2', name: 'BIA' },
+        ],
+      });
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ lidos: 5, coletados: 2, abortou: true }),
+      );
+      expect(JSON.stringify(linhas)).not.toMatch(/ANA|BIA/);
+
+      ligado.encerrar();
+    });
+
+    it('leitor pendurado na leitura de nome nao trava o vinculo do senduser', async () => {
+      let soltar: (nome: string | null) => void = () => undefined;
+      const lerNome = jest.fn(() => new Promise<string | null>((r) => (soltar = r)));
+      const { post, registrar, informar, ligado } = montar(['1'], 20, { lerNome });
+      responderComSemAluno(post, ['1']);
+
+      registrar('SER');
+      await ate(() => lerNome.mock.calls.length === 1);
+      // A leitura de nome segue pendente; um cadastro novo no leitor chega.
+      informar('SER', '99');
+      await ate(() => lotesDe99(post).length > 0);
+
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+
+      soltar(null);
+      ligado.encerrar();
+    });
+
+    it('encerrar interrompe a leitura de nomes entre uma leitura e outra', async () => {
+      const base = ['1', '2', '3'];
+      let soltar: (nome: string | null) => void = () => undefined;
+      const lerNome = jest.fn(() => new Promise<string | null>((r) => (soltar = r)));
+      const { post, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => lerNome.mock.calls.length === 1);
+      ligado.encerrar();
+      soltar('ANA');
+      await esperar(40);
+
+      expect(lerNome).toHaveBeenCalledTimes(1);
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+    });
+
+    it('limita as leituras ao teto por base', async () => {
+      const base = Array.from({ length: MAXIMO_DE_NOMES + 3 }, (_, i) => String(i + 1));
+      const lerNome = jest.fn(() => Promise.resolve('X'));
+      const { post, registrar, ligado } = montar(base, 20, { lerNome });
+      responderComSemAluno(post, base);
+
+      registrar('SER');
+      await ate(() => chamadasDeNomes(post).length > 0, 10_000);
+
+      expect(lerNome).toHaveBeenCalledTimes(MAXIMO_DE_NOMES);
+
+      ligado.encerrar();
+    });
+
+    it('falha do envio de nomes nao reabre a listagem nem impede o vinculo', async () => {
+      const lerNome = jest.fn(() => Promise.resolve('ANA'));
+      const aposVincular = jest.fn();
+      const { listar, post, linhas, registrar, ligado } = montar(['1'], 20, { lerNome, aposVincular });
+      (post as jest.Mock).mockImplementation((caminho: unknown) =>
+        Promise.resolve(
+          caminho === CAMINHO_NOMES
+            ? { ok: false, status: 500, body: null, errorCode: null }
+            : { ok: true, status: 201, body: { ...RESPOSTA, withoutStudent: ['1'] }, errorCode: null },
+        ),
+      );
+
+      registrar('SER');
+      await ate(() => linhas.some((l) => l['msg'] === 'nomes do leitor nao chegaram na nuvem'));
+      // Registrar de novo NAO lista de novo: `listados` continua marcado.
+      registrar('SER');
+      await esperar(40);
+
+      expect(listar).toHaveBeenCalledTimes(1);
+      expect(aposVincular).toHaveBeenCalledTimes(1);
+
+      ligado.encerrar();
+    });
+
+    it('rede caindo no envio de nomes tambem nao reabre a listagem', async () => {
+      const lerNome = jest.fn(() => Promise.resolve('ANA'));
+      const aposVincular = jest.fn();
+      const { listar, post, linhas, registrar, ligado } = montar(['1'], 20, { lerNome, aposVincular });
+      (post as jest.Mock).mockImplementation((caminho: unknown) =>
+        caminho === CAMINHO_NOMES
+          ? Promise.reject(new Error('socket hang up'))
+          : Promise.resolve({ ok: true, status: 201, body: { ...RESPOSTA, withoutStudent: ['1'] }, errorCode: null }),
+      );
+
+      registrar('SER');
+      await ate(() => linhas.some((l) => l['msg'] === 'nomes do leitor nao foram enviados'));
+      registrar('SER');
+      await esperar(40);
+
+      expect(listar).toHaveBeenCalledTimes(1);
+      expect(aposVincular).toHaveBeenCalledTimes(1);
+
+      ligado.encerrar();
+    });
+
+    it('o nome da pessoa nunca aparece no log', async () => {
+      const lerNome = jest.fn(() => Promise.resolve('MARIA SEGREDO DA SILVA'));
+      const { post, linhas, registrar, ligado } = montar(['1'], 20, { lerNome });
+      responderComSemAluno(post, ['1']);
+
+      registrar('SER');
+      await ate(() => linhas.some((l) => l['msg'] === 'nomes do leitor enviados'));
+
+      expect(linhas).toContainEqual(
+        expect.objectContaining({ msg: 'nomes do leitor enviados', nomes: 1, gravados: 1 }),
+      );
+      expect(JSON.stringify(linhas)).not.toContain('SEGREDO');
+
+      ligado.encerrar();
+    });
+
+    it('o senduser nao dispara leitura de nome', async () => {
+      const lerNome = jest.fn(() => Promise.resolve('ANA'));
+      const { post, informar, ligado } = montar([], 20, { lerNome });
+      responderComSemAluno(post, ['10']);
+
+      informar('SER', '10');
+      await ate(() => post.mock.calls.length > 0);
+      await esperar(40);
+
+      expect(lerNome).not.toHaveBeenCalled();
+      expect(chamadasDeNomes(post)).toHaveLength(0);
+
+      ligado.encerrar();
+    });
   });
 
   it('falha ao listar vira aviso, nao derruba o agente', async () => {

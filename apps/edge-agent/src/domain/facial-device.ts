@@ -126,6 +126,13 @@ export interface FacialDeviceAdapter {
    */
   lerFoto?(externalEnrollId: ExternalEnrollId): Promise<string | null>;
 
+  /**
+   * O nome que o leitor guarda para o numero, ou `null` -- spec 2026-10-03.
+   * Nunca lanca: falha de leitura ou nome ausente e `null`. Opcional: o
+   * simulador nao guarda nome.
+   */
+  lerNome?(externalEnrollId: ExternalEnrollId): Promise<string | null>;
+
   /** Registra quem recebe evento de reconhecimento (`M0-FR-004`). */
   aoReconhecer(ouvinte: (evento: EventoReconhecimento) => void): void;
 

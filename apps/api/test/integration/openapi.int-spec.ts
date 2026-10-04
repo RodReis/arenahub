@@ -278,6 +278,12 @@ describe('contrato OpenAPI', () => {
         '/api/v1/app-distribution',
         // #538 -- link curto publico do app (`<painel>/baixar/<slug>`).
         '/api/v1/public/app-links/{slug}',
+        // Nome que o leitor guarda para um numero (so reconhecimento na
+        // recepcao) -- rota de Edge assinada, so atualiza numero ja registrado.
+        '/api/v1/edge/device-users/reader-names',
+        // Acao "Numero da catraca" da lista de alunos (spec 2026-10-03).
+        '/api/v1/students/{id}/turnstile-number',
+        '/api/v1/device-reader-numbers/unlinked',
       ]),
     );
   });

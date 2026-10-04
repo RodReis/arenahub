@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BiometricIdentity, Prisma } from '@arenahub/database';
+import type { BiometricIdentity, DeviceUserState, Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -142,14 +142,73 @@ export class BiometricIdentityRepository {
     });
   }
 
-  /** Todos os vinculos do leitor: quem ja tem numero nele (#468). */
+  /**
+   * Todos os vinculos do leitor: quem ja tem numero nele (#468).
+   *
+   * `state` vai junto: so um vinculo `SYNCED` pode ser reapontado na troca de
+   * numero -- ver `reapontarNumero`.
+   */
   async vinculosDoDispositivo(
     tenantId: string,
     deviceId: string,
-  ): Promise<{ externalUserId: string; studentId: string }[]> {
+  ): Promise<{ externalUserId: string; studentId: string; state: DeviceUserState }[]> {
     return this.db.deviceUser.findMany({
       where: { tenantId, deviceId },
-      select: { externalUserId: true, studentId: true },
+      select: { externalUserId: true, studentId: true, state: true },
+    });
+  }
+
+  /**
+   * Troca de numero do aluno -- o vinculo dele NESTE leitor passa a apontar
+   * para o numero novo. `@@unique([deviceId, identityId])` impede um segundo
+   * `DeviceUser` por identidade; reapontar e a forma de a catraca reconhecer
+   * o novo.
+   *
+   * SO reaponta quando o aluno tem EXATAMENTE UM `DeviceUser` neste leitor e
+   * ele esta `SYNCED`. Reapontar linha `PENDING`/`REMOVAL_PENDING` mudaria o
+   * alvo de um `senduser`/`deluser` futuro (apagaria cadastro vivo); linha
+   * `REMOVED`/`FAILED` nunca reconheceria o numero; duas linhas do aluno
+   * escreveriam o mesmo numero nas duas (P2002). Devolve `false` quando nao
+   * reapontou -- o chamador devolve o caso para a recepcao.
+   */
+  async reapontarNumero(
+    tenantId: string,
+    deviceId: string,
+    studentId: string,
+    novoNumero: string,
+    correlationId: string,
+  ): Promise<boolean> {
+    return this.db.$transaction(async (tx) => {
+      const linhas = await tx.deviceUser.findMany({
+        where: { tenantId, deviceId, studentId },
+        select: { id: true, externalUserId: true, state: true },
+      });
+      const [linha] = linhas;
+
+      if (linhas.length !== 1 || linha === undefined || linha.state !== 'SYNCED') return false;
+
+      const { count } = await tx.deviceUser.updateMany({
+        where: { id: linha.id, tenantId, state: 'SYNCED', externalUserId: linha.externalUserId },
+        data: { externalUserId: novoNumero },
+      });
+
+      if (count !== 1) return false;
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorType: 'SYSTEM',
+          actorId: null,
+          action: 'biometric.number_repointed',
+          target: 'device_user',
+          targetId: linha.id,
+          correlationId,
+          // Numero do leitor e chave de equipamento, nao PII.
+          metadata: { deviceId, from: linha.externalUserId, to: novoNumero },
+        },
+      });
+
+      return true;
     });
   }
 

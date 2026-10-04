@@ -5,6 +5,8 @@ import { useFormStatus } from 'react-dom';
 
 import { Button, Field, SelectField, useToastDeErro } from '@arenahub/ui';
 
+import { NumeroEmDestaque } from '@/components/numero-em-destaque';
+
 import estilos from '../../../formulario.module.css';
 
 import { definirCredencial, type EstadoDaCredencial } from '../../../actions/membership';
@@ -35,12 +37,11 @@ function BotaoDeCredencial() {
 /**
  * Vincula o numero que o leitor reconhece para o aluno -- ISSUE #396.
  *
- * CAMINHO MANUAL. Ate aqui esse numero so entrava pelo import em lote do
- * CSV do Pacto (`packages/database/src/import-ativos`); quem cadastra um
- * aluno direto no painel nao tinha onde digitar o numero que a academia ja
- * levantou por fora (ex.: no proprio leitor Topdata). NAO sincroniza com o
- * equipamento -- isso e fatia propria, com SPEC do PI (regra de
- * arquitetura #7, `CLAUDE.md`: biometria nunca e a UNICA porta).
+ * CAMINHO MANUAL para alterar o numero. Desde a spec 2026-10-03 o aluno
+ * novo ja nasce com identificador facial, mostrado no visor em destaque
+ * (`NumeroEmDestaque`) -- e a recepcao o digita no leitor. O identificador
+ * facial salvo aqui vai pela rota do numero da catraca, que vincula ao
+ * leitor na hora; cartao segue o PUT de credenciais.
  *
  * FECHADO POR PADRAO, mesmo criterio de `AtribuirPlano`: a secao existe
  * para RESPONDER "este aluno tem numero vinculado", nao para editar o
@@ -52,10 +53,12 @@ export function CredencialDeAcesso({ studentId, credenciais }: Props) {
   useToastDeErro(estado.erro, 'error', 'erro-da-credencial');
 
   const porTipo = new Map(credenciais.map((c) => [c.kind, c.externalId]));
+  const facial = porTipo.get('FACIAL_ENROLL_ID');
 
   if (!aberto && !estado.valores && !estado.sucesso) {
     return (
       <div className={estilos['secao']}>
+        {facial === undefined ? null : <NumeroEmDestaque numero={facial} />}
         {credenciais.length === 0 ? (
           <p data-testid="sem-credenciais">Nenhum número de catraca vinculado.</p>
         ) : (
@@ -82,6 +85,9 @@ export function CredencialDeAcesso({ studentId, credenciais }: Props) {
   if (estado.sucesso) {
     return (
       <div role="status" data-testid="credencial-definida">
+        {estado.sucesso.kind === 'FACIAL_ENROLL_ID' ? (
+          <NumeroEmDestaque numero={estado.sucesso.externalId} />
+        ) : null}
         <p>
           {ROTULO_DO_TIPO[estado.sucesso.kind] ?? estado.sucesso.kind} vinculado:{' '}
           {estado.sucesso.externalId}

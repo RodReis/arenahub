@@ -9,6 +9,7 @@ import { StudentCredentialRepository } from './student-credential.repository.js'
 import { StudentPhotoService } from './student-photo.service.js';
 import { StudentRepository } from './student.repository.js';
 import { StudentsController } from './students.controller.js';
+import { TurnstileNumberService } from './turnstile-number.service.js';
 
 @Module({
   // `TenancyModule` porque a unidade de origem do aluno (F45) tem de existir
@@ -30,6 +31,7 @@ import { StudentsController } from './students.controller.js';
     TenantContextService,
     StudentPhotoService,
     StudentCredentialRepository,
+    TurnstileNumberService,
   ],
   // Exportado porque `membership` precisa consultar o aluno -- por provider
   // publico, nunca lendo a tabela do outro modulo (regra de arquitetura 9).
@@ -37,6 +39,12 @@ import { StudentsController } from './students.controller.js';
   // numero do equipamento com o aluno, pela mesma regra.
   // `StudentPhotoService` -- #503: a foto que vem do leitor facial entra pela
   // mesma porta do upload do painel (formato, antivirus, storage).
-  exports: [StudentRepository, StudentCredentialRepository, StudentPhotoService],
+  // `TurnstileNumberService` -- consumido por `biometrics` para a acao da lista.
+  exports: [
+    StudentRepository,
+    StudentCredentialRepository,
+    StudentPhotoService,
+    TurnstileNumberService,
+  ],
 })
 export class StudentsModule {}

@@ -1,0 +1,122 @@
+/**
+ * Visor do numero da catraca -- `numero-em-destaque.tsx`.
+ *
+ * Direcao: VISOR DE INSTRUMENTO (PRODUCT.md, "instrumento de precisao").
+ * Uma placa tingida pelo accent do tenant, borda de 2 px no accent, digitos
+ * em mono grande no texto forte -- o accent fica na moldura e no brilho,
+ * nunca nos digitos, porque o accent e do tenant e pode ser claro demais
+ * para texto; `--ah-text-strong` sobre o tinto de 7% passa AA folgado.
+ *
+ * Um unico efeito: ao aparecer, a placa "acende" -- sobe de 97% para 100%
+ * e solta um anel de brilho no accent que assenta na sombra de elevacao.
+ * Desligado em `prefers-reduced-motion`.
+ *
+ * O NUMERO NUNCA QUEBRA. "100 000" sobre "000 007" se le como dois numeros.
+ * Ele mora numa linha so, e o tamanho segue a LARGURA DA PLACA (container
+ * query, `cqi`), nao a da janela: no modal de 460 px a janela e larga e a
+ * placa e estreita, e media query de viewport nunca dispararia ali.
+ *
+ * So camada semantica `--ah-*`; tintos por `color-mix` sobre token (a guarda
+ * `check-css-tokens` aceita composicao sobre token).
+ */
+.placa {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 20px 16px;
+  border: 2px solid var(--ah-action-solid);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ah-action-solid) 7%, var(--ah-surface-raised));
+  box-shadow: var(--ah-elev-2);
+  animation: acender calc(var(--ah-motion-layer) * 4) var(--ah-motion-easing) both;
+}
+
+.rotulo {
+  margin: 0;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: var(--ah-type-body-strong-weight);
+  color: var(--ah-action-text);
+}
+
+.numero {
+  display: flex;
+  flex-wrap: nowrap;
+  column-gap: 0.45ch;
+  white-space: nowrap;
+  font-family: var(--ah-font-mono);
+  /*
+    Doze digitos mono + tres vaos de .45ch + tracking ocupam ~8,25em. Com
+    11cqi a linha usa ~91% da placa em qualquer largura; o teto (~40 px) vale
+    na ficha larga, o piso (20 px) no celular. Conta no relatorio da Task 6.
+  */
+  font-size: var(--ah-type-display-size);
+  font-size: clamp(
+    var(--ah-type-title-size),
+    11cqi,
+    calc(var(--ah-type-display-size) * 1.43)
+  );
+  line-height: 1.15;
+  font-weight: var(--ah-type-display-weight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--ah-text-strong);
+  /* Um clique seleciona o numero inteiro; o gap entre blocos nao e texto. */
+  user-select: all;
+}
+
+/* Situacao a esquerda, copiar a direita; sem espaco, o botao desce. */
+.rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--ah-action-solid) 25%, transparent);
+}
+
+.rodape > :last-child {
+  margin-left: auto;
+}
+
+.situacao {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  color: var(--ah-text-default);
+}
+
+.situacao[data-vinculado='true'] {
+  color: var(--ah-state-success);
+  font-weight: var(--ah-type-body-strong-weight);
+}
+
+@keyframes acender {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ah-action-solid) 45%, transparent), var(--ah-elev-2);
+  }
+
+  55% {
+    opacity: 1;
+    transform: none;
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--ah-action-solid) 16%, transparent), var(--ah-elev-2);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ah-action-solid) 0%, transparent), var(--ah-elev-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placa {
+    animation: none;
+  }
+}

@@ -2,10 +2,11 @@ import { FcBiotech, FcEditImage, FcMoneyTransfer, FcUnlock } from 'react-icons/f
 
 import { Button } from '@arenahub/ui';
 
+import { NumeroDaCatraca } from './numero-da-catraca';
 import estilos from './students.module.css';
 
 /**
- * As três ações de linha, como ícones.
+ * As ações de linha, como ícones.
  *
  * ---------------------------------------------------------------------------
  * ÍCONE SOZINHO EXIGE RÓTULO ACESSÍVEL — NÃO É OPCIONAL AQUI.
@@ -67,6 +68,9 @@ export function AcoesDoAluno({ studentId, podeLiberar, liberacao }: Props) {
       >
         <FcMoneyTransfer size={TAMANHO} aria-hidden />
       </Button>
+
+      {/* Abre o dialogo de gerar/usar o numero do leitor -- spec 2026-10-03. */}
+      <NumeroDaCatraca studentId={studentId} />
 
       {/*
         A liberação FINANCEIRA não vira ícone fantasma quando não se aplica:

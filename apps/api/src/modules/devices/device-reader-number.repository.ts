@@ -37,6 +37,42 @@ export class DeviceReaderNumberRepository {
     );
   }
 
+  /**
+   * Nome que o leitor guarda -- so atualiza numero ja registrado (nao cria).
+   * Devolve quantos numeros atualizou.
+   */
+  async registrarNomes(
+    tenantId: string,
+    deviceId: string,
+    nomes: readonly { externalUserId: string; name: string }[],
+  ): Promise<number> {
+    if (nomes.length === 0) return 0;
+
+    const resultados = await this.db.$transaction(
+      nomes.map((n) =>
+        this.db.deviceReaderNumber.updateMany({
+          where: { tenantId, deviceId, externalUserId: n.externalUserId },
+          data: { readerName: n.name.trim().slice(0, 100) },
+        }),
+      ),
+    );
+
+    return resultados.reduce((total, r) => total + r.count, 0);
+  }
+
+  /** Leitores do tenant que TEM este numero -- vinculo imediato (spec 2026-10-03). */
+  async leitoresComNumero(
+    tenantId: string,
+    externalUserId: string,
+  ): Promise<{ deviceId: string; serial: string }[]> {
+    const linhas = await this.db.deviceReaderNumber.findMany({
+      where: { tenantId, externalUserId },
+      select: { deviceId: true, device: { select: { serial: true } } },
+    });
+
+    return linhas.map((l) => ({ deviceId: l.deviceId, serial: l.device.serial }));
+  }
+
   /** Todos os numeros que algum leitor do tenant ja teve. */
   async listarNumerosDoTenant(tenantId: string): Promise<string[]> {
     const linhas = await this.db.deviceReaderNumber.findMany({
@@ -45,5 +81,29 @@ export class DeviceReaderNumberRepository {
     });
 
     return linhas.map((l) => l.externalUserId);
+  }
+
+  /**
+   * Todos os numeros dos leitores do tenant, com o nome gravado no leitor e o
+   * serial -- a aba "Do leitor" da acao da lista (spec 2026-10-03).
+   *
+   * Nao filtra por aluno: `devices` nao le `student_credentials` (regra de
+   * arquitetura no 9). Quem chama cruza com `listarNumerosDoTenant` das
+   * credenciais para achar o que esta sem aluno.
+   */
+  async listarComNome(
+    tenantId: string,
+  ): Promise<{ externalId: string; readerName: string | null; deviceSerial: string }[]> {
+    const linhas = await this.db.deviceReaderNumber.findMany({
+      where: { tenantId },
+      select: { externalUserId: true, readerName: true, device: { select: { serial: true } } },
+      orderBy: { externalUserId: 'asc' },
+    });
+
+    return linhas.map((l) => ({
+      externalId: l.externalUserId,
+      readerName: l.readerName,
+      deviceSerial: l.device.serial,
+    }));
   }
 }

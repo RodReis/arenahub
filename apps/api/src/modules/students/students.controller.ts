@@ -5,6 +5,7 @@ import {
   Controller,
   Get,
   Header,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -24,15 +25,12 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
-import { DeviceRepository } from '../devices/device.repository.js';
-import { DeviceReaderNumberRepository } from '../devices/device-reader-number.repository.js';
 import { MembershipRepository } from '../iam/membership.repository.js';
 import { TeamRepository } from '../team/team.repository.js';
 import { GymUnitModalityRepository } from '../tenancy/gym-unit-modality.repository.js';
 import { GymUnitRepository } from '../tenancy/gym-unit.repository.js';
 import { normalizarCep, ufEhValida } from './domain/endereco.js';
 import { cpfEhValido, formatarCpf } from './domain/identificacao.js';
-import { proximoNumeroLivre } from '../devices/domain/proximo-numero-livre.js';
 import { transicionarAluno } from './domain/student.js';
 import { TAMANHO_MAXIMO_DE_FOTO_BYTES } from './domain/foto-do-aluno.js';
 import { StudentCredentialRepository } from './student-credential.repository.js';
@@ -42,6 +40,7 @@ import {
   type AlunoComDetalhes,
   type CandidatoADuplicata,
 } from './student.repository.js';
+import { TurnstileNumberService } from './turnstile-number.service.js';
 
 /**
  * O arquivo como o `FileInterceptor` o entrega -- mesma declaracao local do
@@ -416,6 +415,8 @@ interface AlunoCriadoDto extends AlunoDto {
 
 @Controller('api/v1/students')
 export class StudentsController {
+  private readonly logger = new Logger(StudentsController.name);
+
   constructor(
     private readonly alunos: StudentRepository,
     private readonly unidades: GymUnitRepository,
@@ -425,8 +426,7 @@ export class StudentsController {
     private readonly fotos: StudentPhotoService,
     private readonly credenciais: StudentCredentialRepository,
     private readonly time: TeamRepository,
-    private readonly dispositivos: DeviceRepository,
-    private readonly numerosDoLeitor: DeviceReaderNumberRepository,
+    private readonly numeroDaCatraca: TurnstileNumberService,
   ) {}
 
   /**
@@ -455,15 +455,7 @@ export class StudentsController {
   async proximaCredencialDisponivel(): Promise<{ externalId: string }> {
     const contexto = this.contexto.require();
 
-    const [doLeitor, deCredencial, vinculados] = await Promise.all([
-      this.numerosDoLeitor.listarNumerosDoTenant(contexto.tenantId),
-      this.credenciais.listarNumerosDoTenant(contexto.tenantId),
-      this.dispositivos.listarNumerosVinculadosDoTenant(contexto.tenantId),
-    ]);
-
-    const ocupados = new Set([...doLeitor, ...deCredencial, ...vinculados]);
-
-    return { externalId: proximoNumeroLivre(ocupados) };
+    return { externalId: await this.numeroDaCatraca.proximoLivre(contexto.tenantId) };
   }
 
   /**
@@ -621,6 +613,18 @@ export class StudentsController {
       requisicao.correlationId ?? 'sem-correlacao',
       agora.getUTCFullYear(),
     );
+
+    // Numero de catraca automatico (spec 2026-10-03). Transacao propria: se
+    // falhar, o aluno JA existe e responder 500 faria o cliente repetir o
+    // cadastro (caindo em duplicata). Fica sem numero e a acao da lista gera
+    // depois. Log so com o id -- nunca CPF, nome ou outro dado pessoal.
+    try {
+      await this.numeroDaCatraca.gerar(contexto, aluno.id);
+    } catch (erro: unknown) {
+      this.logger.error(
+        `Falha ao gerar numero de catraca do aluno ${aluno.id}: ${erro instanceof Error ? erro.message : 'erro desconhecido'}`,
+      );
+    }
 
     return { ...this.paraDto(aluno), duplicateCandidates: candidatos };
   }
