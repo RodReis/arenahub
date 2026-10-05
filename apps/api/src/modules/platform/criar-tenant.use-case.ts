@@ -174,6 +174,15 @@ export class CriarTenantUseCase {
       );
 
       return { tenantId: tenant.id, gymUnitId: unidade.id };
+    }, {
+      /*
+       * 20 s, e nao os 5 s padrao do Prisma -- issue #568. Criar tenant monta
+       * os papeis de sistema com dezenas de `upsert` em sequencia; no runner
+       * de 2 vCPU a transacao passou de 5,1 s e expirou. E operacao rara da
+       * plataforma, entao segurar a transacao mais tempo nao disputa com o
+       * balcao.
+       */
+      timeout: 20_000,
     });
 
     return { ...resultado, ownerInvitationToken: token };
