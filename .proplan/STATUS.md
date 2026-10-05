@@ -32,6 +32,8 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] aluna em dia barrada no primeiro reconhecimento e financeiro mostrando em dia como devedor (#566, finalizado em: 2026-10-05)
+- [INFRA] CI: job integração e E2E cancelado aos 25 min em todas as branches desde 05/10 (#568, finalizado em: 2026-10-05)
 - [MVP1][FIX] Recepção não consegue adicionar/alterar plano do aluno (#564, finalizado em: 2026-10-05)
 - [MVP1][SPEC-084][FIX] Meu perfil fora do padrão visual das outras telas (#562, finalizado em: 2026-10-05)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2, finalizado em: 2026-10-04)
