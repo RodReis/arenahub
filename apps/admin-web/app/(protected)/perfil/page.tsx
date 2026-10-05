@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
 
-import { Ausente, PageHeader, ProblemDetail, TenantDateTime } from '@arenahub/ui';
+import {
+  Ausente,
+  PageHeader,
+  ProblemDetail,
+  SectionCard,
+  SummaryStrip,
+  TenantDateTime,
+} from '@arenahub/ui';
 
 import { chamarApi } from '../../../lib/api/server-client';
 import { rotuloDePerfil } from '../../../src/iam/rotulos';
@@ -54,52 +62,70 @@ export default async function PaginaDePerfil() {
     <section aria-labelledby="titulo-perfil" className={estilos['pagina']}>
       <PageHeader id="titulo-perfil" title="Meu perfil" />
 
-      <div className={estilos['grade']}>
-        <article className={estilos['cartao']} aria-labelledby="titulo-conta">
-          <div className={estilos['identidade']}>
-            <span className={estilos['avatar']} aria-hidden="true" data-testid="perfil-avatar">
-              {iniciais(perfil.email)}
-            </span>
-            <h2 id="titulo-conta" className={estilos['email']} data-testid="perfil-email">
-              {perfil.email}
-            </h2>
-          </div>
+      <div className={estilos['identidade']}>
+        <span className={estilos['avatar']} aria-hidden="true" data-testid="perfil-avatar">
+          {iniciais(perfil.email)}
+        </span>
+        <h2 id="titulo-conta" className={estilos['email']} data-testid="perfil-email">
+          {perfil.email}
+        </h2>
+      </div>
 
-          <dl className={estilos['dados']}>
-            <dt>Perfil</dt>
-            <dd data-testid="perfil-papeis">
-              {perfil.roles.length === 0 ? (
-                <Ausente />
-              ) : (
-                perfil.roles.map((papel) => rotuloDePerfil(papel)).join(', ')
-              )}
-            </dd>
+      <div className={estilos['resumo']}>
+        <SummaryStrip
+          label="Dados da conta"
+          celulas={[
+            {
+              id: 'perfil',
+              label: 'Perfil',
+              icon: 'shield',
+              value: (
+                <span data-testid="perfil-papeis">
+                  {perfil.roles.length === 0 ? (
+                    <Ausente />
+                  ) : (
+                    perfil.roles.map((papel) => rotuloDePerfil(papel)).join(', ')
+                  )}
+                </span>
+              ),
+            },
+            {
+              id: 'academia',
+              label: 'Academia',
+              icon: 'building',
+              value: <span data-testid="perfil-academia">{perfil.tenant.displayName}</span>,
+            },
+            {
+              id: 'criada-em',
+              label: 'Conta criada em',
+              icon: 'clock',
+              value: (
+                <span data-testid="perfil-criada-em">
+                  {/* Sem fuso conhecido, ausente: chutar um fuso e o bug que o TenantDateTime existe para matar. */}
+                  {perfil.tenant.timezone ? (
+                    <TenantDateTime
+                      iso={perfil.createdAt}
+                      timeZone={perfil.tenant.timezone}
+                      format="date"
+                    />
+                  ) : (
+                    <Ausente />
+                  )}
+                </span>
+              ),
+            },
+          ]}
+        />
+      </div>
 
-            <dt>Academia</dt>
-            <dd data-testid="perfil-academia">{perfil.tenant.displayName}</dd>
-
-            <dt>Conta criada em</dt>
-            <dd data-testid="perfil-criada-em">
-              {/* Sem fuso conhecido, ausente: chutar um fuso e o bug que o TenantDateTime existe para matar. */}
-              {perfil.tenant.timezone ? (
-                <TenantDateTime
-                  iso={perfil.createdAt}
-                  timeZone={perfil.tenant.timezone}
-                  format="date"
-                />
-              ) : (
-                <Ausente />
-              )}
-            </dd>
-          </dl>
-        </article>
-
-        <article className={estilos['cartao']} aria-labelledby="titulo-senha">
-          <h2 id="titulo-senha" className={estilos['tituloDoCartao']}>
-            Alterar senha
-          </h2>
+      <div className="ah-entrar" style={{ '--ordem': 3 } as CSSProperties}>
+        <SectionCard
+          title="Alterar senha"
+          icon="lock"
+          summary="Mínimo de 8 caracteres. Ao alterar, você continua conectado aqui e as outras sessões são encerradas."
+        >
           <FormularioDeSenha />
-        </article>
+        </SectionCard>
       </div>
     </section>
   );
