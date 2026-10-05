@@ -14,6 +14,8 @@ interface Props {
   readonly evento: EventoDoFeed;
   readonly agora: number;
   readonly timeZone: string;
+  /** Recusados do dia: quantas vezes a pessoa foi barrada (o horário é o da última). */
+  readonly vezes?: number;
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * O cartão inteiro leva à ficha: o `::after` do link cobre o cartão, então o
  * alvo é grande sem aninhar elemento interativo.
  */
-export function CartaoDePresenca({ evento, agora, timeZone }: Props) {
+export function CartaoDePresenca({ evento, agora, timeZone, vezes = 1 }: Props) {
   const rotulo = stateLabel('accessReason', evento.reason);
   const liberado = evento.outcome === 'ALLOW';
   const tom = rotulo?.tone ?? (liberado ? 'success' : 'danger');
@@ -90,7 +92,10 @@ export function CartaoDePresenca({ evento, agora, timeZone }: Props) {
 
       <dl className={estilos['rodapeDePresenca']}>
         <div>
-          <dt>{liberado ? 'Entrada' : 'Tentativa'}</dt>
+          <dt>
+            {liberado ? 'Entrada' : 'Tentativa'}
+            {vezes > 1 ? ` (${vezes}×)` : ''}
+          </dt>
           <dd>
             <TenantDateTime iso={evento.occurredAt} timeZone={timeZone} format="time" />
           </dd>

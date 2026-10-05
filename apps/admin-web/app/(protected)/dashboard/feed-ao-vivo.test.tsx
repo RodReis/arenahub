@@ -193,6 +193,58 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     expect(screen.getByTestId('contagem-de-recusados')).toHaveTextContent('1 recusado hoje');
   });
 
+  /** Pedido do PI, 05/10/2026: os três assuntos do dia viram abas, com contador. */
+  it('acessos, bloqueados e aniversariantes ficam em abas, com contador', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        situacoes={[{ status: 'BLOCKED', motivo: null, quantidade: 2, alunos: ['Ana', 'Bia'] }]}
+        aniversariantes={{ id: 'aniversariantes', label: 'Aniversariantes do mês', contador: 3, content: 'bolo' }}
+        inicial={[
+          evento('e-1', 'Nanci Santana'),
+          { ...evento('e-2', 'Joao Pedro Ramalho'), outcome: 'DENY', reason: 'NO_ENTITLEMENT' },
+        ]}
+      />,
+    );
+
+    const abas = screen.getAllByRole('tab');
+    expect(abas.map((aba) => aba.textContent)).toEqual([
+      'Acessos em tempo real2',
+      'Bloqueados e suspensos3', // 2 travados + 1 recusado hoje
+      'Aniversariantes do mês3',
+    ]);
+    expect(abas[0]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('painel-bloqueados')).not.toBeVisible();
+  });
+
+  /*
+   * Pedido do PI, 05/10/2026: o recusado aparece no MESMO cartão do feed --
+   * foto e link para a ficha quando identificado, o número da catraca quando
+   * o leitor não o identificou (caso do 861).
+   */
+  it('recusado usa o cartão do feed: com aluno leva à ficha, sem aluno mostra o número da catraca', () => {
+    render(
+      <FeedAoVivo
+        gymUnitId="u-1"
+        timeZone="America/Sao_Paulo"
+        situacoes={[]}
+        inicial={[
+          { ...evento('e-1', 'Joao Pedro Ramalho'), outcome: 'DENY', reason: 'NO_ENTITLEMENT' },
+          { ...evento('e-2', ''), student: null, externalUserId: '861', outcome: 'DENY', reason: 'NO_ENTITLEMENT' },
+          { ...evento('e-3', ''), student: null, externalUserId: '861', outcome: 'DENY', reason: 'NO_ENTITLEMENT' },
+        ]}
+      />,
+    );
+
+    const recusados = screen.getByTestId('recusados-de-hoje');
+    const cartoes = recusados.querySelectorAll('li');
+    expect(cartoes).toHaveLength(2);
+    expect(cartoes[0]?.querySelector('a')).toHaveAttribute('href', '/students/aluno-e-1');
+    expect(cartoes[1]).toHaveTextContent('861');
+    expect(cartoes[1]).toHaveTextContent('Tentativa (2×)');
+  });
+
   /** Pedido do PI, 03/10/2026: saída é giro livre, então a lista mostra só quem entrou há até 90 min. */
   it('a lista só mostra quem passou nos últimos 90 min', () => {
     const antigo: EventoDoFeed = {

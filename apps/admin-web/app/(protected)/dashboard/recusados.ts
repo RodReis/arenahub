@@ -1,12 +1,13 @@
 import type { EventoDoFeed } from '../../actions/dashboard';
 
 export interface Recusado {
-  /** Aluno pelo nome, ou o numero do leitor de quem nao foi identificado. */
+  /** Aluno pelo id, ou o numero do leitor de quem nao foi identificado. */
   readonly chave: string;
-  readonly nome: string;
-  /** A recusa MAIS RECENTE desta pessoa hoje. */
-  readonly occurredAt: string;
-  readonly reason: string;
+  /**
+   * A recusa MAIS RECENTE desta pessoa hoje -- o evento inteiro, para o
+   * cartao desenhar foto, nome e numero da catraca igual ao feed ao vivo.
+   */
+  readonly evento: EventoDoFeed;
   /** Quantas vezes foi recusada hoje. */
   readonly vezes: number;
 }
@@ -28,22 +29,12 @@ export function recusadosDoDia(eventos: readonly EventoDoFeed[]): Recusado[] {
   for (const evento of eventos) {
     if (evento.outcome !== 'DENY') continue;
 
-    const nome = evento.student?.fullName ?? evento.externalUserId ?? 'Não identificado';
-    const chave = evento.student ? `aluno:${nome}` : `numero:${nome}`;
+    const chave = evento.student
+      ? `aluno:${evento.student.id}`
+      : `numero:${evento.externalUserId ?? 'nao-identificado'}`;
     const anterior = porPessoa.get(chave);
 
-    porPessoa.set(
-      chave,
-      anterior
-        ? { ...anterior, vezes: anterior.vezes + 1 }
-        : {
-            chave,
-            nome,
-            occurredAt: evento.occurredAt,
-            reason: evento.reason,
-            vezes: 1,
-          },
-    );
+    porPessoa.set(chave, anterior ? { ...anterior, vezes: anterior.vezes + 1 } : { chave, evento, vezes: 1 });
   }
 
   return [...porPessoa.values()];

@@ -576,6 +576,24 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
   gap: 10px;
 }
 
+/*
+ * A faixa de estado do feed, dentro da aba (05/10/2026: os cartões viraram
+ * abas e o cabeçalho que levava "ao vivo" sumiu). Fica à direita, colada na
+ * régua das abas, onde o olho chega depois de ler o título da aba.
+ */
+.barraDoFeed {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -8px 0 10px;
+}
+
+/* A contagem de recusas encosta na direita do subtítulo. */
+.subtituloDoCartao .contagemDeRecusas {
+  margin-left: auto;
+}
+
 /* Diz por que a linha some da lista: a saída é giro livre, só há horário de entrada. */
 .janelaDoFeed {
   font-size: 11px;

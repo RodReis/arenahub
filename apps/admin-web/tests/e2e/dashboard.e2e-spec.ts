@@ -87,13 +87,12 @@ test.describe('dashboard operacional', () => {
     await entrar(page);
     await page.goto('/dashboard');
 
-    for (const titulo of [
-      'Acessos em tempo real',
-      'Bloqueados e suspensos',
-      'Placar do mês',
-      'Desafios ativos',
-      'Feriados do mês',
-    ]) {
+    // Os três assuntos do dia são ABAS desde 05/10/2026 (pedido do PI).
+    for (const aba of ['Acessos em tempo real', 'Bloqueados e suspensos', 'Aniversariantes do mês']) {
+      await expect(page.getByRole('tab', { name: new RegExp(aba) })).toBeVisible();
+    }
+
+    for (const titulo of ['Placar do mês', 'Desafios ativos', 'Feriados do mês']) {
       await expect(page.getByRole('heading', { name: titulo })).toBeVisible();
     }
   });

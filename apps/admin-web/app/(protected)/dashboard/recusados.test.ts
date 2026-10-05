@@ -26,7 +26,7 @@ describe('recusadosDoDia', () => {
       evento('2', 'DENY', { nome: 'Joao Pedro' }, '2026-10-02T12:10:00Z'),
     ]);
 
-    expect(r.map((x) => x.nome)).toEqual(['Joao Pedro']);
+    expect(r.map((x) => x.evento.student?.fullName)).toEqual(['Joao Pedro']);
   });
 
   it('uma linha por pessoa, com a recusa mais recente e quantas vezes', () => {
@@ -35,21 +35,16 @@ describe('recusadosDoDia', () => {
       evento('2', 'DENY', { nome: 'Joao Pedro' }, '2026-10-02T12:10:00Z', 'STUDENT_BLOCKED'),
     ]);
 
-    expect(r).toEqual([
-      {
-        chave: 'aluno:Joao Pedro',
-        nome: 'Joao Pedro',
-        occurredAt: '2026-10-02T12:30:00Z',
-        reason: 'NO_ENTITLEMENT',
-        vezes: 2,
-      },
-    ]);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ chave: 'aluno:aluno-Joao Pedro', vezes: 2 });
+    expect(r[0]?.evento).toMatchObject({ id: '3', reason: 'NO_ENTITLEMENT' });
   });
 
   it('quem nao foi identificado aparece pelo numero do leitor', () => {
     const r = recusadosDoDia([evento('1', 'DENY', { numero: '1558' }, '2026-10-02T12:00:00Z')]);
 
-    expect(r).toMatchObject([{ nome: '1558', vezes: 1 }]);
+    expect(r).toMatchObject([{ chave: 'numero:1558', vezes: 1 }]);
+    expect(r[0]?.evento.externalUserId).toBe('1558');
   });
 
   it('nenhuma recusa, lista vazia', () => {
