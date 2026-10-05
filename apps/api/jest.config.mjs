@@ -51,6 +51,18 @@ export default {
    * fato trave ainda falha, so que em 30 s.
    */
   testTimeout: 30_000,
+  /*
+   * Recicla o worker que passou deste uso de memoria ao fim de um arquivo --
+   * issue #568. O Jest NAO recicla worker por padrao: cada um acumula heap
+   * de todas as suites que roda (cada uma monta um `AppModule` Nest inteiro).
+   * Com 4 workers isso nao aparecia; com 2 (runner de repositorio privado,
+   * 2 vCPU) cada worker roda o dobro de suites e bateu o teto de 3072 MB do
+   * CI ("JavaScript heap out of memory"). 1536 MB fica na metade do teto:
+   * o worker e trocado bem antes de chegar perto.
+   *
+   * Na RAIZ, como o `testTimeout`: e opcao global do Jest.
+   */
+  workerIdleMemoryLimit: '1536MB',
   projects: [
     {
       ...base,

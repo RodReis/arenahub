@@ -424,6 +424,13 @@ próprio, e **a próxima fatia que acrescentar suíte de integração pode reenc
 > `--maxWorkers=4` cada worker tem heap próprio e o acúmulo deixa de existir por construção — ver
 > a entrega `FIX #327` no `docs/DEVELOPMENT.md`.
 
+> **Atualização de 05/10/2026 (issue #568, `[INFRA]`):** o repositório virou **privado**, e o runner
+> GitHub-hosted de repositório privado tem **2 vCPU / 7,8 GiB** (o público tinha 4 vCPU / 15 GiB).
+> Com 4 workers × 3072 MB o job de integração morria por memória (exit 137) ou estourava o timeout,
+> em todas as branches. Agora `--maxWorkers=2` (1 por vCPU; 2 × 3072 MB cabe) e os timeouts dos dois
+> jobs subiram (15→25 e 20→35 min). O passo `nproc && free -h` do CI foi o que denunciou a troca —
+> **se o runner mudar de novo, comece por ele.**
+
 🔴 **O CI sobe SÓ Postgres — nem MinIO, nem Redis.** Descoberto pela F51, que foi a **primeira
 suíte de integração a gravar objeto de verdade** no object storage e derrubou o pipeline com
 `ECONNREFUSED 127.0.0.1:9000`. Toda suíte de integração desta casa dubla o storage com
