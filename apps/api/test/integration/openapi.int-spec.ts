@@ -200,6 +200,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/billing/financial-overrides/{id}/revoke',
         // F16 -- estorno, conciliacao e recibo.
         '/api/v1/payments/{id}/refunds',
+        // F85 -- cancelamento de pagamento manual lancado errado (ADR-065).
+        '/api/v1/payments/{id}/cancel',
         '/api/v1/refunds/{id}/observe',
         '/api/v1/payments/{id}/receipt',
         '/api/v1/receipts/{id}',

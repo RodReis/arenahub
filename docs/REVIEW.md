@@ -58,7 +58,7 @@ Qualquer um destes impede o merge. Não há bom senso a aplicar; há regra escri
 
 ### 3.3 Dinheiro
 - `float`, `number` ou decimal de ponto flutuante em caminho monetário (INV-065).
-- Invoice paga voltando a aberta (INV-069).
+- Invoice paga voltando a aberta (INV-069) **por qualquer caminho que não seja o cancelamento de pagamento `MANUAL`** (ADR-065, F85); PIX/cartão só saem de `PAID` por estorno.
 - Efeito externo sem chave de idempotência persistida **antes** do efeito (INV-076, INV-084).
 - Webhook processado sem verificação de assinatura (INV-077).
 - Qualquer dado completo de cartão tocando o backend (INV-098, INV-099).

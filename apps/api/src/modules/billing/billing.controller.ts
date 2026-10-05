@@ -27,6 +27,7 @@ import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamen
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
 import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-case.js';
 import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
+import { CancelarPagamentoManualUseCase, type PagamentoCancelado } from './cancelar-pagamento-manual.use-case.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
 import { janelaPadrao } from './domain/resumo-financeiro.js';
 import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
@@ -105,6 +106,17 @@ const esquemaDeMetodoTokenizado = z
 const esquemaDeAdesao = z
   .object({
     aceitouRecorrencia: z.literal(true),
+  })
+  .strict();
+
+/**
+ * Cancelamento de pagamento manual (F85). `.strict()` como todo esquema deste
+ * controller; motivo obrigatorio com o mesmo piso do pagamento manual -- sem
+ * ele a auditoria mostra QUEM cancelou e nunca POR QUE.
+ */
+const esquemaDeCancelamento = z
+  .object({
+    reason: z.string().min(3).max(300),
   })
   .strict();
 
@@ -504,6 +516,7 @@ export class BillingController {
     private readonly liberacao: LiberacaoFinanceiraUseCase,
     private readonly consultarMesesPagaveis: ConsultarMesesPagaveisUseCase,
     private readonly registrarPagamentoEmLote: RegistrarPagamentoEmLoteUseCase,
+    private readonly cancelarPagamentoManual: CancelarPagamentoManualUseCase,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -561,6 +574,43 @@ export class BillingController {
     const completa = await this.billing.timelineDaInvoice(this.contexto.require(), id);
 
     return this.paraDto(completa!);
+  }
+
+  /**
+   * Cancela pagamento MANUAL lancado por engano (F85, decisao do PI em
+   * 05/10/2026): a fatura volta a aberta e o lancamento some da grade, com
+   * motivo e autor na auditoria.
+   *
+   * Mesma permissao de `manual-payment`: quem recebe no balcao corrige o que
+   * lancou errado. O controle e o motivo obrigatorio e a trilha -- detectivo,
+   * nao preventivo, como o proprio lancamento (ADR-027, consequencia 3).
+   */
+  @Post('payments/:id/cancel')
+  @RequirePermissions('billing.payment.manual')
+  @HttpCode(200)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['paymentId', 'invoiceId', 'vencimentoRestaurado'],
+      properties: {
+        paymentId: { type: 'string' },
+        invoiceId: { type: 'string' },
+        vencimentoRestaurado: { type: 'boolean' },
+      },
+    },
+  })
+  async cancelarPagamento(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<PagamentoCancelado> {
+    const dados = esquemaDeCancelamento.parse(corpo);
+
+    return this.cancelarPagamentoManual.executar(
+      this.contexto.require(),
+      { paymentId: id, reason: dados.reason, agora: new Date() },
+      requisicao.correlationId ?? 'sem-correlacao',
+    );
   }
 
   /**

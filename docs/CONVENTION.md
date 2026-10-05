@@ -212,7 +212,7 @@ terminal. Inadimplência usa **`SUSPENDED`**.
 ### 3.4 `Invoice`
 `DRAFT | OPEN | PAID | OVERDUE | CANCELLED | REFUNDED`
 `OPEN → OVERDUE` por job idempotente; `→ PAID` por confirmação do provedor.
-**`PAID` nunca volta a `OPEN`** (INV-069).
+**`PAID` nunca volta a `OPEN`** (INV-069) — **exceto** pelo cancelamento de pagamento **manual** lançado errado (`PAID → OPEN`, ADR-065, F85): PIX e cartão só saem de `PAID` por estorno.
 
 **Fechado na F12** (18/08/2026), decisão do Code registrada no PR — ambos reversíveis, então não
 viraram ADR:
@@ -231,7 +231,7 @@ viraram ADR:
 **Fechado pelo ADR-027 e implementado na F12** (18/08/2026). São dois
 grafos de entidades diferentes, não duas versões do mesmo: a tentativa responde *o que eu tentei*,
 o pagamento responde *que dinheiro foi reconhecido*. `CONFIRMED` não volta atrás — é o par de
-INV-069 do lado do pagamento. Invoice paga em duas tentativas (PIX falho + cartão) tem **duas**
+INV-069 do lado do pagamento — **exceto** o pagamento `MANUAL`, que o cancelamento da F85 leva a `CANCELLED` com autor, data e motivo (ADR-065); a linha nunca é apagada. Invoice paga em duas tentativas (PIX falho + cartão) tem **duas**
 linhas em `payment_attempts` e **uma** em `payments`; a falha continua no histórico. A **autorização revogada pelo pagador**
 (Pix Automático) é estado do *mandato*: vive no `PaymentMethod`, não no `Payment` — ver ADR-027.
 
@@ -400,7 +400,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
 - **INV-066** Uma invoice por assinatura e período: único `(tenant_id, subscription_id, billing_period)`.
 - **INV-067** Itens, subtotal, desconto e total são imutáveis após o pagamento.
 - **INV-068** Moeda e valor não mudam após a abertura da invoice.
-- **INV-069** **Invoice paga não volta a aberta.** Estorno cria estado e movimento próprios.
+- **INV-069** **Invoice paga não volta a aberta.** Estorno cria estado e movimento próprios. **Exceção (ADR-065, F85):** cancelamento de pagamento `MANUAL` lançado errado reabre a invoice, com motivo e autor na auditoria.
 - **INV-070** Desconto não altera retroativamente invoice paga.
 - **INV-071** Pagamento parcial não ativa plano integral.
 - **INV-072** Pagamento manual registra ator, evidência, razão e respeita limite de aprovação.

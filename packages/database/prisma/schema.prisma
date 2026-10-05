@@ -3696,6 +3696,13 @@ model Payment {
   /// depois. A diferenca e deliberada e e do PI (ADR-027, consequencia 3).
   recognizedByUserId String? @map("recognized_by_user_id") @db.Uuid
 
+  /// Cancelamento de pagamento MANUAL lancado por engano (F85, decisao do PI em
+  /// 05/10/2026). Preenchidos juntos, so quando `status = CANCELLED`. A linha
+  /// NAO e apagada: e a trilha de quem lancou, quem cancelou e por que.
+  cancelledAt       DateTime? @map("cancelled_at")
+  cancelledByUserId String?   @map("cancelled_by_user_id") @db.Uuid
+  cancelReason      String?   @map("cancel_reason")
+
   /// Nulo em pagamento manual: dinheiro na recepcao nao tem tentativa.
   attemptId         String? @unique @map("attempt_id") @db.Uuid
   providerAccountId String? @map("provider_account_id")
