@@ -36,6 +36,18 @@ export function CartaoDePresenca({ evento, agora, timeZone }: Props) {
     : (evento.externalUserId ?? 'Não identificado');
   const recente = agora - Date.parse(evento.occurredAt) < RECENTE_MS;
   const razao = rotulo?.label ?? (liberado ? 'Liberado' : 'Recusado');
+  const avatar = (
+    <>
+      <span className={estilos['avatarDePresenca']}>
+        {evento.student?.temFoto ? (
+          <img src={`/fotos-de-aluno/${evento.student.id}`} alt="" loading="lazy" />
+        ) : (
+          iniciaisDe(evento.student?.fullName ?? nome)
+        )}
+      </span>
+      <span className={estilos['pontoDePresenca']} />
+    </>
+  );
 
   return (
     <li className={estilos['cartaoDePresenca']} data-tom={tom} data-recente={recente}>
@@ -46,16 +58,25 @@ export function CartaoDePresenca({ evento, agora, timeZone }: Props) {
         </span>
       </span>
 
-      <span className={estilos['molduraDoAvatar']} aria-hidden="true">
-        <span className={estilos['avatarDePresenca']}>
-          {evento.student?.temFoto ? (
-            <img src={`/fotos-de-aluno/${evento.student.id}`} alt="" loading="lazy" />
-          ) : (
-            iniciaisDe(evento.student?.fullName ?? nome)
-          )}
+      {/*
+        A foto também leva à ficha. `tabIndex={-1}` e `aria-hidden`: o link do
+        nome já é a parada de teclado e o nome acessível -- um segundo link
+        para o mesmo destino só repetiria a leitura.
+      */}
+      {evento.student ? (
+        <Link
+          className={estilos['molduraDoAvatar']}
+          href={`/students/${evento.student.id}`}
+          tabIndex={-1}
+          aria-hidden="true"
+        >
+          {avatar}
+        </Link>
+      ) : (
+        <span className={estilos['molduraDoAvatar']} aria-hidden="true">
+          {avatar}
         </span>
-        <span className={estilos['pontoDePresenca']} />
-      </span>
+      )}
 
       <span className={estilos['nomeDePresenca']}>
         {evento.student ? (

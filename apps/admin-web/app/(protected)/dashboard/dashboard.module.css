@@ -1205,9 +1205,14 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
   height: 14px;
 }
 
+/*
+ * Sobe 20 px sobre a faixa (56 px de avatar, anel de 2 px): o topo do anel fica
+ * em 24 px, abaixo da linha do rótulo (8 + 15 = 23 px). Com -26 o anel entrava
+ * 3 px na linha e quase cortava "Plano válido".
+ */
 .molduraDoAvatar {
   position: relative;
-  margin-top: -26px;
+  margin-top: -20px;
 }
 
 /* Anel de 2 px no tom (DS-PAINEL §4.19) separado da faixa por 3 px de superfície. */
