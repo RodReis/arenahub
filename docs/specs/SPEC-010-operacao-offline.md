@@ -30,6 +30,37 @@ Ver `docs/prd/academia/MVP-01-smart-access.md` §7, Slice 1.5, e o plano de apoi
 link ou Edge ausente caem em **liberação manual registrada** (`M1-FR-023`) — nunca em allow local.
 Improvisar cache no meio do MVP 1 é violar o ADR-012.
 
+### 1.1 Estado verificado em 04/10/2026
+
+> Conferido no código e na documentação em 04/10/2026. **Não muda escopo**: registra o que mudou
+> desde a aprovação de 16/08 e deixa as decisões para o PI (§5, perguntas 2 a 4).
+
+- **Nada do escopo da F10 existe.** Sem snapshot assinado/versionado, sem `cache_validity` e
+  `grace_period` por unidade, sem denylist, sem `ALLOWED_OFFLINE_CONFLICT`. O
+  `cache-de-permissoes.ts` segue sendo o cache de laboratório da F4 e nenhum código de produção o
+  importa. A F4 deixou fila SQLite durável e reconciliação idempotente — base reaproveitável, não
+  snapshot.
+- **MVP 1 em produção desde 01/10/2026** (Arena Positiva). **Nenhum incidente de link** consta em
+  `docs/`: o gatilho do ADR-012 **não está comprovado**.
+- **O registro das passagens offline já foi antecipado fora da F10**, por decisão do PI de
+  30/09/2026 (#477, PR #479): rota `POST /api/v1/edge/offline-passages`, motivo
+  `OFFLINE_DEVICE_DECISION`, evento `mode OFFLINE` com o horário do equipamento. Quem decidiu foi
+  a **catraca**, não o ArenaHub. A F10 não refaz isso.
+- **Dois decisores offline possíveis.** Desde o #470 o Edge mantém a catraca online por
+  keep-alive; agente parado = a catraca volta ao modo offline em ~10 s e decide pela lista
+  própria (runbook `operacao-edge-arena-positiva.md`). A decisão local do Edge (snapshot) é
+  **outro** decisor. A spec não diz quem prevalece quando os dois existem.
+- **ADR-064 (01/10/2026)** revogou a regra nº 7 e importa todo aluno da base do leitor com
+  consentimento `ACCEPTED`. A revogação feita pelo painel continua bloqueando **na nuvem**
+  (`IdentityResolver` exige identidade `ACTIVE`). A justificativa da denylist (§2, decisão 2) se
+  apoia em base legal, e o `CLAUDE.md` afasta LGPD/consentimento do caminho de desenvolvimento —
+  o item precisa de decisão do PI.
+- **O gatilho "Edge instalado em cliente" da §2, decisão 4, já ocorreu** (01/10/2026). O primeiro
+  ADR de contrato de Edge está devido, ou o PI o dispensa.
+- **Razões de `DENY`:** o ADR-024 já fixou a lista canônica (seis razões de `DENY`). Falta
+  conferir se a razão pós-carência e `ALLOWED_OFFLINE_CONFLICT` cabem nela ou exigem ADR novo.
+- **`DataFreshness` (F11)** não foi conferido quanto a exibir a idade do snapshot.
+
 ## 2. Decisões específicas desta fatia
 
 *(preencher quando houver — decisão com efeito além da fatia vira ADR, não fica aqui)*
@@ -121,7 +152,12 @@ Fora do §4.8, esta fatia toca:
 |---|---|---|---|
 | 1 | A denylist de consentimento revogado altera o contrato de snapshot da F4. Cria ADR novo, emenda o ADR-011, ou versiona dentro da fatia? | **Versiona dentro da F10**, registrado nesta spec. **E a premissa caiu:** não há contrato da F4 a alterar — o snapshot é escopo virgem e nasce com a denylist em `schemaVersion: 1` (§2, decisão 4) | 17/08/2026 |
 
-**Nenhuma pergunta em aberto.**
+| 2 | **O gatilho do ADR-012 está dado?** O MVP 1 está em produção, mas não há incidente de link registrado. F10 sai do Backlog agora ou espera o incidente? | **aberta** | — |
+| 3 | **A denylist de consentimento revogado continua no escopo**, depois do ADR-064 e da diretriz de não tratar LGPD/consentimento como bloqueio? A revogação pelo painel já bloqueia na nuvem | **aberta** | — |
+| 4 | **Quem prevalece offline: a lista da catraca ou o snapshot do Edge?** Hoje a catraca decide sozinha com o agente parado (#470/#477). O snapshot da F10 a substitui, convive com ela ou só vale com a catraca mantida online? | **aberta** | — |
+
+**Perguntas 2 a 4 em aberto** (04/10/2026). Nenhuma bloqueia o desenvolvimento das demais fatias;
+bloqueiam só o início da F10.
 
 ## 6. Antes de codificar, confirme
 
@@ -129,7 +165,10 @@ Fora do §4.8, esta fatia toca:
 - [x] Os ADRs listados acima estão resolvidos
 - [ ] **O gate desta fatia não é de MVP, é de gatilho:** MVP 1 em piloto **com incidente de link
       medido** (ADR-012). Sem o incidente, o card não sai do Backlog — não por falta de spec
-- [ ] **A lista canônica de razões de `DENY` está fechada** (`INV-038`, `DESIGN-UI.md` §17 item 2)
+- [ ] **A lista canônica de razões de `DENY` cobre a negativa pós-carência e
+      `ALLOWED_OFFLINE_CONFLICT`** (`INV-038`; ADR-024 já fixou seis razões de `DENY` —
+      conferir, não presumir)
+- [ ] **Perguntas 2 a 4 da §5 respondidas pelo PI**
 
 ## 7. Fora de dúvida
 
