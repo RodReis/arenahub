@@ -74,7 +74,7 @@ test('recepcao cancela pagamento lancado errado e lanca o certo', async ({ page 
    * (05/10/2026): so o adiantado oferece cancelamento -- o corrente com um
    * pagamento so nao, e mes que ja passou nunca.
    */
-  const chips = page.getByRole('button', { name: /[a-z]{3}\/\d{2}/ });
+  const chips = page.getByRole('button', { name: /^[a-z]{3}\/\d{2}/ });
   await chips.nth(1).click();
   await expect(page.getByText(/2 meses/i)).toBeVisible();
   await page.getByTestId('forma-dinheiro').click();
