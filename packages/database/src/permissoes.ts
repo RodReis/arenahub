@@ -212,11 +212,6 @@ export const PERMISSOES_DA_RECEPCAO = [
   'student.read',
   'student.update',
   'plan.read',
-  // MATRICULAR E TROCAR PLANO -- recepcao que cadastra o aluno precisa vincular
-  // o plano (criar assinatura, trocar, cancelar). Sem isto o balcao recebia
-  // "Seu perfil nao tem permissao" ao adicionar/alterar o plano. Cobranca
-  // (`billing.manage`) e estorno continuam fora.
-  'subscription.manage',
   'billing.read',
   // RECEBER NO BALCAO -- decisao do PI, 02/10/2026: a recepcao da Arena
   // Positiva recebia "Seu perfil nao tem permissao" ao registrar o
