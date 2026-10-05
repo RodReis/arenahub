@@ -22,12 +22,12 @@
     "risk":    { "value": "#B4470B", "contrastOnWhite": 5.46 }
   },
 
-  "$channelComment": "Canal de recebimento no balcao (dinheiro, PIX, debito, credito) -- emenda de 01/10/2026, decisao do PI (DS-PAINEL.md §2.3b). IDENTIFICA o canal, nao comunica estado: nunca usar para pago/vencido. Fixos, nao configuraveis pelo tenant.",
+  "$channelComment": "Canal de recebimento no balcao (dinheiro, PIX, debito, credito) -- emenda de 01/10/2026, decisao do PI (DS-PAINEL.md §2.3b). IDENTIFICA o canal, nao comunica estado: nunca usar para pago/vencido. Fixos, nao configuraveis pelo tenant. Emenda de 05/10/2026 (PI): quatro matizes separados -- oliva 85, ciano 193, indigo 245, magenta 295 -- porque dinheiro (verde) e PIX (verde-azulado) se confundiam na grade.",
   "channel": {
-    "cash":   { "value": "#0E6F4E", "contrastOnWhite": 6.17 },
-    "pix":    { "value": "#0A7480", "contrastOnWhite": 5.49 },
-    "debit":  { "value": "#3B4CCA", "contrastOnWhite": 6.83 },
-    "credit": { "value": "#7B3FC4", "contrastOnWhite": 6.27 }
+    "cash":   { "value": "#3F6212", "contrastOnWhite": 7.08 },
+    "pix":    { "value": "#0B6E8A", "contrastOnWhite": 5.81 },
+    "debit":  { "value": "#4338CA", "contrastOnWhite": 7.90 },
+    "credit": { "value": "#A21CAF", "contrastOnWhite": 6.32 }
   },
 
   "$accentComment": "Rampa DERIVADA do hex seed do tenant. Os valores abaixo sao o padrao Azul ArenaHub #3E63E8 (DS-PAINEL.md v2 §2.2, alinhado ao app -- troca o Ciano Arena #00A9B8 da v1). Em runtime a rampa vem do tenant; estes existem para o build ter um default e para o teste de contraste ter alvo fixo. Gerados por packages/ui/src/accent.ts:deriveRamp('#3E63E8').",

@@ -79,5 +79,13 @@ describe('CancelarPagamento', () => {
 
     await waitFor(() => expect(screen.getByTestId('erro-ao-cancelar-pagamento')).toBeInTheDocument());
     expect(refresh).not.toHaveBeenCalled();
+    // O dialogo continua aberto com o motivo digitado: recusa nao apaga texto.
+    expect(screen.getByLabelText(/Motivo/)).toHaveValue('motivo valido');
+  });
+
+  it('o icone diz a acao E qual pagamento, para quem usa leitor de tela', () => {
+    renderizar();
+
+    expect(screen.getByTestId('cancelar-pagamento')).toHaveAccessibleName('Cancelar pagamento de nov/26, Dinheiro');
   });
 });

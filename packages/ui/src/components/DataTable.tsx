@@ -83,6 +83,16 @@ export interface Column<T> {
    * semantica de doze telas num commit que nao e sobre elas.
    */
   readonly rowHeader?: boolean;
+  /**
+   * GRUPO da coluna -- emenda de 05/10/2026 (decisao do PI, DS-PAINEL §3.5b).
+   *
+   * Colunas CONSECUTIVAS com o mesmo grupo ganham um cabecalho comum numa
+   * linha acima (`<th scope="colgroup">`), e a primeira de cada grupo uma
+   * divisoria vertical. Serve quando a linha descreve DUAS coisas -- a
+   * cobranca e o recebimento dela -- e o olho precisa saber de qual lado esta.
+   * Sem nenhum grupo declarado a tabela fica como sempre foi.
+   */
+  readonly group?: string;
 }
 
 interface Props<T> {
@@ -194,6 +204,30 @@ export function DataTable<T>({
 }: Props<T>) {
   if (rows.length === 0) return <>{empty}</>;
 
+  const inicioDeGrupo = (indice: number): boolean => {
+    const grupo = columns[indice]?.group;
+
+    return grupo !== undefined && columns[indice - 1]?.group !== grupo;
+  };
+
+  /*
+   * Faixas de colunas CONSECUTIVAS com o mesmo grupo (ou sem grupo). Cada uma
+   * vira uma celula da linha de grupos, com `colSpan` do tamanho da faixa.
+   */
+  const faixasDeGrupo = columns.some((coluna) => coluna.group !== undefined)
+    ? columns.reduce<{ grupo: string | undefined; chave: string; colunas: number }[]>((faixas, coluna) => {
+        const ultima = faixas[faixas.length - 1];
+
+        if (ultima !== undefined && ultima.grupo === coluna.group) {
+          ultima.colunas += 1;
+        } else {
+          faixas.push({ grupo: coluna.group, chave: coluna.key, colunas: 1 });
+        }
+
+        return faixas;
+      }, [])
+    : [];
+
   return (
     <>
       {/*
@@ -232,8 +266,21 @@ export function DataTable<T>({
       >
         <caption className={estilos['legenda']}>{caption}</caption>
         <thead>
+          {faixasDeGrupo.length > 0 ? (
+            <tr className={estilos['grupos']}>
+              {faixasDeGrupo.map((faixa) =>
+                faixa.grupo === undefined ? (
+                  <td key={faixa.chave} colSpan={faixa.colunas} aria-hidden="true" />
+                ) : (
+                  <th key={faixa.chave} scope="colgroup" colSpan={faixa.colunas} data-inicio-de-grupo="">
+                    {faixa.grupo}
+                  </th>
+                ),
+              )}
+            </tr>
+          ) : null}
           <tr>
-            {columns.map((coluna) => {
+            {columns.map((coluna, indice) => {
               const ordenavel = coluna.sortKey !== undefined && sort !== undefined;
               const ativa = ordenavel && sort.key === coluna.sortKey;
               /*
@@ -248,6 +295,7 @@ export function DataTable<T>({
                   key={coluna.key}
                   scope="col"
                   {...(coluna.role !== undefined ? { 'data-role': coluna.role } : {})}
+                  {...(inicioDeGrupo(indice) ? { 'data-inicio-de-grupo': '' } : {})}
                   {...(coluna.numeric === true ? { 'data-numeric': '' } : {})}
                   /*
                     `aria-sort` é o que faz o leitor de tela anunciar "ordenado
@@ -284,10 +332,11 @@ export function DataTable<T>({
               {...(rowTestId !== undefined ? { 'data-testid': rowTestId(linha) } : {})}
               {...(rowTom?.(linha) !== undefined ? { 'data-tom': rowTom(linha) } : {})}
             >
-              {columns.map((coluna) => {
+              {columns.map((coluna, indice) => {
                 const atributos = {
                   ...(coluna.role !== undefined ? { 'data-role': coluna.role } : {}),
                   ...(coluna.numeric === true ? { 'data-numeric': '' } : {}),
+                  ...(inicioDeGrupo(indice) ? { 'data-inicio-de-grupo': '' } : {}),
                 };
 
                 /*

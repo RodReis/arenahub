@@ -173,30 +173,30 @@ export const CONTRAST_REPORT = [
   },
   {
     "role": "channel.cash",
-    "fg": "#0E6F4E",
-    "bg": "#e7f1ed",
-    "value": 5.35,
+    "fg": "#3F6212",
+    "bg": "#ecefe7",
+    "value": 6.09,
     "exempt": null
   },
   {
     "role": "channel.pix",
-    "fg": "#0A7480",
-    "bg": "#e7f1f2",
-    "value": 4.78,
+    "fg": "#0B6E8A",
+    "bg": "#e7f1f3",
+    "value": 5.06,
     "exempt": null
   },
   {
     "role": "channel.debit",
-    "fg": "#3B4CCA",
-    "bg": "#ebedfa",
-    "value": 5.87,
+    "fg": "#4338CA",
+    "bg": "#ecebfa",
+    "value": 6.71,
     "exempt": null
   },
   {
     "role": "channel.credit",
-    "fg": "#7B3FC4",
-    "bg": "#f2ecf9",
-    "value": 5.41,
+    "fg": "#A21CAF",
+    "bg": "#f6e8f7",
+    "value": 5.36,
     "exempt": null
   },
   {

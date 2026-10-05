@@ -1,16 +1,30 @@
-/* Acao discreta na celula de recebimento -- so camada semantica (regra 2 de lint). */
+/*
+ * Acao de cancelar na coluna Acao -- so camada semantica (regra 2 de lint).
+ *
+ * O icone ganha vida no hover (cresce e inclina de leve, 140 ms): e o unico
+ * movimento da grade, e responde a mao da recepcao -- diz "isto e clicavel"
+ * sem precisar de moldura de botao. `prefers-reduced-motion` desliga.
+ */
 .acao {
-  margin-inline-start: 4px;
+  display: inline-flex;
 }
 
-.acao button {
-  min-height: 24px;
-  padding-inline: 8px;
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
-  color: var(--ah-text-muted);
+.acao svg {
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.acao button:hover:not(:disabled) {
-  color: var(--ah-state-danger);
+.acao button:hover:not(:disabled) svg,
+.acao button:focus-visible svg {
+  transform: scale(1.12) rotate(-8deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acao svg {
+    transition: none;
+  }
+
+  .acao button:hover:not(:disabled) svg,
+  .acao button:focus-visible svg {
+    transform: none;
+  }
 }

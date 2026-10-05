@@ -443,3 +443,33 @@
 .ordenar[data-ativa] .seta {
   color: var(--ah-action-text);
 }
+
+/* ---------------------------------------------------------------------------
+ * GRUPOS DE COLUNA -- emenda de 05/10/2026 (decisao do PI, DS-PAINEL §3.5b).
+ *
+ * A linha de grupos fica ACIMA do cabecalho de coluna, na mesma superficie
+ * afundada, com rotulo um degrau mais forte (e o titulo do bloco, nao de uma
+ * coluna). A divisoria vertical na primeira coluna de cada grupo atravessa
+ * cabecalho e corpo: e ela que diz ao olho "daqui para a direita e outra
+ * coisa" sem precisar reler o cabecalho a cada linha.
+ * ------------------------------------------------------------------------- */
+.grupos th,
+.grupos td {
+  background: var(--ah-surface-sunken);
+  padding-block: 10px 0;
+  border-bottom: none;
+}
+
+.tabela thead .grupos th {
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  border-bottom: none;
+}
+
+.tabela [data-inicio-de-grupo] {
+  border-inline-start: 1px solid var(--ah-border-default);
+}
+

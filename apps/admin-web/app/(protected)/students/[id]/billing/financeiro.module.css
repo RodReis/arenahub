@@ -1,11 +1,14 @@
 /**
  * Historico de cobrancas -- distribuicao das colunas SO desta tela.
  *
- * O `DataTable` encolhe toda coluna que nao e `support` a 1% e entrega o resto
- * ao Recebimento: com seis colunas curtas, tudo embolava na esquerda e sobrava
- * um vao vazio. Aqui as colunas repartem a largura. Seletor com `table` para
- * vencer a especificidade do `DataTable.module.css` sem depender da ordem de
- * carga do CSS; as outras treze tabelas continuam com a regra do DS.
+ * Emenda de 05/10/2026 (decisao do PI): a grade virou dois blocos, COBRANCA e
+ * RECEBIMENTO (grupos do `DataTable`, DS-PAINEL §3.5b), com a data do
+ * recebimento em coluna propria e a acao em icone. Larguras por POSICAO
+ * porque tres colunas dividem o papel `moment` (competencia, vencimento, pago
+ * em) e precisam de larguras diferentes; o seletor com `tbody`/`thead` vence a
+ * especificidade do `DataTable.module.css` sem depender da ordem de carga.
+ *
+ *   1 Nº | 2 Competência | 3 Situação | 4 Valor | 5 Vence em || 6 Forma | 7 Pago em || 8 Ação
  */
 .historico {
   margin-block: 20px 8px;
@@ -13,35 +16,67 @@
 
 .historico table th,
 .historico table td {
-  padding-inline: 20px;
+  padding-inline: 16px;
 }
 
-.historico table th[data-role='code'],
-.historico table td[data-role='code'] {
-  width: 7%;
+.historico tbody td:nth-child(1),
+.historico thead tr:last-child th:nth-child(1) {
+  inline-size: 6%;
 }
 
-.historico table th[data-role='moment'],
-.historico table td[data-role='moment'] {
-  width: 15%;
+.historico tbody td:nth-child(2),
+.historico thead tr:last-child th:nth-child(2) {
+  inline-size: 11%;
 }
 
-.historico table th[data-role='state'],
-.historico table td[data-role='state'] {
-  width: 15%;
+.historico tbody td:nth-child(3),
+.historico thead tr:last-child th:nth-child(3) {
+  inline-size: 13%;
 }
 
-.historico table th[data-role='value'],
-.historico table td[data-role='value'] {
-  width: 13%;
+.historico tbody td:nth-child(4),
+.historico thead tr:last-child th:nth-child(4) {
+  inline-size: 11%;
 }
 
-/* Recebimento e a coluna de controle (ADR-027): o resto da largura, e em
- * destaque -- texto forte em vez do cinza de apoio. */
-.historico table th[data-role='support'],
-.historico table td[data-role='support'] {
-  width: auto;
-  color: var(--ah-text-strong);
+.historico tbody td:nth-child(5),
+.historico thead tr:last-child th:nth-child(5) {
+  inline-size: 11%;
+}
+
+.historico tbody td:nth-child(6),
+.historico thead tr:last-child th:nth-child(6) {
+  inline-size: 16%;
+}
+
+.historico tbody td:nth-child(7),
+.historico thead tr:last-child th:nth-child(7) {
+  inline-size: 18%;
+}
+
+.historico tbody td:nth-child(8),
+.historico thead tr:last-child th:nth-child(8) {
+  inline-size: 8%;
+  text-align: center;
+}
+
+/*
+ * A linha inteira acende no hover: com oito colunas e dois blocos, e o que
+ * mantem o olho na MESMA cobranca ao atravessar a divisoria. Fundo, nao
+ * sombra (card nao flutua em tabela, PRODUCT.md).
+ */
+.historico tbody td {
+  transition: background-color 120ms ease-out;
+}
+
+.historico tbody tr:hover td {
+  background: color-mix(in srgb, var(--ah-surface-sunken) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .historico tbody td {
+    transition: none;
+  }
 }
 
 .competencia {
@@ -49,11 +84,33 @@
   font-weight: var(--ah-type-body-strong-weight);
 }
 
-.recebimentos {
+.semRecebimento {
+  color: var(--ah-text-placeholder);
+}
+
+/*
+ * PILHA -- um item por pagamento, a mesma altura nas tres colunas (Forma,
+ * Pago em, Acao). E o que deixa o 2º pagamento de um mes na mesma linha do
+ * selo e do icone dele.
+ */
+.pilha {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.pilha li {
+  display: flex;
+  align-items: center;
+  min-block-size: 32px;
+  color: var(--ah-text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.historico tbody td:nth-child(8) .pilha li {
+  justify-content: center;
 }
