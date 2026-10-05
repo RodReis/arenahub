@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-04
+updated: 2026-10-05
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,11 +9,11 @@ updated: 2026-10-04
 
 ### Sem épico
 
+- [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
 - [MVP2][INFRA] Decisão: só existe plano mensal — os ciclos da §33 (trimestral, semestral, anual) nunca foram discutidos (#338)
 - [MVP1][INFRA] Decisão: QR, cartão e PIN como caminho de acesso — a regra de arquitetura nº 7 não tem implementação (#336)
 - [MVP3][SPEC-055][F55] Adapters reais (Sicoob e Getnet) e Configuração → Pagamento (#158)
-- [MVP1.5][SPEC-010][F10] Operação offline (#10)
 
 ## A Fazer
 
@@ -32,6 +32,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][SPEC-084][FIX] Meu perfil fora do padrão visual das outras telas (#562, finalizado em: 2026-10-05)
 - [MVP0][SPEC-002][F2] Ciclo de vida facial (#2, finalizado em: 2026-10-04)
 - [MVP1][FIX] refresh em voo escapa da revogação de sessões (troca de senha e logout) (#558, finalizado em: 2026-10-04)
 - [MVP1][SPEC-084][F84] Perfil do usuário e troca da própria senha (#557, finalizado em: 2026-10-04)
@@ -156,8 +157,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
+- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
