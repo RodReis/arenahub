@@ -69,32 +69,43 @@ test('recepcao cancela pagamento lancado errado e lanca o certo', async ({ page 
   await page.goto(`/students/${idDoAluno}/billing`);
   await expect(page.locator('#titulo-financeiro')).toContainText(/^Financeiro —/);
 
-  // Paga so o mes corrente (selecao inicial: 1 chip) em dinheiro.
+  /*
+   * Paga o mes CORRENTE e o SEGUINTE (adiantado) em dinheiro. Regra do PI
+   * (05/10/2026): so o adiantado oferece cancelamento -- o corrente com um
+   * pagamento so nao, e mes que ja passou nunca.
+   */
+  const chips = page.getByRole('button', { name: /^[a-z]{3}\/\d{2}/ });
+  await chips.nth(1).click();
+  await expect(page.getByText(/2 meses/i)).toBeVisible();
   await page.getByTestId('forma-dinheiro').click();
   await page.getByRole('button', { name: /^Receber$/ }).click();
-  await expect(page.getByText(/1 mês recebido/i)).toBeVisible();
+  await expect(page.getByText(/2 meses recebidos/i)).toBeVisible();
 
   const grade = page.getByTestId('tabela-de-cobrancas');
-  await expect(grade.getByText('Paga')).toHaveCount(1);
-  await expect(grade.getByText('Dinheiro')).toHaveCount(1);
+  await expect(grade.getByText('Paga')).toHaveCount(2);
+  await expect(grade.getByText('Dinheiro')).toHaveCount(2);
+  // Os dois blocos da grade: Cobranca e Recebimento.
+  await expect(grade.getByRole('columnheader', { name: 'Cobrança' })).toBeVisible();
+  await expect(grade.getByRole('columnheader', { name: 'Recebimento' })).toBeVisible();
+  // So o mes adiantado ganha o icone de cancelar.
   await expect(page.getByTestId('cancelar-pagamento')).toHaveCount(1);
 
-  // Cancela com motivo.
+  // Cancela o adiantado, com motivo.
   await page.getByTestId('cancelar-pagamento').click();
   await page.getByLabel(/Motivo/).fill('lancei no aluno errado');
   await page.getByTestId('confirmar-acao-sensivel').click();
 
   await expect(page.getByTestId('pagamento-cancelado')).toBeVisible();
 
-  // A grade perdeu o lancamento e a cobranca voltou a aberta.
-  await expect(grade.getByText('Paga')).toHaveCount(0);
-  // O lancamento errado SUMIU da coluna Recebimento (a linha segue no banco).
-  await expect(grade.getByText('Dinheiro')).toHaveCount(0);
+  // A grade perdeu o lancamento e a cobranca do adiantado voltou a aberta.
+  await expect(grade.getByText('Paga')).toHaveCount(1);
+  // O lancamento errado SUMIU da coluna Forma (a linha segue no banco).
+  await expect(grade.getByText('Dinheiro')).toHaveCount(1);
   await expect(page.getByTestId('cancelar-pagamento')).toHaveCount(0);
 
   // E o mes volta a ser pagavel pelo mesmo caminho.
   await page.getByTestId('forma-dinheiro').click();
   await page.getByRole('button', { name: /^Receber$/ }).click();
   await expect(page.getByText(/1 mês recebido/i)).toBeVisible();
-  await expect(grade.getByText('Paga')).toHaveCount(1);
+  await expect(grade.getByText('Paga')).toHaveCount(2);
 });

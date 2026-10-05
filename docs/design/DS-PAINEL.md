@@ -4,6 +4,16 @@ Academia ArenaHub · plataforma ArenaHub
 Arquivo de referência: `Painel Admin.dc.html`
 Versão 1.0 — sistema completo: tokens, grids, componentes, formulários, feedback
 
+> **Emenda de 05/10/2026 — o DS não é teto (decisão do PI).** Palavras do PI: *"amplia esse
+> DS-PAINEL.md, toda vez tem que falar, e fica preso neste design"*. A partir daqui:
+>
+> 1. **Pedido visual do PI amplia o DS na mesma entrega.** O Code não recusa nem dilui um pedido
+>    por "não estar no DS": implementa, e registra o padrão novo aqui, como emenda datada. O que o
+>    DS proíbe de verdade é o que é **contrato** — contraste AA medido, cor nunca como canal único,
+>    `prefers-reduced-motion`, verbo real em ação destrutiva, foco visível. Estética não é contrato.
+> 2. **Padrão registrado vale para toda tela, sem o PI repetir.** A seção **§5.6 "Padrões que já
+>    valem sem pedir"** é a lista; tela nova ou refeita começa por ela.
+
 ---
 
 ## 1. Sobre o produto
@@ -87,12 +97,17 @@ Chamada no código: `bdg(tone, icon, label, prefixo)` → devolve `{ bC, bBg, bB
 
 **Emenda de 01/10/2026, decisão do PI.** As quatro formas de pagamento do balcão eram retângulos cinza iguais, diferenciados só pela palavra. O PI pediu cor, efeito e borda nelas e mandou **ampliar a paleta do DS**, em vez de improvisar cor na tela.
 
-| Canal | Token | Hex | Contraste sobre branco | Sobre o próprio tint de 10% |
-|---|---|---|---|---|
-| Dinheiro | `--ah-channel-cash` | `#0E6F4E` | 6,17 | 5,35 |
-| PIX | `--ah-channel-pix` | `#0A7480` | 5,49 | 4,78 |
-| Débito | `--ah-channel-debit` | `#3B4CCA` | 6,83 | 5,87 |
-| Crédito | `--ah-channel-credit` | `#7B3FC4` | 6,27 | 5,41 |
+| Canal | Token | Hex | Matiz | Contraste sobre branco | Sobre o próprio tint de 10% |
+|---|---|---|---|---|---|
+| Dinheiro | `--ah-channel-cash` | `#3F6212` | oliva ~85° | 7,08 | 6,09 |
+| PIX | `--ah-channel-pix` | `#0B6E8A` | ciano ~193° | 5,81 | 5,06 |
+| Débito | `--ah-channel-debit` | `#4338CA` | índigo ~245° | 7,90 | 6,71 |
+| Crédito | `--ah-channel-credit` | `#A21CAF` | magenta ~295° | 6,32 | 5,36 |
+
+**Emenda de 05/10/2026 (decisão do PI): quatro matizes separados.** A primeira paleta tinha dinheiro
+(`#0E6F4E`) e PIX (`#0A7480`) a ~15° de distância — na grade os dois liam como "o mesmo verde". Agora
+os quatro estão a 50°+ um do outro, e dinheiro é **oliva**, não o verde de `state-ok`: o selo de
+dinheiro ao lado do badge "Paga" não pode parecer o mesmo estado.
 
 Fonte: `packages/ui/tokens/primitive.json` (`channel`) → `semantic.json` (`channel`). O build de tokens aplica a esses quatro **o mesmo gate de contraste de `state`** (texto sobre o tint de 10%, alvo 4,5): uma cor nova que reprove derruba o build.
 
@@ -103,6 +118,11 @@ Fonte: `packages/ui/tokens/primitive.json` (`channel`) → `semantic.json` (`cha
 - Cor nunca sozinha: o selo e o botão sempre trazem ícone e rótulo.
 - Fixos e **não configuráveis pelo tenant**, pela mesma razão da semântica.
 - Débito e crédito dividem o glifo do cartão (é o mesmo plástico na mão); a cor é o que os separa de relance, e o rótulo é o que os separa de verdade.
+
+**Tratamento na grade (selo do canal, emenda de 05/10/2026):** glifo de 11 px dentro de um **disco cheio**
+de 18 px na cor do canal (glifo em `--ah-action-on-solid`), rótulo 600 na cor do canal, fundo no tint de
+10% e borda a 30%. Altura 26 px, raio de badge. Componente: `SeloDoCanal`
+(`apps/admin-web/.../billing/recebimento.tsx`).
 
 **Tratamento no seletor:** aresta superior de 3 px na cor do canal, borda e fundo tingidos (28% e 4%), ícone de 20 px na cor. Hover: fundo a 9%, sombra tingida e subida de 1 px. Escolhido: fundo a 10% (o tint que o gate mede), anel `inset` e rótulo na cor do canal. `prefers-reduced-motion: reduce` desliga a subida e a transição.
 
@@ -207,6 +227,11 @@ Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador 
 
 **Emenda de 28/09/2026 (decisão do PI), só nas grades de KPI:** entrada `ah-entrar` (opacidade 0 → 1 e `translateY(6px)` → 0, 360 ms, `cubic-bezier(.16,1,.3,1)`, escalonada em 45 ms por card via `--ordem`) e subida de 2 px no hover (`hover:-translate-y-0.5`). Card de tabela e de formulário não sobe — só a sombra muda. `prefers-reduced-motion: reduce` desliga as duas coisas. Nada mais anima.
 
+**Emenda de 05/10/2026 (decisão do PI), qualquer tabela:** a linha acende no hover (fundo
+`surface-sunken` a 70%, 120 ms) e o ícone da coluna Ação responde à mão (`scale(1.12) rotate(-8deg)`,
+140 ms, `cubic-bezier(.16,1,.3,1)`). São respostas a interação, não entrada decorativa.
+`prefers-reduced-motion: reduce` desliga as duas.
+
 **Emenda de 03/10/2026 (decisão do PI), cartão de presença (§4.5d):** entrada `ah-chega` (opacidade 0 → 1, `translateY(8px) scale(.97)` → 0, 260 ms, `cubic-bezier(.16,1,.3,1)`) quando a pessoa passa na catraca; subida de 2 px no hover; halo `ah-halo` no ponto de presença nos primeiros 2 min. As três comunicam estado ("acabou de passar"). `prefers-reduced-motion: reduce` desliga as três; o tom e o texto continuam.
 
 ---
@@ -268,6 +293,25 @@ Regras:
 - Coluna de ações: `justify-content: flex-end`.
 - Cabeçalho repete exatamente as mesmas colunas, 12 px/600 em `text/muted`, `border-bottom: 1px solid border/subtle`.
 - Tabela larga: `overflow-x: auto` no wrapper + `min-width` na linha (ex. 640 px).
+
+### 3.5b Grupos de coluna (emenda de 05/10/2026, decisão do PI)
+
+Quando a linha descreve **duas coisas** — a cobrança e o dinheiro que entrou contra ela, a matrícula e
+o acesso, o pedido e a entrega — as colunas de cada uma ficam sob um **cabeçalho de grupo**.
+
+- `DataTable` recebe `group: 'Cobrança'` por coluna. Colunas **consecutivas** com o mesmo grupo ganham
+  uma linha de cabeçalho acima (`<th scope="colgroup" colSpan>`), e a primeira coluna de cada grupo uma
+  **divisória vertical** de 1 px (`border/default`) que atravessa cabeçalho e corpo.
+- O rótulo do grupo é 700, `text/strong`, tracking 0,08em — um degrau acima do cabeçalho de coluna.
+- Coluna sem grupo (ex.: Ação) fica fora, sem divisória.
+- Sem nenhum `group` declarado a tabela fica como sempre foi — é opt-in.
+- Exemplo de referência: financeiro do aluno — **Cobrança** (Nº, Competência, Situação, Valor, Vence em)
+  · **Recebimento** (Forma, Pago em) · Ação.
+
+**Célula com vários itens (pilha).** Quando uma linha tem N filhos (dois pagamentos no mesmo mês), cada
+coluna do bloco renderiza uma **pilha** com o mesmo `min-block-size` por item (32 px) — o 2º selo, a 2ª
+data e o 2º ícone ficam na mesma altura. **Nunca** misturar dado e data na mesma célula quando a largura
+de um varia (selo "PIX" × "Dinheiro"): a data vira coluna própria.
 
 ### 3.6 Grade de cards de plano
 
@@ -580,7 +624,23 @@ Abas por assunto (pessoais, endereço, administrativo, plano, consentimentos, hi
 
 ### 5.3 Tabela de trabalho
 
-Barra de filtros acima (busca 280 px com ícone à esquerda, selects, espaçador, primário à direita), cabeçalho, linhas, e rodapé com contagem e paginação. Ações por linha à direita, fantasmas de 26–28 px. Seleção múltipla adiciona barra de ação em lote no topo da tabela, em `canvas`.
+Barra de filtros acima (busca 280 px com ícone à esquerda, selects, espaçador, primário à direita), cabeçalho, linhas, e rodapé com contagem e paginação. Ações por linha à direita — **em ícone**, ver §5.3b (a menção a "fantasmas de 26–28 px" foi substituída em 05/10/2026). Seleção múltipla adiciona barra de ação em lote no topo da tabela, em `canvas`.
+
+### 5.3b Coluna Ação — ícone, padrão da Lista de Alunos (emenda de 05/10/2026, decisão do PI)
+
+Toda grade com ação por linha usa **ícone, não botão de texto** — o mesmo padrão de
+`students/acoes-do-aluno.tsx`:
+
+- Desenho de `react-icons/fc` (Flat Color, decisão do PI em 24/08/2026), **22 px**, dentro de
+  `Button variant="icon"` com alvo de **32 px**.
+- `aria-label` com **ação + objeto** ("Cancelar pagamento de nov/26, Dinheiro") e `title` curto
+  ("Cancelar pagamento"). Ícone repetido em cinco linhas com o mesmo nome não diz nada a quem ouve.
+- Cabeçalho "Ação", coluna `role: 'actions'`, ícones centralizados.
+- **Ação que não se aplica não aparece** — nada de ícone desabilitado. Quem decide se aparece é a
+  **API** (flag por linha, ex. `cancellable`), nunca uma regra reimplementada na tela.
+- Ação sensível abre o `ConfirmDialog` (§5.1). O diálogo **só fecha no sucesso**: recusa da API vira
+  toast com o motivo ainda digitado.
+- Hover: o ícone cresce e inclina (§2.9).
 
 ### 5.4 Dado de saúde
 
@@ -589,6 +649,24 @@ Valor + unidade + faixa de referência + comparação com a medição anterior. 
 ### 5.5 Revisão de OCR
 
 Campo a campo, com valor lido, confiança e original ao lado; confiança baixa destaca a linha em `warn`. Nada é gravado antes da confirmação explícita do operador.
+
+### 5.6 Padrões que já valem sem pedir
+
+Lista viva. Tela nova ou refeita começa por aqui; o PI não precisa repetir nada desta lista.
+
+| Padrão | Onde está |
+|---|---|
+| Ação por linha em ícone `react-icons/fc` 22 px, alvo 32 px, `aria-label` com ação + objeto | §5.3b |
+| Ação que não se aplica não aparece; a API decide (flag por linha) | §5.3b |
+| Linha que descreve duas coisas → grupos de coluna com divisória | §3.5b |
+| Dado de largura variável e data nunca na mesma célula; data em coluna própria | §3.5b |
+| Vários filhos na linha → pilha com altura igual por item em todas as colunas do bloco | §3.5b |
+| Canal de recebimento com cor e selo próprios (disco cheio + rótulo na cor) | §2.3b |
+| Linha acende no hover; ícone de ação responde ao hover; `reduced-motion` desliga | §2.9 |
+| Estado pinta pelo próprio tom (`PainelDeEstado`, `SummaryStrip`), nunca por enfeite | §4.6b, §4.6c |
+| Diálogo de ação sensível com motivo obrigatório, que não perde o texto em erro | §5.1, §5.3b |
+| Toast para info/warn/erro; nunca `Alert` | §4.16 |
+| Pedido visual novo do PI → implementa e registra aqui como emenda | topo deste arquivo |
 
 ---
 
@@ -629,6 +707,8 @@ Campo a campo, com valor lido, confiança e original ao lado; confiança baixa d
 - [ ] Valor e data com `tabular-nums`; monetário à direita
 
 **Componentes**
+- [ ] Ação de linha em ícone (§5.3b), com `aria-label` de ação + objeto; ausente quando não se aplica
+- [ ] Linha com dois assuntos usa grupos de coluna (§3.5b)
 - [ ] Controles em 40–44 px; 32–34 px dentro de tabela
 - [ ] Um único botão primário por tela
 - [ ] Card com `elev/1` em repouso, `elev/2` no hover (emenda de 28/09/2026) — nunca sombra chapada sem blur, nunca sombra colorida decorativa

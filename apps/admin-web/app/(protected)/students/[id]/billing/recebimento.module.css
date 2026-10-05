@@ -1,19 +1,18 @@
-/* Celula de recebimento -- so camada semantica (regra 2 de lint). */
-.recebimento {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-}
-
-.canal {
+/*
+ * Selo do canal -- so camada semantica (regra 2 de lint).
+ *
+ * Emenda de 05/10/2026 (DS-PAINEL §2.3b): o glifo fica num DISCO CHEIO da cor
+ * do canal (branco por cima, contraste >= 5,8 nos quatro) e o rotulo na cor
+ * do canal sobre o tint de 10% -- o par que o gate de tokens mede.
+ */
+.selo {
   --canal: var(--ah-state-neutral);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--canal) 32%, transparent);
+  gap: 7px;
+  min-height: 26px;
+  padding: 0 10px 0 4px;
+  border: 1px solid color-mix(in srgb, var(--canal) 30%, transparent);
   border-radius: var(--ah-radius-badge);
   background: color-mix(in srgb, var(--canal) 10%, var(--ah-surface-raised));
   color: var(--canal);
@@ -23,18 +22,22 @@
   white-space: nowrap;
 }
 
-.canal svg {
-  width: 14px;
-  height: 14px;
+.disco {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: 50%;
+  background: var(--canal);
+  color: var(--ah-action-on-solid);
 }
 
-.canal[data-canal='cash'] { --canal: var(--ah-channel-cash); }
-.canal[data-canal='pix'] { --canal: var(--ah-channel-pix); }
-.canal[data-canal='debit'] { --canal: var(--ah-channel-debit); }
-.canal[data-canal='credit'] { --canal: var(--ah-channel-credit); }
-
-.quando {
-  color: var(--ah-text-default);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.disco svg {
+  width: 11px;
+  height: 11px;
 }
+
+.selo[data-canal='cash'] { --canal: var(--ah-channel-cash); }
+.selo[data-canal='pix'] { --canal: var(--ah-channel-pix); }
+.selo[data-canal='debit'] { --canal: var(--ah-channel-debit); }
+.selo[data-canal='credit'] { --canal: var(--ah-channel-credit); }

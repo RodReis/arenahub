@@ -10,6 +10,8 @@ import { instanteDeBloqueio, proximoVencimento } from './domain/ciclo-de-cobranc
 import {
   CreditoJaAplicadoError,
   PagamentoNaoCancelavelError,
+  creditoAConsumir,
+  decidirCancelamento,
   deveRestaurarVencimento,
   validarCancelamento,
 } from './domain/cancelamento-de-pagamento.js';
@@ -42,6 +44,11 @@ export class PagamentoNaoEncontradoParaCancelamentoError extends ErroDeDominio {
 export interface PagamentoCancelado {
   readonly paymentId: string;
   readonly invoiceId: string;
+  /**
+   * A fatura voltou a aberta? `false` quando havia OUTRO pagamento confirmado
+   * na mesma competencia: ele passa a quita-la e a fatura continua paga.
+   */
+  readonly faturaReaberta: boolean;
   /** A fatura seguinte voltou ao vencimento padrao do ciclo? */
   readonly vencimentoRestaurado: boolean;
 }
@@ -55,7 +62,11 @@ interface PagamentoLido {
   readonly paidAt: Date | null;
   readonly receivedVia: string | null;
   readonly batchId: string | null;
-  readonly invoice: { readonly subscriptionId: string; readonly billingPeriod: Date };
+  readonly invoice: {
+    readonly subscriptionId: string;
+    readonly billingPeriod: Date;
+    readonly totalMinor: number;
+  };
 }
 
 @Injectable()
@@ -78,7 +89,7 @@ export class CancelarPagamentoManualUseCase {
         paidAt: true,
         receivedVia: true,
         batchId: true,
-        invoice: { select: { subscriptionId: true, billingPeriod: true } },
+        invoice: { select: { subscriptionId: true, billingPeriod: true, totalMinor: true } },
       },
     });
 
@@ -91,36 +102,39 @@ export class CancelarPagamentoManualUseCase {
     const motivo = entrada.reason.trim();
 
     return this.db.$transaction(async (tx) => {
-      const creditoUsado = await tx.accountCredit.findFirst({
-        where: { tenantId: contexto.tenantId, originPaymentId: pagamento.id, status: 'APPLIED' },
-        select: { id: true },
-      });
-
-      if (creditoUsado) {
-        throw new CreditoJaAplicadoError();
-      }
-
       /**
-       * OUTRO pagamento confirmado cobrindo a mesma fatura -- tipicamente um
-       * PIX pago por fora cujo webhook chegou com a fatura ja `PAID` (ele grava
-       * o pagamento e manda o valor para credito). Reabrir a fatura aqui faria
-       * o aluno "dever" um mes que pagou de verdade, e o credito do PIX ficaria
-       * disponivel sem ninguem para abate-lo. Quem decide esse caso e o gerente.
+       * TRAVA A FATURA antes de contar os pagamentos dela. Sem isto, dois
+       * cancelamentos simultaneos de pagamentos DIFERENTES da mesma competencia
+       * (os dois de uma fatura com dinheiro + PIX) contariam "2 confirmados"
+       * cada um e cancelariam os dois, deixando a fatura `PAID` sem dinheiro
+       * nenhum. Com a trava o segundo espera e conta 1.
        */
-      const outroConfirmado = await tx.payment.findFirst({
-        where: {
-          tenantId: contexto.tenantId,
-          invoiceId: pagamento.invoiceId,
-          status: 'CONFIRMED',
-          id: { not: pagamento.id },
-        },
+      await tx.$queryRaw`
+        SELECT id FROM invoices
+        WHERE id = ${pagamento.invoiceId}::uuid AND tenant_id = ${contexto.tenantId}::uuid
+        FOR UPDATE
+      `;
+
+      const confirmados = await tx.payment.findMany({
+        where: { tenantId: contexto.tenantId, invoiceId: pagamento.invoiceId, status: 'CONFIRMED' },
         select: { id: true },
       });
 
-      if (outroConfirmado) {
-        throw new PagamentoNaoCancelavelError(
-          'esta cobranca tem outro pagamento confirmado; cancelar este a reabriria indevidamente',
-        );
+      // Regra de QUANDO (decisao do PI, 05/10/2026): adiantado, ou 2+
+      // pagamentos na mesma competencia; mes que ja passou nunca.
+      const efeito = decidirCancelamento({
+        competencia: pagamento.invoice.billingPeriod,
+        agora: entrada.agora,
+        confirmadosNaFatura: confirmados.length,
+      });
+
+      const creditosDoCancelado = await tx.accountCredit.findMany({
+        where: { tenantId: contexto.tenantId, originPaymentId: pagamento.id },
+        select: { status: true, amountMinor: true },
+      });
+
+      if (creditosDoCancelado.some((credito) => credito.status === 'APPLIED')) {
+        throw new CreditoJaAplicadoError();
       }
 
       /**
@@ -143,21 +157,34 @@ export class CancelarPagamentoManualUseCase {
         throw new PagamentoNaoCancelavelError('pagamento ja foi cancelado ou alterado por outra operacao');
       }
 
-      const reaberta = await tx.invoice.updateMany({
-        where: { id: pagamento.invoiceId, tenantId: contexto.tenantId, status: 'PAID' },
-        data: { status: 'OPEN', paidAt: null, version: { increment: 1 } },
-      });
-
-      if (reaberta.count !== 1) {
-        throw new TransicaoDeInvoiceConcorrenteError(pagamento.invoiceId);
-      }
-
       await tx.accountCredit.updateMany({
         where: { tenantId: contexto.tenantId, originPaymentId: pagamento.id, status: 'AVAILABLE' },
         data: { status: 'EXPIRED' },
       });
 
-      const vencimentoRestaurado = await this.restaurarVencimentoDaSeguinte(tx, contexto, pagamento);
+      const faturaReaberta = efeito === 'REABRE_FATURA';
+      let vencimentoRestaurado = false;
+
+      if (faturaReaberta) {
+        const reaberta = await tx.invoice.updateMany({
+          where: { id: pagamento.invoiceId, tenantId: contexto.tenantId, status: 'PAID' },
+          data: { status: 'OPEN', paidAt: null, version: { increment: 1 } },
+        });
+
+        if (reaberta.count !== 1) {
+          throw new TransicaoDeInvoiceConcorrenteError(pagamento.invoiceId);
+        }
+
+        vencimentoRestaurado = await this.restaurarVencimentoDaSeguinte(tx, contexto, pagamento);
+      } else {
+        await this.passarQuitacaoAoOutroPagamento(
+          tx,
+          contexto,
+          pagamento,
+          confirmados.map((confirmado) => confirmado.id).filter((id) => id !== pagamento.id),
+          creditosDoCancelado.reduce((soma, credito) => soma + credito.amountMinor, 0),
+        );
+      }
 
       await tx.outboxEvent.create({
         data: {
@@ -168,6 +195,7 @@ export class CancelarPagamentoManualUseCase {
           payload: {
             invoiceId: pagamento.invoiceId,
             amountMinor: pagamento.amountMinor,
+            faturaReaberta,
             vencimentoRestaurado,
           },
         },
@@ -187,12 +215,67 @@ export class CancelarPagamentoManualUseCase {
             amountMinor: pagamento.amountMinor,
             reason: motivo,
             receivedVia: pagamento.receivedVia,
+            faturaReaberta,
             invoiceVencimentoRestaurado: vencimentoRestaurado,
           },
         },
       });
 
-      return { paymentId: pagamento.id, invoiceId: pagamento.invoiceId, vencimentoRestaurado };
+      return { paymentId: pagamento.id, invoiceId: pagamento.invoiceId, faturaReaberta, vencimentoRestaurado };
+    });
+  }
+
+  /**
+   * A fatura tinha 2+ pagamentos e um saiu: ela continua `PAID`, mas o
+   * dinheiro que a quita pode mudar de dono (`creditoAConsumir`).
+   *
+   * Se o cancelado era o que QUITOU, o outro -- que tinha virado credito
+   * inteiro quando chegou com a fatura ja paga -- passa a quitar: o credito
+   * dele e consumido no valor da fatura. Sem isso o aluno ficaria com a fatura
+   * paga E o mesmo dinheiro de credito.
+   */
+  private async passarQuitacaoAoOutroPagamento(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    pagamento: PagamentoLido,
+    outrosConfirmados: readonly string[],
+    creditoDoCanceladoMinor: number,
+  ): Promise<void> {
+    const paga = await tx.invoice.count({
+      where: { id: pagamento.invoiceId, tenantId: contexto.tenantId, status: 'PAID' },
+    });
+
+    if (paga !== 1) {
+      throw new TransicaoDeInvoiceConcorrenteError(pagamento.invoiceId);
+    }
+
+    const creditosDosOutros = await tx.accountCredit.findMany({
+      where: {
+        tenantId: contexto.tenantId,
+        originPaymentId: { in: [...outrosConfirmados] },
+        status: 'AVAILABLE',
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, amountMinor: true },
+    });
+
+    const consumo = creditoAConsumir({
+      totalDaFaturaMinor: pagamento.invoice.totalMinor,
+      pagoNoCanceladoMinor: pagamento.amountMinor,
+      creditoDoCanceladoMinor,
+      creditosDisponiveisDosOutros: creditosDosOutros,
+    });
+
+    if (consumo === null) {
+      return;
+    }
+
+    await tx.accountCredit.update({
+      where: { id: consumo.creditId },
+      data:
+        consumo.restanteMinor === 0
+          ? { status: 'EXPIRED' }
+          : { amountMinor: consumo.restanteMinor },
     });
   }
 

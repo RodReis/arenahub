@@ -37,7 +37,8 @@ sem script e sem perder a trilha de auditoria.
 | `status = CONFIRMED` | 409 `BILLING_PAYMENT_NOT_CANCELLABLE` (já cancelado ou estornado) |
 | `reason` com ao menos 3 caracteres após `trim` | 422 `BILLING_INVALID_CANCEL` |
 | Crédito gerado por este pagamento (`AccountCredit` com `originPaymentId`) **não** está `APPLIED` | 409 `BILLING_CREDIT_ALREADY_APPLIED` |
-| A fatura **não** tem outro pagamento `CONFIRMED` (ex.: PIX pago por fora, cujo webhook chegou com a fatura já `PAID` e mandou o valor para crédito) | 409 `BILLING_PAYMENT_NOT_CANCELLABLE` — reabrir faria o aluno dever um mês que pagou; o caso é do gerente |
+| **Quando** (decisão do PI, 05/10/2026, depois da F85): competência **adiantada**, ou competência com **2+ pagamentos `CONFIRMED`**; mês que **já passou** nunca; mês **corrente** com um pagamento só, não | 409 `BILLING_PAYMENT_NOT_CANCELLABLE` |
+| Com 2+ pagamentos (ex.: dinheiro + PIX pago por fora, cujo webhook mandou o valor para crédito): a fatura **continua paga**; se o cancelado era o que a quitou, o crédito do outro é consumido no valor da fatura — se não houver crédito disponível que cubra | 409 `BILLING_CREDIT_ALREADY_APPLIED` |
 
 **Efeitos**, na ordem:
 

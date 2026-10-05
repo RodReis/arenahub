@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import {
-  AusenteDeAcao,
   DataTable,
   EmptyState,
   Money,
@@ -17,7 +16,7 @@ import { chamarApi } from '../../../../../lib/api/server-client';
 import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { CancelarPagamento } from './cancelar-pagamento';
 import { PainelDeCobranca } from './painel-de-cobranca';
-import { Recebimento } from './recebimento';
+import { SeloDoCanal } from './recebimento';
 import { FORMAS } from './seletor-de-forma';
 import { SituacaoAtual } from './situacao-atual';
 
@@ -38,6 +37,8 @@ interface Pagamento {
   recognizedByUserId: string | null;
   /** Canal da maquininha fisica -- preenchido so quando `method = MANUAL`. */
   receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | null;
+  /** A API diz se a grade oferece o cancelamento (regra do PI, 05/10/2026). */
+  cancellable: boolean;
 }
 
 interface Invoice {
@@ -210,27 +211,26 @@ export default async function PaginaFinanceiroDoAluno({
         rowTestId={(invoice) => `cobranca-${invoice.id}`}
         caption="Cobranças do aluno, da mais recente para a mais antiga"
         columns={[
+          /*
+           * DOIS BLOCOS -- COBRANCA e RECEBIMENTO (decisao do PI, 05/10/2026,
+           * DS-PAINEL §3.5b). A linha descreve duas coisas: o que o aluno deve
+           * e o dinheiro que entrou contra isso. O grupo no cabecalho e a
+           * divisoria vertical dizem de que lado o olho esta.
+           */
           {
             key: 'numero',
             header: 'Nº',
-            /*
-             * `code` e nao `value`: numero de fatura IDENTIFICA, nao se compara
-             * nem se soma. Alinhado a direita, "7" e "1042" abririam um vao
-             * irregular ate a competencia ao lado.
-             *
-             * O `<output data-numeric>` saiu junto: `data-numeric` so pedia
-             * `tabular-nums`, que o papel `code` ja da -- e `<output>` e o
-             * elemento de RESULTADO DE CALCULO, que numero de fatura nao e.
-             */
+            group: 'Cobrança',
+            /* `code`: numero de fatura IDENTIFICA, nao se soma -- a esquerda. */
             role: 'code',
             render: (invoice) => invoice.number,
           },
           {
             key: 'competencia',
             header: 'Competência',
+            group: 'Cobrança',
             role: 'moment',
-            /* Competencia e MES, nao instante: "01/07/2026, 00:00" sugeria uma
-             * hora que o dado nao tem. Mesmo rotulo dos chips do balcao. */
+            /* Competencia e MES, nao instante -- mesmo rotulo dos chips do balcao. */
             render: (invoice) => (
               <span className={estilos['competencia']}>{formatarMesAno(invoice.billingPeriod.slice(0, 7))}</span>
             ),
@@ -238,10 +238,10 @@ export default async function PaginaFinanceiroDoAluno({
           {
             key: 'situacao',
             header: 'Situação',
+            group: 'Cobrança',
             role: 'state',
             /* `estadoExibido`: OPEN com vencimento passado aparece Vencida antes
-             * de o job de inadimplencia gravar OVERDUE; com vencimento futuro,
-             * "A vencer" -- cobranca no prazo nao e divida. */
+             * de o job gravar OVERDUE; com vencimento futuro, "A vencer". */
             render: (invoice) => (
               <StateBadge machine="invoice" state={estadoExibido(invoice, agora, timezoneDaUnidade)} />
             ),
@@ -249,57 +249,86 @@ export default async function PaginaFinanceiroDoAluno({
           {
             key: 'valor',
             header: 'Valor',
-            /* Dinheiro E o numero que se compara entre linhas -- `value` poe as
-             * casas decimais na mesma coluna vertical. */
+            group: 'Cobrança',
             role: 'value',
-            render: (invoice) => (
-              <Money cents={invoice.totalMinor} currency={invoice.currency} />
-            ),
+            render: (invoice) => <Money cents={invoice.totalMinor} currency={invoice.currency} />,
           },
           {
             key: 'vencimento',
             header: 'Vence em',
+            group: 'Cobrança',
             role: 'moment',
-            /* `dueAt` e DATA guardada como meia-noite UTC (`vencimento.ts`):
-             * a parte `YYYY-MM-DD` mostra o dia certo, sem a "21:00" que a
-             * conversao de fuso inventava. */
+            /* `dueAt` e DATA guardada como meia-noite UTC: so a parte do dia. */
             render: (invoice) => (
               <TenantDateTime iso={invoice.dueAt.slice(0, 10)} timeZone={timezoneDaUnidade} format="date" />
             ),
           },
           {
-            key: 'recebimento',
-            header: 'Recebimento',
+            key: 'forma',
+            header: 'Forma',
+            group: 'Recebimento',
+            role: 'label',
             /*
-             * MANUAL aparece por extenso e com quem reconheceu. Com a dupla
-             * permissão fora do MVP 2 (ADR-027), esta coluna é o controle
-             * DETECTIVO que sobrou: sem ela, dinheiro registrado no balcão
-             * não teria onde ser percebido.
-             *
-             * `support` e nao `actions`: a coluna e o REGISTRO do recebimento,
-             * texto de apoio vindo da API -- nao tem botao nem form.
+             * Um selo por pagamento. MANUAL aparece com quem reconheceu na
+             * auditoria (ADR-027); esta coluna e o controle DETECTIVO que a
+             * recepcao ve -- por isso o canal tem cor propria e forte.
              */
-            role: 'support',
             render: (invoice) =>
               invoice.payments.length === 0 ? (
-                /*
-                 * `AusenteDeAcao` e nao `<span>—</span>`: o travessao cru era
-                 * bug de a11y silencioso -- lido como pontuacao solta, deixava
-                 * quem usa leitor de tela sem saber se a fatura nao tem
-                 * recebimento ou se o dado nao carregou.
-                 */
-                <AusenteDeAcao />
+                <span className={estilos['semRecebimento']} aria-label="sem recebimento">—</span>
               ) : (
-                <ul className={estilos['recebimentos']}>
+                <ul className={estilos['pilha']}>
                   {invoice.payments.map((pagamento) => (
                     <li key={pagamento.id}>
-                      <Recebimento pagamento={pagamento} timezone={timezoneDaUnidade} />
-                      {/*
-                        So pagamento MANUAL confirmado: PIX e cartao se devolvem
-                        pelo estorno, e a API recusaria. A grade ja nao recebe
-                        pagamento CANCELADO (`listarInvoicesDoAluno`).
-                      */}
-                      {pagamento.method === 'MANUAL' && pagamento.status === 'CONFIRMED' ? (
+                      <SeloDoCanal pagamento={pagamento} />
+                    </li>
+                  ))}
+                </ul>
+              ),
+          },
+          {
+            key: 'pagoEm',
+            header: 'Pago em',
+            group: 'Recebimento',
+            role: 'moment',
+            /*
+             * COLUNA PROPRIA, nao colada no selo: selos de largura diferente
+             * ("PIX" x "Dinheiro") empurravam a data e nenhuma linha alinhava
+             * com a de baixo. Pilha com a mesma altura da coluna Forma, para
+             * o 2º pagamento de um mes ficar na mesma linha do selo dele.
+             */
+            render: (invoice) =>
+              invoice.payments.length === 0 ? null : (
+                <ul className={estilos['pilha']}>
+                  {invoice.payments.map((pagamento) => (
+                    <li key={pagamento.id}>
+                      {pagamento.paidAt ? (
+                        <TenantDateTime iso={pagamento.paidAt} timeZone={timezoneDaUnidade} format="datetime" />
+                      ) : (
+                        <span aria-label="data não registrada">—</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ),
+          },
+          {
+            key: 'acao',
+            header: 'Ação',
+            role: 'actions',
+            /*
+             * ICONE, no padrao da coluna Acao da Lista de Alunos (decisao do
+             * PI, 05/10/2026; DS-PAINEL §5.3b). Uma posicao por pagamento,
+             * alinhada a pilha das colunas ao lado; so aparece o icone quando
+             * a API diz `cancellable` (adiantado ou duplicado no mes) -- mes
+             * que ja passou nao ganha icone desabilitado, ganha ausencia.
+             */
+            render: (invoice) =>
+              invoice.payments.some((pagamento) => pagamento.cancellable) ? (
+                <ul className={estilos['pilha']}>
+                  {invoice.payments.map((pagamento) => (
+                    <li key={pagamento.id}>
+                      {pagamento.cancellable ? (
                         <CancelarPagamento
                           paymentId={pagamento.id}
                           resumo={`${formatarMesAno(invoice.billingPeriod.slice(0, 7))}, ${rotuloDoCanal(pagamento.receivedVia)}`}
@@ -308,7 +337,7 @@ export default async function PaginaFinanceiroDoAluno({
                     </li>
                   ))}
                 </ul>
-              ),
+              ) : null,
           },
         ]}
         empty={

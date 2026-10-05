@@ -194,7 +194,7 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
    * valores fixos (era o bug: a contagem antiga so batia por `endsAt` ter
    * sido fixado perto o bastante do `agora` de quando o teste foi escrito).
    */
-  const chips = page.getByRole('button', { name: /[a-z]{3}\/\d{2}/ });
+  const chips = page.getByRole('button', { name: /^[a-z]{3}\/\d{2}/ });
   await expect(chips).toHaveCount(8);
 
   // Marca tambem o mes CORRENTE (2º chip).
@@ -326,7 +326,7 @@ test('aluno suspenso por inadimplencia ve e usa a faixa de pagamento em lote', a
    */
   await expect(page.getByTestId('gerar-cobranca')).toHaveCount(0);
 
-  const chips = page.getByRole('button', { name: /[a-z]{3}\/\d{2}/ });
+  const chips = page.getByRole('button', { name: /^[a-z]{3}\/\d{2}/ });
   await expect(chips.first()).toBeVisible();
 
   await page.getByTestId('forma-dinheiro').click();

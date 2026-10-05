@@ -1,5 +1,6 @@
 import { ErroDeDominio } from '../../../common/http/erro-de-dominio.js';
 
+import { competenciaDe } from './ciclo-de-cobranca.js';
 import { vencimentoAposPagamento } from './meses-pagaveis.js';
 
 /**
@@ -112,4 +113,114 @@ export function deveRestaurarVencimento(entrada: {
   const ancora = vencimentoAposPagamento(diaDoPagamento(entrada.paidAt), entrada.tamanhoDoLote);
 
   return entrada.dueAtAtual.getTime() === ancora.getTime();
+}
+
+/** O que o cancelamento faz com a fatura. */
+export type EfeitoDoCancelamento = 'REABRE_FATURA' | 'FATURA_CONTINUA_PAGA';
+
+/**
+ * QUANDO se cancela -- decisao do PI em 05/10/2026 (depois da F85): "so pode
+ * cancelar o que esta adiantado ou mais de 1 pagamento no mesmo mes, e mes
+ * que ja passou NAO se cancela".
+ *
+ * - "Mesmo mes" e a mesma COMPETENCIA com 2+ pagamentos confirmados (ex.:
+ *   nov/26 pago em dinheiro e tambem por PIX). Cancela o extra e a fatura
+ *   continua paga pelo outro.
+ * - Mes corrente com UM pagamento so nao cancela: o caso fica com o gerente.
+ * - Mes que ja passou nunca cancela, nem duplicado.
+ *
+ * ponytail: competencia corrente pelo mes UTC (`competenciaDe`), o mesmo
+ * corte da faixa de meses pagaveis; na virada do mes ha 3h (21h-0h BRT) em
+ * que o "mes corrente" ja e o seguinte. Se incomodar, passar o fuso da
+ * unidade para as duas.
+ */
+export function decidirCancelamento(entrada: {
+  readonly competencia: Date;
+  readonly agora: Date;
+  readonly confirmadosNaFatura: number;
+}): EfeitoDoCancelamento {
+  const corrente = competenciaDe(entrada.agora).getTime();
+  const competencia = entrada.competencia.getTime();
+
+  if (competencia < corrente) {
+    throw new PagamentoNaoCancelavelError('pagamento de mes que ja passou nao se cancela');
+  }
+
+  if (entrada.confirmadosNaFatura >= 2) {
+    return 'FATURA_CONTINUA_PAGA';
+  }
+
+  if (competencia > corrente) {
+    return 'REABRE_FATURA';
+  }
+
+  throw new PagamentoNaoCancelavelError(
+    'pagamento do mes corrente so se cancela quando ha mais de um pagamento no mesmo mes',
+  );
+}
+
+/**
+ * A mesma regra sem lancar, para a GRADE decidir se oferece a acao. Uma regra
+ * so, chamada pelos dois lados -- a tela nao reimplementa o corte de mes.
+ */
+export function podeCancelarPagamento(entrada: {
+  readonly method: string;
+  readonly status: string;
+  readonly competencia: Date;
+  readonly agora: Date;
+  readonly confirmadosNaFatura: number;
+}): boolean {
+  if (entrada.method !== 'MANUAL' || entrada.status !== 'CONFIRMED') {
+    return false;
+  }
+
+  try {
+    decidirCancelamento(entrada);
+
+    return true;
+  } catch (erro) {
+    if (erro instanceof PagamentoNaoCancelavelError) {
+      return false;
+    }
+
+    throw erro;
+  }
+}
+
+/**
+ * Quando a fatura tem 2+ pagamentos e um deles e cancelado, QUAL dinheiro
+ * passa a quita-la?
+ *
+ * So um pagamento quitou de fato a fatura; os que chegaram depois (o PIX cujo
+ * webhook encontrou a fatura ja `PAID`) viraram credito do aluno. Cancelar o
+ * EXTRA so expira o credito dele. Cancelar o QUE QUITOU transfere a quitacao:
+ * consome o total da fatura do credito disponivel de outro pagamento -- senao
+ * o aluno ficaria com a fatura paga E o mesmo dinheiro de credito.
+ *
+ * Devolve o credito a consumir (e quanto sobra nele), ou `null` quando nao ha
+ * o que transferir. Recusa quando o quitador sai e nenhum credito disponivel
+ * cobre a fatura (ja foi usado em outra cobranca).
+ */
+export function creditoAConsumir(entrada: {
+  readonly totalDaFaturaMinor: number;
+  readonly pagoNoCanceladoMinor: number;
+  readonly creditoDoCanceladoMinor: number;
+  readonly creditosDisponiveisDosOutros: readonly { readonly id: string; readonly amountMinor: number }[];
+}): { creditId: string; restanteMinor: number } | null {
+  const quitouAFatura =
+    entrada.pagoNoCanceladoMinor - entrada.creditoDoCanceladoMinor >= entrada.totalDaFaturaMinor;
+
+  if (!quitouAFatura) {
+    return null;
+  }
+
+  const cobre = entrada.creditosDisponiveisDosOutros.find(
+    (credito) => credito.amountMinor >= entrada.totalDaFaturaMinor,
+  );
+
+  if (!cobre) {
+    throw new CreditoJaAplicadoError();
+  }
+
+  return { creditId: cobre.id, restanteMinor: cobre.amountMinor - entrada.totalDaFaturaMinor };
 }

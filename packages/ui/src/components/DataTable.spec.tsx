@@ -200,3 +200,64 @@ describe('DataTable', () => {
     expect(container.querySelectorAll('td[data-numeric]').length).toBe(2);
   });
 });
+
+/*
+ * GRUPOS DE COLUNA -- emenda de 05/10/2026 (decisao do PI, DS-PAINEL §3.5b).
+ * A grade de cobrancas junta colunas sob "Cobranca" e "Recebimento"; o
+ * grupo e uma linha de cabecalho a mais, com `scope="colgroup"`, para o leitor
+ * de tela anunciar a qual bloco a coluna pertence.
+ */
+describe('DataTable com grupos de coluna', () => {
+  interface Fatura {
+    readonly id: string;
+    readonly mes: string;
+    readonly valor: string;
+    readonly forma: string;
+  }
+
+  const FATURAS: readonly Fatura[] = [{ id: 'f1', mes: 'nov/26', valor: 'R$ 150,00', forma: 'Dinheiro' }];
+
+  const AGRUPADAS: readonly Column<Fatura>[] = [
+    { key: 'mes', header: 'Competência', group: 'Cobrança', render: (f) => f.mes },
+    { key: 'valor', header: 'Valor', group: 'Cobrança', render: (f) => f.valor },
+    { key: 'forma', header: 'Forma', group: 'Recebimento', render: (f) => f.forma },
+    { key: 'acao', header: 'Ação', role: 'actions', render: () => null },
+  ];
+
+  const montar = (colunas: readonly Column<Fatura>[]) =>
+    render(
+      <DataTable
+        rows={FATURAS}
+        columns={colunas}
+        caption="Cobranças"
+        rowKey={(f) => f.id}
+        empty={<p>vazio</p>}
+      />,
+    );
+
+  it('desenha uma linha de grupos com colSpan e scope="colgroup"', () => {
+    montar(AGRUPADAS);
+
+    const cobranca = screen.getByRole('columnheader', { name: 'Cobrança' });
+    const recebimento = screen.getByRole('columnheader', { name: 'Recebimento' });
+
+    expect(cobranca).toHaveAttribute('scope', 'colgroup');
+    expect(cobranca).toHaveAttribute('colspan', '2');
+    expect(recebimento).toHaveAttribute('colspan', '1');
+    expect(document.querySelectorAll('thead tr')).toHaveLength(2);
+  });
+
+  it('marca a primeira coluna de cada grupo, no cabecalho e no corpo, para a divisoria', () => {
+    montar(AGRUPADAS);
+
+    const marcadas = [...document.querySelectorAll('tbody [data-inicio-de-grupo]')].map((c) => c.textContent);
+    expect(marcadas).toEqual(['nov/26', 'Dinheiro']);
+  });
+
+  it('sem grupo declarado, a tabela continua com uma linha de cabecalho so', () => {
+    montar(AGRUPADAS.map(({ group: _grupo, ...coluna }) => coluna));
+
+    expect(document.querySelectorAll('thead tr')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-inicio-de-grupo]')).toHaveLength(0);
+  });
+});
