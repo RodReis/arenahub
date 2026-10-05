@@ -199,7 +199,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #557 | SPEC-084 | integração | 1526 | 1526 | 0 | 82.0 | [#559](https://github.com/RodReis/arenahub/pull/559) — número local do `test:report`; CI verde nos dois jobs |
 | 2026-10-04 | #558 | — | unitário | 4282 | 4282 | 0 | 74.3 | [#560](https://github.com/RodReis/arenahub/pull/560) — número local do `test:report`; CI verde nos dois jobs |
 | 2026-10-04 | #558 | — | integração | 1530 | 1530 | 0 | 81.9 | [#560](https://github.com/RodReis/arenahub/pull/560) — número local do `test:report`; CI verde nos dois jobs |
-| 2026-10-05 | #571 | F85 | unitário | 4315 | 4315 | 0 | 73.9 | — |
-| 2026-10-05 | #571 | F85 | integração | 1547 | 1547 | 0 | 82.0 | — |
-| 2026-10-05 | #571 | F85 | unitário | 4315 | 4315 | 0 | 73.9 | — |
-| 2026-10-05 | #571 | F85 | integração | 1548 | 1548 | 0 | 82.0 | — |
+| 2026-10-05 | #571 | F85 | unitário | 4315 | 4315 | 0 | 73.9 | [#572](https://github.com/RodReis/arenahub/pull/572) — número local do `test:report`; CI verde nos dois jobs |
+| 2026-10-05 | #571 | F85 | integração | 1548 | 1548 | 0 | 82.0 | [#572](https://github.com/RodReis/arenahub/pull/572) — número local do `test:report`; CI verde nos dois jobs |
