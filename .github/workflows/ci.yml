@@ -38,7 +38,10 @@ jobs:
   rapido:
     name: lint, typecheck, guardas e testes
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 25 min (era 15) -- issue #568: o repositorio virou PRIVADO em 05/10/2026
+    # e o runner caiu de 4 vCPU / 15 GiB para 2 vCPU / 7,8 GiB. Este job passou
+    # de ~8 min para ~12 min, colado no teto antigo.
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v7
@@ -143,7 +146,9 @@ jobs:
   pesado:
     name: integração e E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 35 min (era 20) -- issue #568: runner de repositorio PRIVADO, metade da
+    # CPU do publico. Integracao + build + E2E levavam ~9 min com 4 vCPU.
+    timeout-minutes: 35
 
     # O job roda DENTRO da imagem oficial do Playwright -- issue #105.
     #
@@ -211,7 +216,14 @@ jobs:
       # um comeca do zero a cada punhado de suites (o Jest recicla workers
       # entre arquivos), e o acumulo deixa de existir por construcao.
       #
-      # `--maxWorkers=4`: o runner GitHub-hosted de repositorio PUBLICO tem
+      # ATUALIZACAO, issue #568 (05/10/2026): o repositorio virou PRIVADO, e o
+      # runner de repositorio privado tem 2 vCPU / 7,8 GiB. 4 workers x 3072 MB
+      # = 12 GB numa maquina de 7,8 GB: exit 137 (kill por memoria) ou o job
+      # inteiro estourando o timeout. Agora `--maxWorkers=2` -- 1 por vCPU, e
+      # 2 x 3072 MB = 6 GB cabe. O raciocinio abaixo continua valendo; so o
+      # numero de vCPUs mudou.
+      #
+      # `--maxWorkers=4` (historico): o runner GitHub-hosted de repositorio PUBLICO tem
       # 4 vCPUs / 16 GB desde dez/2023 -- 1 worker por vCPU e o teto usual.
       # Medido na bancada (4 vCPUs tambem): 77 suites, 1048 testes, 0 falha,
       # 48s -- contra os ~4 min em serie e sem o exit 134 (OOM) nem o exit
