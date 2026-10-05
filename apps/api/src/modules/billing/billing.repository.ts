@@ -500,7 +500,19 @@ export class BillingRepository {
 
     const invoices = await this.db.invoice.findMany({
       where: { tenantId: contexto.tenantId, studentId },
-      include: { items: true, payments: true },
+      include: {
+        items: true,
+        /*
+         * A GRADE nunca mostra pagamento CANCELADO (F85): para a recepcao o
+         * lancamento errado "some" e a fatura reaparece em aberto. A linha
+         * continua no banco, com autor e motivo, e `timelineDaInvoice` (a
+         * trilha de auditoria) segue devolvendo tudo.
+         *
+         * `orderBy` explicito: sem ele a ordem das linhas filhas muda depois
+         * de um UPDATE -- justamente o que acabamos de fazer no pagamento.
+         */
+        payments: { where: { status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'asc' } },
+      },
       /*
        * `dueAt` PRIMEIRO, e `id` como desempate -- ordem TOTAL.
        *

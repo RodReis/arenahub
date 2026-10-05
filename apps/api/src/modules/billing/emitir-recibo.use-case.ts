@@ -6,6 +6,7 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
+import { PagamentoCanceladoError } from './domain/cancelamento-de-pagamento.js';
 import { hashDoRecibo, type SnapshotDoRecibo } from './domain/recibo.js';
 
 /**
@@ -70,10 +71,22 @@ export class EmitirReciboUseCase {
   ): Promise<ReciboEmitido> {
     const existente = await this.db.receipt.findFirst({
       where: { tenantId: contexto.tenantId, paymentId: entrada.paymentId },
-      select: { id: true, number: true, verificationHash: true, snapshot: true },
+      select: {
+        id: true,
+        number: true,
+        verificationHash: true,
+        snapshot: true,
+        payment: { select: { status: true } },
+      },
     });
 
     if (existente) {
+      // F85: o recibo de um pagamento CANCELADO nao circula -- o recebimento
+      // nao vale mais. Sem esta checagem o ramo "existente" devolvia o papel.
+      if (existente.payment.status === 'CANCELLED') {
+        throw new PagamentoCanceladoError();
+      }
+
       return {
         receiptId: existente.id,
         numero: existente.number,
@@ -182,11 +195,21 @@ export class EmitirReciboUseCase {
   async consultar(contexto: TenantContext, receiptId: string): Promise<ReciboEmitido> {
     const recibo = await this.db.receipt.findFirst({
       where: { id: receiptId, tenantId: contexto.tenantId },
-      select: { id: true, number: true, verificationHash: true, snapshot: true },
+      select: {
+        id: true,
+        number: true,
+        verificationHash: true,
+        snapshot: true,
+        payment: { select: { status: true } },
+      },
     });
 
     if (!recibo) {
       throw new ReciboNaoEncontradoError();
+    }
+
+    if (recibo.payment.status === 'CANCELLED') {
+      throw new PagamentoCanceladoError();
     }
 
     return {
