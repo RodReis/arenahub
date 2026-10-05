@@ -1,0 +1,16 @@
+/* Acao discreta na celula de recebimento -- so camada semantica (regra 2 de lint). */
+.acao {
+  margin-inline-start: 4px;
+}
+
+.acao button {
+  min-height: 24px;
+  padding-inline: 8px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-muted);
+}
+
+.acao button:hover:not(:disabled) {
+  color: var(--ah-state-danger);
+}

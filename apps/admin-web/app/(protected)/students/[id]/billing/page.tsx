@@ -15,8 +15,10 @@ import { formatarMesAno } from '../../../../../src/billing/meses-pagaveis';
 import { estadoExibido, faturaEmDestaque } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { consultarMesesPagaveis } from '../../../../actions/billing';
+import { CancelarPagamento } from './cancelar-pagamento';
 import { PainelDeCobranca } from './painel-de-cobranca';
 import { Recebimento } from './recebimento';
+import { FORMAS } from './seletor-de-forma';
 import { SituacaoAtual } from './situacao-atual';
 
 import estilos from './financeiro.module.css';
@@ -72,6 +74,11 @@ interface Aluno {
 interface InvoicesDoAluno {
   timezone: string;
   invoices: Invoice[];
+}
+
+/** Mesmo rotulo do `Recebimento`; pagamento anterior ao registro de canal (`receivedVia` nulo) cai em "Dinheiro". */
+function rotuloDoCanal(canal: string | null): string {
+  return FORMAS.find((forma) => forma.forma === canal)?.rotulo ?? 'Dinheiro';
 }
 
 /**
@@ -287,6 +294,17 @@ export default async function PaginaFinanceiroDoAluno({
                   {invoice.payments.map((pagamento) => (
                     <li key={pagamento.id}>
                       <Recebimento pagamento={pagamento} timezone={timezoneDaUnidade} />
+                      {/*
+                        So pagamento MANUAL confirmado: PIX e cartao se devolvem
+                        pelo estorno, e a API recusaria. A grade ja nao recebe
+                        pagamento CANCELADO (`listarInvoicesDoAluno`).
+                      */}
+                      {pagamento.method === 'MANUAL' && pagamento.status === 'CONFIRMED' ? (
+                        <CancelarPagamento
+                          paymentId={pagamento.id}
+                          resumo={`${formatarMesAno(invoice.billingPeriod.slice(0, 7))}, ${rotuloDoCanal(pagamento.receivedVia)}`}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>

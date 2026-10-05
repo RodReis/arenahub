@@ -74,6 +74,14 @@ const MENSAGEM: Record<string, string> = {
     'O total mudou desde que a tela carregou. Atualize a página e confira os meses antes de repetir.',
   IDEMPOTENCY_KEY_BODY_MISMATCH:
     'Esta operação já foi tentada com dados diferentes. Atualize a página antes de repetir.',
+  PAYMENT_NOT_FOUND: 'Pagamento não encontrado nesta academia.',
+  BILLING_PAYMENT_NOT_CANCELLABLE:
+    'Este pagamento não pode ser cancelado por aqui — já foi cancelado ou não é um recebimento manual.',
+  BILLING_CREDIT_ALREADY_APPLIED:
+    'O crédito gerado por este pagamento já foi usado em outra cobrança. Peça ao gerente para tratar o caso.',
+  BILLING_INVALID_CANCEL: 'Descreva o motivo do cancelamento (mínimo de 3 caracteres).',
+  BILLING_INVOICE_ALREADY_SETTLED:
+    'Esta cobrança mudou desde que a tela carregou. Atualize a página e confira.',
 };
 
 function mensagemDe(code: string | undefined, padrao: string): string {
@@ -544,4 +552,53 @@ export async function receberPagamentoEmLote(input: {
   revalidatePath('/billing');
 
   return { ok: true, batchId: resposta.dados.batchId };
+}
+
+export interface EstadoDoCancelamento {
+  erro?: string;
+  sucesso?: true;
+}
+
+const esquemaDeCancelamento = z.object({
+  paymentId: z.string().uuid(),
+  reason: z
+    .string()
+    .trim()
+    .min(3, 'Descreva o motivo — a auditoria depende disso')
+    .max(300, 'Motivo longo demais'),
+});
+
+/**
+ * Cancela um pagamento MANUAL lancado por engano -- `POST
+ * /payments/:id/cancel` (F85, decisao do PI em 05/10/2026).
+ *
+ * A fatura volta a aberta e o lancamento some da grade; a API grava autor e
+ * motivo na auditoria. Mesma permissao do lancamento (`billing.payment.manual`):
+ * quem recebe no balcao corrige o que lancou errado.
+ *
+ * Recebe `(paymentId, reason)` direto, e nao `FormData`: quem chama e o
+ * `ConfirmDialog`, que ja entrega o motivo validado -- nao ha formulario.
+ */
+export async function cancelarPagamento(
+  paymentId: string,
+  reason: string,
+): Promise<EstadoDoCancelamento> {
+  const analisado = esquemaDeCancelamento.safeParse({ paymentId, reason });
+
+  if (!analisado.success) {
+    return { erro: analisado.error.issues[0]?.message ?? 'Confira os dados informados.' };
+  }
+
+  const resposta = await chamarApi<{ paymentId: string }>(
+    `/api/v1/payments/${analisado.data.paymentId}/cancel`,
+    { metodo: 'POST', corpo: { reason: analisado.data.reason } },
+  );
+
+  if (!resposta.ok) {
+    return { erro: mensagemDe(resposta.erro?.code, 'Não foi possível cancelar o pagamento.') };
+  }
+
+  revalidatePath('/billing');
+
+  return { sucesso: true };
 }
