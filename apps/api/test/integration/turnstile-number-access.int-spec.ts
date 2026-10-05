@@ -259,4 +259,59 @@ describe('numero da catraca libera na decisao de acesso', () => {
       'UNKNOWN_EXTERNAL_USER',
     );
   });
+
+  /*
+   * Incidente de 05/10/2026 (Sirleide, numero 861): a credencial existia desde
+   * 01/10, mas o leitor so informou o numero no PRIMEIRO reconhecimento. A
+   * decisao saiu DENY `UNKNOWN_EXTERNAL_USER` 27 ms antes de o vinculo
+   * automatico nascer. O primeiro reconhecimento de quem ja tem o numero no
+   * cadastro tem de liberar -- pelas mesmas travas do vinculo legado.
+   */
+  it('credencial sem vinculo no leitor: o primeiro reconhecimento ja vincula e libera', async () => {
+    const z = numero(3);
+    const aluno = await criarAluno('11144477735');
+    await db.student.update({ where: { id: aluno }, data: { status: 'ACTIVE' } });
+    await darDireitoVigente(aluno);
+
+    // So a credencial: o leitor ainda nao informou o numero, entao a rota nao vincula.
+    const gravou = await request(servidor())
+      .put(`/api/v1/students/${aluno}/credentials`)
+      .set('Cookie', ctx.cookie)
+      .send({ kind: 'FACIAL_ENROLL_ID', externalId: z });
+    expect(gravou.status).toBe(200);
+    expect(await db.deviceUser.count({ where: { deviceId: ctx.deviceId, externalUserId: z } })).toBe(0);
+
+    const porZ = await decidir(z);
+    expect(porZ.body).toMatchObject({ outcome: 'ALLOW', reason: 'ACTIVE_ENTITLEMENT' });
+    const evento = await db.accessEvent.findUniqueOrThrow({
+      where: { id: (porZ.body as { accessEventId: string }).accessEventId },
+    });
+    expect(evento.studentId).toBe(aluno);
+    expect((evento.detail as { identityLinkedOnRecognition?: boolean }).identityLinkedOnRecognition).toBe(true);
+  });
+
+  /* A trava que o vinculo no reconhecimento NAO pode afrouxar: numero de dois alunos nao abre. */
+  it('numero que dois alunos tem continua negado, sem vinculo', async () => {
+    const w = numero(4);
+    const ana = await criarAluno('39053344705');
+    const bia = await criarAluno('86288366757');
+    for (const id of [ana, bia]) {
+      await db.student.update({ where: { id }, data: { status: 'ACTIVE' } });
+      await darDireitoVigente(id);
+    }
+    await db.studentCredential.create({
+      data: { tenantId: ctx.tenantId, studentId: ana, kind: 'TURNSTILE_CARD', externalId: w },
+    });
+    await db.studentCredential.create({
+      data: { tenantId: ctx.tenantId, studentId: bia, kind: 'FACIAL_ENROLL_ID', externalId: w },
+    });
+
+    const porW = await decidir(w);
+    expect(porW.body).toMatchObject({ outcome: 'DENY' });
+    const evento = await db.accessEvent.findUniqueOrThrow({
+      where: { id: (porW.body as { accessEventId: string }).accessEventId },
+    });
+    expect(evento.studentId).toBeNull();
+    expect(await db.deviceUser.count({ where: { deviceId: ctx.deviceId, externalUserId: w } })).toBe(0);
+  });
 });

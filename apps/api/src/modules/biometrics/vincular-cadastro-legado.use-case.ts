@@ -132,6 +132,41 @@ export class VincularCadastroLegadoUseCase {
     return { linkedReaders };
   }
 
+  /**
+   * Vinculo no PRIMEIRO reconhecimento -- incidente de 05/10/2026 (numero 861).
+   *
+   * O leitor reconheceu um numero que ainda nao tem `DeviceUser` neste
+   * leitor, mas que pode estar na credencial do cadastro. Antes, a decisao
+   * saia `UNKNOWN_EXTERNAL_USER` e o vinculo automatico nascia 27 ms DEPOIS:
+   * aluna em dia barrada na catraca.
+   *
+   * NAO AFROUXA NADA: e o mesmo `vincularNoLeitor` que o `getuserlist` roda a
+   * cada reinicio do Edge, com as mesmas travas (numero de UM aluno, um
+   * numero por aluno no leitor, termo vigente). So antecipa o que o proximo
+   * reinicio faria. Devolve se o numero passou a resolver para alguem.
+   */
+  async vincularNoReconhecimento(
+    tenantId: string,
+    deviceId: string,
+    numero: string,
+    correlationId: string,
+    agora: Date,
+  ): Promise<boolean> {
+    const serial = await this.dispositivos.serialDoDispositivo(tenantId, deviceId);
+
+    if (serial === null) return false;
+
+    const resultado = await this.vincularNoLeitor(
+      tenantId,
+      { id: deviceId, serial },
+      [numero],
+      correlationId,
+      agora,
+    );
+
+    return resultado.linked + resultado.alreadyLinked > 0;
+  }
+
   private async vincularNoLeitor(
     tenantId: string,
     leitor: { id: string; serial: string },

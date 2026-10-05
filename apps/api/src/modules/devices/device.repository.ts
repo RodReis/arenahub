@@ -78,6 +78,16 @@ export class DeviceRepository {
     return this.db.device.findFirst({ where: { id, tenantId: contexto.tenantId } });
   }
 
+  /** Para quem so tem o tenant (decisao do Edge), sem sessao de usuario. */
+  async serialDoDispositivo(tenantId: string, id: string): Promise<string | null> {
+    const dispositivo = await this.db.device.findFirst({
+      where: { id, tenantId },
+      select: { serial: true },
+    });
+
+    return dispositivo?.serial ?? null;
+  }
+
   /**
    * Dispositivos-alvo de uma unidade: os que recebem cadastro biometrico.
    *
