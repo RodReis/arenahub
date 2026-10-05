@@ -25,6 +25,7 @@ import { CriarCheckoutDeCartaoUseCase } from './criar-checkout-de-cartao.use-cas
 import { EmitirReciboUseCase } from './emitir-recibo.use-case.js';
 import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-case.js';
 import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
+import { CancelarPagamentoManualUseCase } from './cancelar-pagamento-manual.use-case.js';
 import { EstornarPagamentoUseCase } from './estornar-pagamento.use-case.js';
 import { EstornoConciliacaoController } from './estorno-conciliacao.controller.js';
 import { ObservarEstornoUseCase } from './observar-estorno.use-case.js';
@@ -98,6 +99,7 @@ import { WebhookController } from './webhook.controller.js';
     EmitirReciboUseCase,
     ConsultarMesesPagaveisUseCase,
     RegistrarPagamentoEmLoteUseCase,
+    CancelarPagamentoManualUseCase,
     { provide: PAYMENT_PROVIDER, useClass: FakePaymentProvider },
   ],
   /**
