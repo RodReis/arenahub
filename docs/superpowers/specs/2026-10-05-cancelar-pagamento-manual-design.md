@@ -45,12 +45,15 @@ sem script e sem perder a trilha de auditoria.
 2. `Invoice`: transição condicionada (`updateMany` onde `status = PAID`) para `OPEN`, `paidAt = null`,
    `version + 1`. Se a contagem não for 1 (corrida), aborta. A fatura reaberta aparece como "A vencer"
    ou "Vencida" conforme `estadoExibido`, sem tocar em `dueAt`/`blockAt` dela.
-3. **Vencimento da fatura seguinte:** o pagamento de um mês empurra `dueAt` da primeira fatura ainda
-   devida depois dele (`ancorarProximoVencimento`, `vencimentoAposPagamento(paidAt, 1)`). Ao cancelar,
-   a primeira fatura `OPEN`/`OVERDUE` com competência posterior volta ao padrão do ciclo
-   (`proximoVencimento(competencia, dueDay)` e `instanteDeBloqueio`) **somente se** o `dueAt` atual for
-   exatamente `vencimentoAposPagamento(paidAt do pagamento cancelado, 1)`. Se for outro valor, outro
-   pagamento já mexeu nele e não é tocado.
+3. **Vencimento da fatura seguinte:** só o pagamento em lote (`batchId` preenchido) empurra o `dueAt`
+   da primeira fatura ainda devida depois do último mês do lote (`ancorarProximoVencimento`, que grava
+   `vencimentoAposPagamento(dia do pagamento, N)` com N = tamanho do lote). Ao cancelar, essa fatura
+   volta ao padrão do ciclo (`proximoVencimento(competencia, dueDay)` e `instanteDeBloqueio`)
+   **somente se** (a) o pagamento tem `batchId`, (b) nenhum outro pagamento `CONFIRMED` do mesmo lote
+   sobrou (o lote inteiro foi desfeito) e (c) o `dueAt` atual é exatamente
+   `vencimentoAposPagamento(dia do pagamento, N)`. Fora disso a fatura não é tocada (outro pagamento
+   ou a recepção já mexeu nele). A "fatura seguinte" é a primeira `OPEN`/`OVERDUE` com competência
+   posterior à maior competência do lote.
 4. `AccountCredit` com `originPaymentId = este pagamento` e `status = AVAILABLE` → `EXPIRED`.
 5. `AuditLog` `billing.payment.cancelled` (metadata: `invoiceId`, `amountMinor`, `reason`,
    `receivedVia`, `invoiceVencimentoRestaurado`) e `OutboxEvent` `PaymentCancelled` na mesma transação
@@ -65,8 +68,10 @@ sem script e sem perder a trilha de auditoria.
   `blockAt`. Cancelar não bloqueia ninguém na hora.
 - **Não cancela o lote inteiro.** Escopo é um pagamento, um mês. Os outros pagamentos do mesmo
   `batchId` ficam como estão.
-- **Recibo:** a linha de `Receipt` permanece. A reimpressão do recibo de pagamento `CANCELLED` é
-  recusada com 409 `BILLING_PAYMENT_CANCELLED`, para não circular papel de um recebimento que não vale.
+- **Recibo:** a linha de `Receipt` permanece. Emitir (`POST payments/:id/receipt`) e consultar
+  (`GET receipts/:id`) o recibo de pagamento `CANCELLED` passam a recusar com 409
+  `BILLING_PAYMENT_CANCELLED` — hoje o `executar` devolve o recibo existente sem olhar o status do
+  pagamento, e o papel de um recebimento que não vale circularia.
 
 ## 4. Dados
 
@@ -93,7 +98,7 @@ Em `apps/admin-web/app/(protected)/students/[id]/billing/`:
 - Coluna **Recebimento**: em cada pagamento `MANUAL`/`CONFIRMED`, botão de ação discreto
   "Cancelar pagamento" ao lado do canal/data (`Recebimento` ganha `invoiceId`/`id`).
 - Clique abre `<dialog>` nativo (centralizado explicitamente — o preflight do Tailwind remove o
-  `margin: auto`) com resumo (competência, valor, canal, data), campo **Motivo** obrigatório e
+  `margin: auto`) com resumo (competência e canal — sem o valor: formatar dinheiro fora de `Money` é recusado pelo lint), campo **Motivo** obrigatório e
   botões Cancelar pagamento / Voltar.
 - Resultado em **Toast** (info no sucesso, erro com a mensagem do código), nunca `Alert`. Server
   Action em `app/actions/billing.ts`; o formulário valida o motivo em JS (não `required` nativo em
