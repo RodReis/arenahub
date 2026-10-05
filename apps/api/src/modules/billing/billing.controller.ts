@@ -29,6 +29,7 @@ import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-ca
 import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
 import { CancelarPagamentoManualUseCase, type PagamentoCancelado } from './cancelar-pagamento-manual.use-case.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
+import { podeCancelarPagamento } from './domain/cancelamento-de-pagamento.js';
 import { janelaPadrao } from './domain/resumo-financeiro.js';
 import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
@@ -255,6 +256,12 @@ interface PagamentoDto {
   recognizedByUserId: string | null;
   /** Canal da maquininha fisica -- preenchido so quando `method = MANUAL`. */
   receivedVia: string | null;
+  /**
+   * A grade pode oferecer "Cancelar pagamento"? Sai da MESMA regra que o caso
+   * de uso aplica (`podeCancelarPagamento`, decisao do PI em 05/10/2026), para
+   * a tela nunca reimplementar o corte de mes.
+   */
+  cancellable: boolean;
 }
 
 interface InvoiceDto {
@@ -591,10 +598,11 @@ export class BillingController {
   @ApiOkResponse({
     schema: {
       type: 'object',
-      required: ['paymentId', 'invoiceId', 'vencimentoRestaurado'],
+      required: ['paymentId', 'invoiceId', 'faturaReaberta', 'vencimentoRestaurado'],
       properties: {
         paymentId: { type: 'string' },
         invoiceId: { type: 'string' },
+        faturaReaberta: { type: 'boolean' },
         vencimentoRestaurado: { type: 'boolean' },
       },
     },
@@ -1373,6 +1381,9 @@ export class BillingController {
   }
 
   private paraDto(invoice: InvoiceComTimeline | InvoiceComItens): InvoiceDto {
+    const agora = new Date();
+    const confirmadosNaFatura = invoice.payments.filter((p) => p.status === 'CONFIRMED').length;
+
     return {
       id: invoice.id,
       number: invoice.number,
@@ -1402,6 +1413,13 @@ export class BillingController {
         paidAt: pagamento.paidAt?.toISOString() ?? null,
         recognizedByUserId: pagamento.recognizedByUserId,
         receivedVia: pagamento.receivedVia,
+        cancellable: podeCancelarPagamento({
+          method: pagamento.method,
+          status: pagamento.status,
+          competencia: invoice.billingPeriod,
+          agora,
+          confirmadosNaFatura,
+        }),
       })),
     };
   }

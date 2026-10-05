@@ -31,6 +31,10 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  * O pagamento e criado pelo CAMINHO REAL (lote da recepcao), nao por `INSERT`:
  * e ele que ancora o vencimento da fatura seguinte, e e esse efeito que o
  * cancelamento precisa desfazer.
+ *
+ * REGRA DE QUANDO (decisao do PI, 05/10/2026, depois da F85): so cancela mes
+ * ADIANTADO ou competencia com 2+ pagamentos; mes que ja passou nunca. Com
+ * AGORA em out/26, o mes adiantado destes testes e nov/26.
  */
 describe('CancelarPagamentoManualUseCase', () => {
   let db: PrismaService;
@@ -141,6 +145,18 @@ describe('CancelarPagamentoManualUseCase', () => {
       },
       select: { id: true },
     });
+    await db.entitlement.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId: aluno.id,
+        source: 'SUBSCRIPTION',
+        subscriptionId: assinatura.id,
+        status: 'ACTIVE',
+        startsAt: new Date('2026-01-01T00:00:00Z'),
+        endsAt: new Date('2099-01-01T00:00:00Z'),
+        policySnapshot: {},
+      },
+    });
 
     return { studentId: aluno.id, subscriptionId: assinatura.id };
   }
@@ -186,22 +202,52 @@ describe('CancelarPagamentoManualUseCase', () => {
     return db.payment.findFirstOrThrow({ where: { invoiceId: invoice.id, status: 'CONFIRMED' } });
   }
 
-  const cancelarPagamento = (paymentId: string, reason = 'lancado no aluno errado') =>
-    cancelar.executar(contexto, { paymentId, reason, agora: AGORA }, 'corr-cancelamento');
+  /**
+   * O que o webhook do PIX faz quando chega com a fatura JA paga
+   * (`processar-webhook-de-pagamento`): grava o pagamento confirmado e manda
+   * o valor inteiro para credito do aluno.
+   */
+  async function pixQueChegouDepois(invoiceId: string, studentId: string) {
+    const pix = await db.payment.create({
+      data: {
+        tenantId: contexto.tenantId,
+        invoiceId,
+        amountMinor: 10000,
+        method: 'PIX',
+        status: 'CONFIRMED',
+        paidAt: AGORA,
+      },
+    });
+    const credito = await db.accountCredit.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId,
+        originPaymentId: pix.id,
+        amountMinor: 10000,
+        currency: 'BRL',
+      },
+    });
 
-  it('cancela o pagamento, reabre a fatura e devolve o vencimento da seguinte', async () => {
+    return { pix, credito };
+  }
+
+  const cancelarPagamento = (paymentId: string, reason = 'lancado no aluno errado', agora = AGORA) =>
+    cancelar.executar(contexto, { paymentId, reason, agora }, 'corr-cancelamento');
+
+  it('mes adiantado: cancela, reabre a fatura e devolve o vencimento da seguinte', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
 
-    // Pre-condicao: o lote ancorou nov em 05/10 + 30 dias.
-    expect((await invoiceDe(subscriptionId, '2026-11')).dueAt.toISOString()).toBe('2026-11-04T00:00:00.000Z');
+    // Pre-condicao: o lote ancorou dez em 05/10 + 30 dias.
+    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-11-04T00:00:00.000Z');
 
     const resultado = await cancelarPagamento(pagamento.id);
 
     expect(resultado).toEqual({
       paymentId: pagamento.id,
       invoiceId: pagamento.invoiceId,
+      faturaReaberta: true,
       vencimentoRestaurado: true,
     });
 
@@ -214,14 +260,14 @@ describe('CancelarPagamentoManualUseCase', () => {
     expect(depois.recognizedByUserId).toBe(contexto.actorId);
     expect(depois.paidAt).not.toBeNull();
 
-    const reaberta = await invoiceDe(subscriptionId, '2026-10');
+    const reaberta = await invoiceDe(subscriptionId, '2026-11');
     expect(reaberta.status).toBe('OPEN');
     expect(reaberta.paidAt).toBeNull();
 
-    // Nov volta ao padrao do ciclo: dia 9, bloqueio +3 dias de carencia.
-    const seguinte = await invoiceDe(subscriptionId, '2026-11');
-    expect(seguinte.dueAt.toISOString()).toBe('2026-11-09T00:00:00.000Z');
-    expect(seguinte.blockAt?.toISOString()).toBe('2026-11-12T00:00:00.000Z');
+    // Dez volta ao padrao do ciclo: dia 9, bloqueio +3 dias de carencia.
+    const seguinte = await invoiceDe(subscriptionId, '2026-12');
+    expect(seguinte.dueAt.toISOString()).toBe('2026-12-09T00:00:00.000Z');
+    expect(seguinte.blockAt?.toISOString()).toBe('2026-12-12T00:00:00.000Z');
 
     const auditoria = await db.auditLog.findFirst({
       where: { tenantId: contexto.tenantId, action: 'billing.payment.cancelled', targetId: pagamento.id },
@@ -237,57 +283,117 @@ describe('CancelarPagamentoManualUseCase', () => {
 
   it('nao toca em entitlement nem em assinatura (regra 1: acesso segue o entitlement)', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
 
     await cancelarPagamento(pagamento.id);
 
-    const assinatura = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
-    expect(assinatura.status).toBe('ACTIVE');
+    expect((await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } })).status).toBe('ACTIVE');
+    const direito = await db.entitlement.findFirstOrThrow({ where: { subscriptionId } });
+    expect(direito.status).toBe('ACTIVE');
+    expect(direito.suspendedAt).toBeNull();
+  });
+
+  it('mes corrente com um pagamento so: recusa sem mudar nada', async () => {
+    const { subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-10']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+
+    await expect(cancelarPagamento(pagamento.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
+
+    expect((await db.payment.findUniqueOrThrow({ where: { id: pagamento.id } })).status).toBe('CONFIRMED');
+    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+  });
+
+  it('mes que ja passou: recusa, mesmo tendo sido adiantado quando foi pago', async () => {
+    const { subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
+
+    await expect(
+      cancelarPagamento(pagamento.id, 'lancado no aluno errado', new Date('2026-12-15T12:00:00Z')),
+    ).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
+
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
+  });
+
+  it('dois pagamentos no mesmo mes (dinheiro + PIX): cancela o dinheiro, a fatura continua paga e o PIX deixa de ser credito', async () => {
+    const { studentId, subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-10']);
+    const dinheiro = await pagamentoDe(subscriptionId, '2026-10');
+    const { pix, credito } = await pixQueChegouDepois(dinheiro.invoiceId, studentId);
+
+    const resultado = await cancelarPagamento(dinheiro.id);
+
+    expect(resultado.faturaReaberta).toBe(false);
+    expect(resultado.vencimentoRestaurado).toBe(false);
+    expect((await db.payment.findUniqueOrThrow({ where: { id: dinheiro.id } })).status).toBe('CANCELLED');
+    expect((await db.payment.findUniqueOrThrow({ where: { id: pix.id } })).status).toBe('CONFIRMED');
+    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+    // O dinheiro do PIX passou a quitar a fatura: nao pode continuar sendo
+    // credito tambem.
+    expect((await db.accountCredit.findUniqueOrThrow({ where: { id: credito.id } })).status).toBe('EXPIRED');
+
+    const { invoices } = await billing.listarInvoicesDoAluno(contexto, studentId);
+    const outubro = invoices.find((i) => i.id === dinheiro.invoiceId);
+    expect(outubro?.payments.map((p) => p.method)).toEqual(['PIX']);
+  });
+
+  it('dois pagamentos no mesmo mes mas o credito do PIX ja foi usado: recusa sem mudar nada', async () => {
+    const { studentId, subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-10']);
+    const dinheiro = await pagamentoDe(subscriptionId, '2026-10');
+    const { credito } = await pixQueChegouDepois(dinheiro.invoiceId, studentId);
+    await db.accountCredit.update({ where: { id: credito.id }, data: { status: 'APPLIED' } });
+
+    await expect(cancelarPagamento(dinheiro.id)).rejects.toBeInstanceOf(CreditoJaAplicadoError);
+
+    expect((await db.payment.findUniqueOrThrow({ where: { id: dinheiro.id } })).status).toBe('CONFIRMED');
+    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
   });
 
   it('nao sobrescreve o vencimento da seguinte quando ele foi alterado por outra via', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
-    const seguinte = await invoiceDe(subscriptionId, '2026-11');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
+    const seguinte = await invoiceDe(subscriptionId, '2026-12');
     await db.invoice.update({
       where: { id: seguinte.id },
-      data: { dueAt: new Date('2026-11-20T00:00:00Z') },
+      data: { dueAt: new Date('2026-12-20T00:00:00Z') },
     });
 
     const resultado = await cancelarPagamento(pagamento.id);
 
     expect(resultado.vencimentoRestaurado).toBe(false);
-    expect((await invoiceDe(subscriptionId, '2026-11')).dueAt.toISOString()).toBe('2026-11-20T00:00:00.000Z');
+    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-12-20T00:00:00.000Z');
   });
 
   it('lote de dois meses: cancelar um nao toca nos irmaos e so devolve o vencimento quando o lote inteiro foi desfeito', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10', '2026-11']);
-    const pagamentoOut = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11', '2026-12']);
     const pagamentoNov = await pagamentoDe(subscriptionId, '2026-11');
+    const pagamentoDez = await pagamentoDe(subscriptionId, '2026-12');
 
-    // Pre-condicao: dez ancorado em 05/10 + 60 dias.
-    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
+    // Pre-condicao: jan ancorado em 05/10 + 60 dias.
+    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
 
-    const primeiro = await cancelarPagamento(pagamentoNov.id);
+    const primeiro = await cancelarPagamento(pagamentoDez.id);
 
     expect(primeiro.vencimentoRestaurado).toBe(false);
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
-    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('OPEN');
-    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
+    expect((await invoiceDe(subscriptionId, '2026-12')).status).toBe('OPEN');
+    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
 
-    const segundo = await cancelarPagamento(pagamentoOut.id);
+    const segundo = await cancelarPagamento(pagamentoNov.id);
 
     expect(segundo.vencimentoRestaurado).toBe(true);
-    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-12-09T00:00:00.000Z');
+    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2027-01-09T00:00:00.000Z');
   });
 
   it('expira o credito de sobrepagamento ainda disponivel', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10'], 12000);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11'], 12000);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     const antes = await db.accountCredit.findFirstOrThrow({ where: { originPaymentId: pagamento.id } });
     expect(antes.status).toBe('AVAILABLE');
     expect(antes.amountMinor).toBe(2000);
@@ -300,8 +406,8 @@ describe('CancelarPagamentoManualUseCase', () => {
 
   it('recusa quando o credito ja abateu outra fatura e deixa TUDO como estava', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10'], 12000);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11'], 12000);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     await db.accountCredit.updateMany({
       where: { originPaymentId: pagamento.id },
       data: { status: 'APPLIED' },
@@ -310,13 +416,13 @@ describe('CancelarPagamentoManualUseCase', () => {
     await expect(cancelarPagamento(pagamento.id)).rejects.toBeInstanceOf(CreditoJaAplicadoError);
 
     expect((await db.payment.findUniqueOrThrow({ where: { id: pagamento.id } })).status).toBe('CONFIRMED');
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
   });
 
   it('recusa e desfaz tudo quando a fatura deixou de estar PAID (nao a ressuscita)', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     // Estado que o fluxo normal nao produz, mas que a barreira condicionada
     // existe para recusar: fatura ja resolvida por outra via.
     await db.invoice.update({ where: { id: pagamento.invoiceId }, data: { status: 'CANCELLED' } });
@@ -325,56 +431,22 @@ describe('CancelarPagamentoManualUseCase', () => {
 
     // A transacao inteira desfez: o pagamento NAO ficou cancelado.
     expect((await db.payment.findUniqueOrThrow({ where: { id: pagamento.id } })).status).toBe('CONFIRMED');
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('CANCELLED');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('CANCELLED');
   });
 
   it('recusa PIX: o caminho dele e o estorno', async () => {
-    const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const invoice = await invoiceDe(subscriptionId, '2026-10');
-    const pix = await db.payment.create({
-      data: {
-        tenantId: contexto.tenantId,
-        invoiceId: invoice.id,
-        amountMinor: 10000,
-        method: 'PIX',
-        status: 'CONFIRMED',
-        paidAt: AGORA,
-      },
-    });
+    const { studentId, subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-11']);
+    const invoice = await invoiceDe(subscriptionId, '2026-11');
+    const { pix } = await pixQueChegouDepois(invoice.id, studentId);
 
     await expect(cancelarPagamento(pix.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
   });
 
-  it('recusa cancelar o manual quando OUTRO pagamento confirmado cobre a mesma fatura (PIX pago por fora)', async () => {
-    const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const manual = await pagamentoDe(subscriptionId, '2026-10');
-    // O webhook do PIX chegou com a fatura ja PAID: grava o pagamento
-    // confirmado e manda o valor para credito. Reabrir a fatura aqui faria o
-    // aluno "dever" um mes que pagou de verdade.
-    const pix = await db.payment.create({
-      data: {
-        tenantId: contexto.tenantId,
-        invoiceId: manual.invoiceId,
-        amountMinor: 10000,
-        method: 'PIX',
-        status: 'CONFIRMED',
-        paidAt: AGORA,
-      },
-    });
-
-    await expect(cancelarPagamento(manual.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
-
-    expect((await db.payment.findUniqueOrThrow({ where: { id: manual.id } })).status).toBe('CONFIRMED');
-    expect((await db.payment.findUniqueOrThrow({ where: { id: pix.id } })).status).toBe('CONFIRMED');
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
-  });
-
   it('recusa o segundo cancelamento do mesmo pagamento', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     await cancelarPagamento(pagamento.id);
 
     await expect(cancelarPagamento(pagamento.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
@@ -382,19 +454,19 @@ describe('CancelarPagamentoManualUseCase', () => {
 
   it('recusa motivo curto sem mudar nada', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
 
     await expect(cancelarPagamento(pagamento.id, 'ab')).rejects.toBeInstanceOf(CancelamentoInvalidoError);
 
     expect((await db.payment.findUniqueOrThrow({ where: { id: pagamento.id } })).status).toBe('CONFIRMED');
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
   });
 
   it('pagamento de outro tenant ou inexistente: 404', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
 
     await expect(
       cancelar.executar(
@@ -411,8 +483,8 @@ describe('CancelarPagamentoManualUseCase', () => {
 
   it('corrida: dois cancelamentos simultaneos -- exatamente um vence, o outro e recusado', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
 
     const resultados = await Promise.allSettled([
       cancelarPagamento(pagamento.id, 'clique um'),
@@ -427,18 +499,18 @@ describe('CancelarPagamentoManualUseCase', () => {
     expect(vencedores).toHaveLength(1);
     expect(perdedores).toHaveLength(1);
     expect((perdedores[0]!.reason as { code?: string }).code).toBe('BILLING_PAYMENT_NOT_CANCELLABLE');
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('OPEN');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('OPEN');
   });
 
   it('o mes reaberto pode ser pago de novo pelo mesmo caminho do lote', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     await cancelarPagamento(pagamento.id);
 
-    await pagarLote(subscriptionId, ['2026-10']);
+    await pagarLote(subscriptionId, ['2026-11']);
 
-    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
     const pagamentos = await db.payment.findMany({
       where: { invoiceId: pagamento.invoiceId },
       orderBy: { createdAt: 'asc' },
@@ -448,21 +520,21 @@ describe('CancelarPagamentoManualUseCase', () => {
 
   it('a grade do aluno nao lista o pagamento cancelado', async () => {
     const { studentId, subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     await cancelarPagamento(pagamento.id);
 
     const { invoices } = await billing.listarInvoicesDoAluno(contexto, studentId);
-    const outubro = invoices.find((i) => i.id === pagamento.invoiceId);
+    const novembro = invoices.find((i) => i.id === pagamento.invoiceId);
 
-    expect(outubro?.status).toBe('OPEN');
-    expect(outubro?.payments).toHaveLength(0);
+    expect(novembro?.status).toBe('OPEN');
+    expect(novembro?.payments).toHaveLength(0);
   });
 
   it('recibo ja emitido do pagamento cancelado nao e reemitido nem consultado', async () => {
     const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-10']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-10');
+    await pagarLote(subscriptionId, ['2026-11']);
+    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
     const emitido = await recibo.executar(contexto, { paymentId: pagamento.id, agora: AGORA });
 
     await cancelarPagamento(pagamento.id);
