@@ -32,9 +32,10 @@
 }
 
 /*
- * O tom do chip vem de `data-tom` (vencido/aberto/adiantado) e so ele decide
- * `--tom`. Vencido e em aberto em `danger` (decisao do PI, 01/10/2026);
- * adiantado em neutro. Cor nunca sozinha: o rotulo diz o mesmo por escrito.
+ * O tom do chip vem de `data-tom` (vencido/aVencer/antecipar) e so ele decide
+ * `--tom`. So vencido e `danger`: "A vencer" e "Antecipar" sao neutros --
+ * mes no prazo nao e divida (decisao do PI, 05/10/2026). Cor nunca sozinha:
+ * o rotulo diz o mesmo por escrito.
  */
 .chip {
   --tom: var(--ah-state-neutral);
@@ -57,7 +58,6 @@
 }
 
 .chip[data-tom='vencido'] { --tom: var(--ah-state-danger); }
-.chip[data-tom='aberto'] { --tom: var(--ah-state-danger); }
 
 .chip:hover:not(:disabled) {
   background: color-mix(in srgb, var(--tom) 10%, var(--ah-surface-raised));
@@ -119,11 +119,17 @@
   line-height: var(--ah-type-caption-lh);
 }
 
-/* Vencido e em aberto escrevem o status no proprio tom (texto sobre tint
- * de <=10%, o par que o gate de contraste mede). */
-.chip[data-tom='vencido'] .status,
-.chip[data-tom='aberto'] .status {
+/* Vencido escreve o status no proprio tom (texto sobre tint de <=10%, o par
+ * que o gate de contraste mede). */
+.chip[data-tom='vencido'] .status {
   color: var(--tom);
+  font-weight: 600;
+}
+
+/* "A vencer" e o proximo a receber: peso, sem cor -- ele lidera sobre os
+ * "Antecipar" sem gritar como divida. */
+.chip[data-tom='aVencer'] .status {
+  color: var(--ah-text-strong);
   font-weight: 600;
 }
 

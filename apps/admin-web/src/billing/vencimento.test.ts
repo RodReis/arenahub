@@ -300,6 +300,11 @@ describe('estadoExibido', () => {
     expect(estadoExibido({ status: 'OPEN', dueAt: '2026-10-01T00:00:00.000Z' }, agora, tz)).toBe('OPEN');
   });
 
+  /* A Iris: cobranca do mes seguinte, ainda no prazo, nao e divida. */
+  it('OPEN com vencimento no futuro aparece como UPCOMING ("A vencer")', () => {
+    expect(estadoExibido({ status: 'OPEN', dueAt: '2026-11-04T00:00:00.000Z' }, agora, tz)).toBe('UPCOMING');
+  });
+
   it('PAID com vencimento no passado continua PAID', () => {
     expect(estadoExibido({ status: 'PAID', dueAt: '2026-07-09T00:00:00.000Z' }, agora, tz)).toBe('PAID');
   });

@@ -83,12 +83,24 @@ describe('FaixaDeMeses', () => {
     expect(screen.getByRole('button', { name: /receber/i })).toBeDisabled();
   });
 
-  it('aluno em dia (nenhum mes OVERDUE/OPEN) comeca sem selecao e botao desabilitado', () => {
-    const semAtraso = [{ competencia: '2026-09', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-09-09' }];
+  /*
+   * Caso do Cleibio (05/10/2026): pagou set/26 fora do lote, out/26 nunca foi
+   * gerada. O mes corrente dizia "Adiantado" -- lido como "ja pago". Agora e
+   * "A vencer", ja marcado; os seguintes "Antecipar".
+   */
+  it('aluno em dia (nenhum mes OVERDUE/OPEN): primeiro mes "A vencer" e marcado, os seguintes "Antecipar"', () => {
+    const semAtraso = [
+      { competencia: '2026-10', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-10-10' },
+      { competencia: '2026-11', status: 'NOT_OPENED' as const, invoiceId: null, totalMinor: 15000, dueAt: '2026-11-10' },
+    ];
 
     renderComToast(<FaixaDeMeses faixa={semAtraso} subscriptionId="sub-1" onPago={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: /receber/i })).toBeDisabled();
+    const outubro = screen.getByRole('button', { name: /out\/26/i });
+    expect(outubro).toHaveTextContent('A vencer');
+    expect(outubro).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /nov\/26/i })).toHaveTextContent('Antecipar');
+    expect(screen.queryByText('Adiantado')).not.toBeInTheDocument();
   });
 
   it('oferece DISPENSAR os meses anteriores em aberto que ficaram de fora', () => {

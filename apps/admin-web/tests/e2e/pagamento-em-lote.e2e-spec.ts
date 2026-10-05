@@ -179,8 +179,8 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
    * do mes CORRENTE nunca foi gerada (nem pela tela nem por esta chamada de
    * API) --, entao `selecaoInicial` (`faixa-de-meses.tsx`) seleciona so o
    * primeiro chip por padrao: o em aberto. Os dois seguintes chegam como
-   * NOT_OPENED ("Adiantado") -- setembro/26 e o mes CORRENTE, outubro/26 e
-   * corrente+1. Clicar em cada um o ADICIONA a selecao (escolha livre, decisao
+   * NOT_OPENED ("A vencer" e "Antecipar") -- o mes CORRENTE e corrente+1.
+   * Clicar em cada um o ADICIONA a selecao (escolha livre, decisao
    * do PI de 01/10/2026) -- e o proprio uso do lote que abre a invoice desses
    * dois meses, ainda inexistentes.
    */

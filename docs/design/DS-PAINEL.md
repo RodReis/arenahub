@@ -382,6 +382,12 @@ O que muda:
 
 **Emenda de 01/10/2026, decisão do PI:** fatura **em aberto passa a ser `danger`**, no badge (`state-labels.ts`, `invoice.OPEN`), no `PainelDeEstado` do financeiro e no chip do balcão. Também `invoice.OVERDUE` sai de `warning` para `danger`. A diferença entre as duas passa a estar na **intensidade** (vencida liga `emAlerta`), no **ícone** (relógio × alerta) e no **rótulo** ("Em aberto" × "Vencida", com os dias de atraso). E a tela **não espera o job de inadimplência**: `OPEN` com vencimento já passado aparece "Vencida" (`estadoExibido`, `apps/admin-web/src/billing/vencimento.ts`).
 
+**Emenda de 05/10/2026, decisão do PI — cobrança no prazo não é dívida.** A emenda acima valia para toda `OPEN`, e o lote abre a cobrança do mês seguinte com vencimento no fim da vigência paga: aluno com tudo pago aparecia "Em aberto" em vermelho. Agora:
+
+- **Badge da grid:** `OPEN` com vencimento no futuro aparece **"A vencer"**, tom neutro (`invoice.UPCOMING`, estado **derivado** por `estadoExibido`, nunca gravado). "Em aberto" `danger` fica só para o **dia** do vencimento; vencida segue "Vencida".
+- **`PainelDeEstado` do financeiro:** com a cobrança em destaque ainda no prazo, o painel diz **"Em dia"** em `success`, com "Próxima cobrança nº N · valor · vence em DD/MM/AAAA" no apoio.
+- **Chip do balcão** (`situacoesDosMeses`, `apps/admin-web/src/billing/meses-pagaveis.ts`): o rótulo diz a **situação** do mês, nunca a ação. **"Vencido"** (`danger`) para `OVERDUE` ou `OPEN` com vencimento passado; **"A vencer"** para o primeiro mês não vencido, com ou sem fatura, já marcado quando não há aberto nem vencido; **"Antecipar"** para os seguintes. Mês **sem fatura nunca é "Vencido"** ("pagou, usou": sem fatura não há dívida). O antigo "Adiantado" para todo mês sem fatura era lido como "já pago" e marcava o mês corrente de quem só tinha pago o anterior.
+
 Contrato do componente:
 
 | Prop | Papel |
