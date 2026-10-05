@@ -106,6 +106,12 @@ describe('perfis de sistema', () => {
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.override.financial');
     });
 
+    it('adiciona e altera o plano do aluno, sem gerenciar cobranca', () => {
+      expect(PERMISSOES_DA_RECEPCAO).toContain('subscription.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('plan.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.manage');
+    });
+
     it('ve o time sem poder trocar perfil -- decisao do PI, 02/10/2026', () => {
       expect(PERMISSOES_DA_RECEPCAO).toContain('team.read');
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('team.update');
