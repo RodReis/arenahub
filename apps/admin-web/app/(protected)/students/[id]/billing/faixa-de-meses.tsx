@@ -9,8 +9,10 @@ import {
   formatarMesAno,
   mesesDispensaveis,
   selecaoInicial,
+  situacoesDosMeses,
   vigenteAte,
   type MesPagavelUI,
+  type SituacaoDoMes,
 } from '../../../../../src/billing/meses-pagaveis';
 import { SeletorDeForma, type FormaDePagamento } from './seletor-de-forma';
 
@@ -35,24 +37,11 @@ function hojeLocal(): string {
   return `${agora.getFullYear()}-${mes}-${dia}`;
 }
 
-type TomDoMes = 'vencido' | 'aberto' | 'adiantado';
-
-/**
- * O tom do chip. VENCIDO pelo `dueAt` tambem, nao so pelo status: o job de
- * inadimplencia pode nao ter rodado, e `OPEN` de setembro em outubro e
- * atraso de verdade (mesma regra de `estadoExibido` na grid). `hoje` vazio
- * (antes de montar no cliente) nao marca nada como vencido.
- */
-function tomDoMes(mes: MesPagavelUI, hoje: string): TomDoMes {
-  if (mes.status === 'OVERDUE') return 'vencido';
-  if (hoje !== '' && mes.status === 'OPEN' && mes.dueAt.slice(0, 10) < hoje) return 'vencido';
-  return mes.status === 'OPEN' ? 'aberto' : 'adiantado';
-}
-
-const ROTULO_DO_TOM: Record<TomDoMes, string> = {
+/** A regra mora em `situacoesDosMeses`; aqui so o texto de cada situacao. */
+const ROTULO_DA_SITUACAO: Record<SituacaoDoMes, string> = {
   vencido: 'Vencido',
-  aberto: 'Em aberto',
-  adiantado: 'Adiantado',
+  aVencer: 'A vencer',
+  antecipar: 'Antecipar',
 };
 
 /**
@@ -94,6 +83,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
     [dispensaveis, dispensados],
   );
   const dataValida = dataPagamento !== '' && dataPagamento <= hojeLocal();
+  const situacoes = useMemo(() => situacoesDosMeses(faixa, hoje), [faixa, hoje]);
 
   function alternar(competencia: string): void {
     const proximo = new Set(selecionados);
@@ -163,9 +153,9 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
       <h3 id="titulo-faixa">Receber no balcão</h3>
 
       <div className={styles['chips']}>
-        {faixa.map((mes) => {
+        {faixa.map((mes, indice) => {
           const marcado = selecionados.has(mes.competencia);
-          const tom = tomDoMes(mes, hoje);
+          const tom = situacoes[indice]!;
           const ehMesAtual = hoje !== '' && mes.competencia === hoje.slice(0, 7);
 
           return (
@@ -181,7 +171,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
             >
               <span className={styles['mesAno']}>{formatarMesAno(mes.competencia)}</span>
               {ehMesAtual ? <span className={styles['marcaAtual']}>Mês atual</span> : null}
-              <span className={styles['status']}>{ROTULO_DO_TOM[tom]}</span>
+              <span className={styles['status']}>{ROTULO_DA_SITUACAO[tom]}</span>
               <span className={styles['valor']}>
                 <Money cents={mes.totalMinor} />
               </span>

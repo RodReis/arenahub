@@ -28,6 +28,10 @@ import { VincularCadastroLegadoUseCase } from './vincular-cadastro-legado.use-ca
     VincularCadastroLegadoUseCase,
     ImportarFotoDoLeitorUseCase,
   ],
-  exports: [BiometricIdentityRepository],
+  /**
+   * `VincularCadastroLegadoUseCase` sai para o acesso: a decisao vincula pela
+   * credencial no primeiro reconhecimento (incidente de 05/10/2026, numero 861).
+   */
+  exports: [BiometricIdentityRepository, VincularCadastroLegadoUseCase],
 })
 export class BiometricsModule {}

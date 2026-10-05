@@ -60,6 +60,33 @@ export function SituacaoAtual({ invoice, timezone, agora }: Props) {
    * numero aqui discordar da faixa que a ficha do aluno mostra.
    */
   const estado = estadoExibido(invoice, agora, timezone);
+
+  /*
+   * NO PRAZO E EM DIA (decisao do PI, 05/10/2026). O lote abre a cobranca do
+   * mes seguinte com vencimento no fim da vigencia paga; pinta-la "Em aberto"
+   * em vermelho fazia a Iris, com set e out pagos, parecer devedora de nov.
+   * A cobranca continua visivel, mas como PROXIMA, no apoio.
+   */
+  if (estado === 'UPCOMING') {
+    return (
+      <PainelDeEstado
+        rotulo="Situação atual"
+        tom="success"
+        icone="check-circle"
+        testId="proxima-cobranca"
+        apoio={
+          <span>
+            Próxima cobrança nº <span className={estilos['numero']}>{invoice.number}</span> ·{' '}
+            <Money cents={invoice.totalMinor} currency={invoice.currency} /> · vence em{' '}
+            <TenantDateTime iso={invoice.dueAt.slice(0, 10)} timeZone={timezone} format="date" />
+          </span>
+        }
+      >
+        <span className={estilos['semPendencia']}>Em dia</span>
+      </PainelDeEstado>
+    );
+  }
+
   const estaVencida = estado === 'OVERDUE';
   const atraso = estaVencida ? diasDeAtraso(invoice, agora, timezone) : 0;
 

@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Icon } from '@arenahub/ui';
+import { Icon, Tabs, type Aba } from '@arenahub/ui';
 
 import { lerFeedDeAcessos, type EventoDoFeed } from '../../actions/dashboard';
 import { CartaoDePresenca } from './cartao-de-presenca';
-import { CartaoDeBloqueados, type SituacaoDoDashboard } from './cartao-de-bloqueados';
+import {
+  ConteudoDeBloqueados,
+  totalDeBloqueados,
+  type SituacaoDoDashboard,
+} from './cartao-de-bloqueados';
 import { JANELA_DE_PERMANENCIA_MIN, naJanelaDePermanencia } from './permanencia';
 import { recusadosDoDia } from './recusados';
 import estilos from './dashboard.module.css';
@@ -28,6 +32,8 @@ interface Props {
    * carga na API que atende a catraca.
    */
   readonly situacoes?: readonly SituacaoDoDashboard[];
+  /** A aba de aniversariantes, montada pelo Server Component (não muda no dia). */
+  readonly aniversariantes?: Aba;
 }
 
 /**
@@ -45,7 +51,7 @@ interface Props {
  * leitura imediata na volta (senão a tela mostraria por até 5 s o estado de
  * quando foi escondida, que pode ser de horas atrás).
  */
-export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: Props) {
+export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes, aniversariantes }: Props) {
   const [eventos, setEventos] = useState<readonly EventoDoFeed[]>(inicial);
   const [pausado, setPausado] = useState(false);
   /** Relógio da janela de permanência: avança a cada leitura, não a cada render. */
@@ -119,63 +125,92 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes }: P
   // bloqueados segue lendo o DIA inteiro (`eventos`).
   const naAcademia = naJanelaDePermanencia(eventos, agora);
 
-  return (
+  const recusados = recusadosDoDia(eventos);
+
+  const feed = (
     <>
-      <details className={estilos['cartao']} open>
-        <summary className={estilos['cabecalhoDoCartao']}>
-          <h2 className={estilos['tituloDoCartao']}>Acessos em tempo real</h2>
-          <span className={estilos['acoesDoCabecalho']}>
-            <span className={estilos['janelaDoFeed']} data-testid="janela-do-feed">
-              últimos {JANELA_DE_PERMANENCIA_MIN} min
-            </span>
-            <span
-              className={estilos['aoVivo']}
-              data-pausado={pausado}
-              data-testid="estado-do-feed"
-              role="status"
-            >
-              <span className={estilos['pulso']} aria-hidden="true" />
-              {pausado ? 'pausado' : 'ao vivo'}
-            </span>
-            <Icon name="chevron-down" />
+      <div className={estilos['barraDoFeed']}>
+        <span className={estilos['janelaDoFeed']} data-testid="janela-do-feed">
+          últimos {JANELA_DE_PERMANENCIA_MIN} min
+        </span>
+        <span
+          className={estilos['aoVivo']}
+          data-pausado={pausado}
+          data-testid="estado-do-feed"
+          role="status"
+        >
+          <span className={estilos['pulso']} aria-hidden="true" />
+          {pausado ? 'pausado' : 'ao vivo'}
+        </span>
+      </div>
+
+      {naAcademia.length === 0 ? (
+        <div className={estilos['vazio']}>
+          <span className={estilos['iconeDoVazio']}>
+            <Icon name="clock" />
           </span>
-        </summary>
-
-        <div className={estilos['conteudoDoCartao']}>
-          {naAcademia.length === 0 ? (
-            <div className={estilos['vazio']}>
-              <span className={estilos['iconeDoVazio']}>
-                <Icon name="clock" />
-              </span>
-              <span className={estilos['textoDoVazio']}>
-                Ninguém passou na catraca nos últimos {JANELA_DE_PERMANENCIA_MIN} min.
-                <span className={estilos['saidaDoVazio']}>
-                  A lista se preenche sozinha quando alguém passar na catraca.
-                </span>
-              </span>
-            </div>
-          ) : (
-            <ul className={estilos['gradeDePresenca']} data-testid="feed-de-acessos">
-              {/*
-                `key` é o id do evento, e é o que faz a animação de entrada
-                funcionar: com índice o React reusaria o mesmo cartão e só
-                trocaria o texto, sem nada indicar que alguém acabou de passar.
-              */}
-              {naAcademia.map((evento) => (
-                <CartaoDePresenca key={evento.id} evento={evento} agora={agora} timeZone={timeZone} />
-              ))}
-            </ul>
-          )}
+          <span className={estilos['textoDoVazio']}>
+            Ninguém passou na catraca nos últimos {JANELA_DE_PERMANENCIA_MIN} min.
+            <span className={estilos['saidaDoVazio']}>
+              A lista se preenche sozinha quando alguém passar na catraca.
+            </span>
+          </span>
         </div>
-      </details>
-
-      {situacoes === undefined ? null : (
-        <CartaoDeBloqueados
-          situacoes={situacoes}
-          recusados={recusadosDoDia(eventos)}
-          timeZone={timeZone}
-        />
+      ) : (
+        <ul className={estilos['gradeDePresenca']} data-testid="feed-de-acessos">
+          {/*
+            `key` é o id do evento, e é o que faz a animação de entrada
+            funcionar: com índice o React reusaria o mesmo cartão e só
+            trocaria o texto, sem nada indicar que alguém acabou de passar.
+          */}
+          {naAcademia.map((evento) => (
+            <CartaoDePresenca key={evento.id} evento={evento} agora={agora} timeZone={timeZone} />
+          ))}
+        </ul>
       )}
     </>
+  );
+
+  /*
+   * ABAS e não três cartões empilhados -- pedido do PI, 05/10/2026: os cartões
+   * recolhíveis empurravam "Bloqueados" e "Aniversariantes" para baixo do feed
+   * e ninguém os abria. Todos os painéis ficam montados (`Tabs`), então o
+   * contador de recusados anda a cada 5 s mesmo com a aba fechada.
+   */
+  const abas: Aba[] = [
+    {
+      id: 'acessos',
+      label: 'Acessos em tempo real',
+      icon: 'scan-face',
+      contador: naAcademia.length,
+      content: feed,
+    },
+  ];
+
+  if (situacoes !== undefined) {
+    abas.push({
+      id: 'bloqueados',
+      label: 'Bloqueados e suspensos',
+      icon: 'user-x',
+      contador: totalDeBloqueados(situacoes) + recusados.length,
+      content: (
+        <ConteudoDeBloqueados
+          situacoes={situacoes}
+          recusados={recusados}
+          agora={agora}
+          timeZone={timeZone}
+        />
+      ),
+    });
+  }
+
+  if (aniversariantes !== undefined) abas.push(aniversariantes);
+
+  return (
+    <section className={estilos['cartao']} aria-label="Painel do dia">
+      <div className={estilos['conteudoDoCartao']}>
+        <Tabs abas={abas} label="Painel do dia" testId="abas-do-dia" />
+      </div>
+    </section>
   );
 }

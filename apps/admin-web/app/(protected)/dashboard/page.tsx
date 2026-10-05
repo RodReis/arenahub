@@ -9,14 +9,16 @@ import {
   type IconName,
   PageHeader,
   ProblemDetail,
+  Tabs,
   TenantDateTime,
+  type Aba,
 } from '@arenahub/ui';
 
 import { lerFeedDeAcessos } from '../../actions/dashboard';
 import { chamarApi } from '../../../lib/api/server-client';
 import estilos from './dashboard.module.css';
 import { doisNomes } from './dois-nomes';
-import { CartaoDeBloqueados } from './cartao-de-bloqueados';
+import { ConteudoDeBloqueados, totalDeBloqueados } from './cartao-de-bloqueados';
 import { FeedAoVivo } from './feed-ao-vivo';
 import { NumeroQueConta } from './numero-que-conta';
 
@@ -182,7 +184,7 @@ export default async function PaginaDoDashboard({
   // ficar sem hora nenhuma — e nesse estado a tela também não mostra número.
   const fuso = unidade?.timezone ?? 'UTC';
 
-  const totalDeRestricoes = dados.situacoes.reduce((soma, s) => soma + s.quantidade, 0);
+  const totalDeRestricoes = totalDeBloqueados(dados.situacoes);
   // Passagens do dia -- zero significa "ninguém passou", não "não sei".
   const movimentoDoDia =
     (dados.acessosDeHoje?.allow ?? 0) + (dados.acessosDeHoje?.deny ?? 0);
@@ -190,6 +192,49 @@ export default async function PaginaDoDashboard({
     dados.dispositivos.total > 0 && dados.dispositivos.online === dados.dispositivos.total;
 
   const aniversariantesDeHoje = dados.aniversariantes.filter((a) => a.hoje);
+
+  // A aba "Aniversariantes do mês" -- montada aqui (não muda durante o dia) e
+  // entregue pronta ao feed, que desenha as abas (pedido do PI, 05/10/2026).
+  const abaDeAniversariantes: Aba = {
+    id: 'aniversariantes',
+    label: 'Aniversariantes do mês',
+    icon: 'cake',
+    contador: dados.aniversariantes.length,
+    content:
+      dados.aniversariantes.length === 0 ? (
+        <Vazio icone="cake">Nenhum aniversário neste mês.</Vazio>
+      ) : (
+        <ul className={estilos['lista']} data-testid="aniversariantes-do-mes">
+          {dados.aniversariantes.map((aniversariante) => {
+            const { dia, mes } = partesDoAniversario(aniversariante.diaEMes);
+
+            return (
+              <li
+                className={estilos['aniversario']}
+                key={`${aniversariante.diaEMes}-${aniversariante.nome}`}
+                data-hoje={aniversariante.hoje}
+              >
+                <span className={estilos['diaDoFeriado']}>
+                  <span className={estilos['diaDoFeriadoNumero']}>{dia}</span>
+                  <span className={estilos['diaDoFeriadoMes']}>{mes}</span>
+                </span>
+                <span className={estilos['linhaTexto']}>{doisNomes(aniversariante.nome)}</span>
+                {/*
+                  HOJE em texto, não só na aresta colorida — cor nunca é canal
+                  único (Princípio 3).
+                */}
+                {aniversariante.hoje ? (
+                  <span className={estilos['hojeSelo']}>
+                    <Icon name="cake" />
+                    Hoje
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ),
+  };
 
   return (
     <>
@@ -376,68 +421,41 @@ export default async function PaginaDoDashboard({
 
       <div className={estilos['corpo']}>
         <div className={estilos['coluna']}>
+          {/*
+            ABAS (pedido do PI, 05/10/2026). Com unidade, quem desenha as abas
+            é o feed ao vivo: a de bloqueados junta quem a catraca recusou
+            hoje, tirado da mesma leitura de 5 s. Sem unidade não há feed, e a
+            página monta as duas abas que sobram.
+          */}
           {unidade ? (
             <FeedAoVivo
               gymUnitId={unidade.id}
               timeZone={unidade.timezone}
               inicial={feedInicial}
               situacoes={dados.situacoes}
+              aniversariantes={abaDeAniversariantes}
               {...(dados.acessosDeHoje ? { desde: dados.acessosDeHoje.desde } : {})}
             />
-          ) : null}
-
-          {/*
-            Com unidade, quem desenha o cartão é o feed ao vivo: ele junta
-            quem a catraca recusou hoje, tirado da mesma leitura de 5 s.
-          */}
-          {unidade ? null : (
-            <CartaoDeBloqueados situacoes={dados.situacoes} timeZone={fuso} />
+          ) : (
+            <section className={estilos['cartao']} aria-label="Painel do dia">
+              <div className={estilos['conteudoDoCartao']}>
+                <Tabs
+                  label="Painel do dia"
+                  testId="abas-do-dia"
+                  abas={[
+                    {
+                      id: 'bloqueados',
+                      label: 'Bloqueados e suspensos',
+                      icon: 'user-x',
+                      contador: totalDeBloqueados(dados.situacoes),
+                      content: <ConteudoDeBloqueados situacoes={dados.situacoes} timeZone={fuso} />,
+                    },
+                    abaDeAniversariantes,
+                  ]}
+                />
+              </div>
+            </section>
           )}
-
-          <details className={estilos['cartao']}>
-            <summary className={estilos['cabecalhoDoCartao']}>
-              <h2 className={estilos['tituloDoCartao']}>
-                <Icon name="cake" />
-                Aniversariantes do mês
-              </h2>
-              <Icon name="chevron-down" />
-            </summary>
-            <div className={estilos['conteudoDoCartao']}>
-              {dados.aniversariantes.length === 0 ? (
-                <Vazio icone="cake">Nenhum aniversário neste mês.</Vazio>
-              ) : (
-                <ul className={estilos['lista']} data-testid="aniversariantes-do-mes">
-                  {dados.aniversariantes.map((aniversariante) => {
-                    const { dia, mes } = partesDoAniversario(aniversariante.diaEMes);
-
-                    return (
-                      <li
-                        className={estilos['aniversario']}
-                        key={`${aniversariante.diaEMes}-${aniversariante.nome}`}
-                        data-hoje={aniversariante.hoje}
-                      >
-                        <span className={estilos['diaDoFeriado']}>
-                          <span className={estilos['diaDoFeriadoNumero']}>{dia}</span>
-                          <span className={estilos['diaDoFeriadoMes']}>{mes}</span>
-                        </span>
-                        <span className={estilos['linhaTexto']}>{doisNomes(aniversariante.nome)}</span>
-                        {/*
-                          HOJE em texto, não só na aresta colorida — cor nunca
-                          é canal único (Princípio 3).
-                        */}
-                        {aniversariante.hoje ? (
-                          <span className={estilos['hojeSelo']}>
-                            <Icon name="cake" />
-                            Hoje
-                          </span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </details>
         </div>
 
         <div className={estilos['coluna']}>

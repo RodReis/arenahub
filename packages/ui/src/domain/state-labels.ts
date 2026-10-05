@@ -291,6 +291,10 @@ export const STATE_LABELS: Dictionary = {
     // `danger` (decisao do PI, 01/10/2026): fatura em aberto e dinheiro que
     // ainda nao entrou. Vencida se distingue pelo rotulo e pelo icone.
     OPEN: { label: 'Em aberto', tone: 'danger', icon: 'clock' },
+    // DERIVADO, nao gravado (`estadoExibido`, admin-web): OPEN que ainda nao
+    // chegou ao vencimento. Neutro (decisao do PI, 05/10/2026): cobranca no
+    // prazo nao e divida.
+    UPCOMING: { label: 'A vencer', tone: 'neutral', icon: 'clock' },
     PAID: { label: 'Paga', tone: 'success', icon: 'check-circle' },
     // `danger`, nao `warning` (decisao do PI, 01/10/2026): vencida e o problema
     // que a recepcao precisa resolver, e o painel `SituacaoAtual` ja a pinta

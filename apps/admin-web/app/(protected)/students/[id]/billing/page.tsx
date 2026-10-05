@@ -233,7 +233,8 @@ export default async function PaginaFinanceiroDoAluno({
             header: 'Situação',
             role: 'state',
             /* `estadoExibido`: OPEN com vencimento passado aparece Vencida antes
-             * de o job de inadimplencia gravar OVERDUE. */
+             * de o job de inadimplencia gravar OVERDUE; com vencimento futuro,
+             * "A vencer" -- cobranca no prazo nao e divida. */
             render: (invoice) => (
               <StateBadge machine="invoice" state={estadoExibido(invoice, agora, timezoneDaUnidade)} />
             ),

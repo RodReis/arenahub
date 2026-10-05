@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { mesesDispensaveis, selecaoInicial, vigenteAte, type MesPagavelUI } from './meses-pagaveis';
+import {
+  mesesDispensaveis,
+  selecaoInicial,
+  situacoesDosMeses,
+  vigenteAte,
+  type MesPagavelUI,
+} from './meses-pagaveis';
 
 const FAIXA: MesPagavelUI[] = [
   { competencia: '2026-07', status: 'OVERDUE', invoiceId: 'jul', totalMinor: 15000, dueAt: '2026-07-09' },
@@ -18,8 +24,64 @@ describe('selecaoInicial', () => {
     expect([...selecaoInicial(FAIXA.filter((m) => m.status === 'OVERDUE'))]).toEqual(['2026-08']);
   });
 
-  it('aluno em dia (so meses nao emitidos): nada marcado', () => {
-    expect(selecaoInicial([FAIXA[3]!]).size).toBe(0);
+  /*
+   * Aluno em dia, sem fatura aberta (ex.: pagou set/26 fora do lote, out/26
+   * nunca foi gerada): marca o mes "A vencer", o proximo a receber.
+   */
+  it('aluno em dia (so meses nao emitidos): marca o primeiro, o "A vencer"', () => {
+    const emDia: MesPagavelUI[] = [
+      FAIXA[3]!,
+      { competencia: '2026-11', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2026-11-09' },
+    ];
+
+    expect([...selecaoInicial(emDia)]).toEqual(['2026-10']);
+  });
+});
+
+describe('situacoesDosMeses', () => {
+  const situacoes = (faixa: readonly MesPagavelUI[], hoje: string) =>
+    situacoesDosMeses(faixa, hoje).join(',');
+
+  it('vencido, depois o primeiro nao vencido "A vencer", o resto "Antecipar"', () => {
+    expect(situacoes(FAIXA, '2026-09-20')).toBe('vencido,vencido,vencido,aVencer');
+  });
+
+  /* Caso da Iris: nov/26 OPEN vencendo em 04/11, hoje 05/10. Nao deve nada. */
+  it('OPEN com vencimento no futuro e "A vencer", nunca "Em aberto"', () => {
+    const iris: MesPagavelUI[] = [
+      { competencia: '2026-11', status: 'OPEN', invoiceId: 'nov', totalMinor: 15000, dueAt: '2026-11-04' },
+      { competencia: '2026-12', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2026-12-10' },
+      { competencia: '2027-01', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2027-01-10' },
+    ];
+
+    expect(situacoes(iris, '2026-10-05')).toBe('aVencer,antecipar,antecipar');
+  });
+
+  /* Caso do Cleibio: pagou set/26, out/26 sem fatura. Nunca "Adiantado". */
+  it('mes atual sem fatura e "A vencer", os seguintes "Antecipar"', () => {
+    const cleibio: MesPagavelUI[] = [
+      { competencia: '2026-10', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2026-10-10' },
+      { competencia: '2026-11', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2026-11-10' },
+    ];
+
+    expect(situacoes(cleibio, '2026-10-05')).toBe('aVencer,antecipar');
+  });
+
+  /* Sem fatura nao ha divida ("pagou, usou") -- decisao do PI, 05/10/2026. */
+  it('mes sem fatura com o dia de vencimento ja passado nunca e "Vencido"', () => {
+    const semFatura: MesPagavelUI[] = [
+      { competencia: '2026-10', status: 'NOT_OPENED', invoiceId: null, totalMinor: 15000, dueAt: '2026-10-10' },
+    ];
+
+    expect(situacoes(semFatura, '2026-10-15')).toBe('aVencer');
+  });
+
+  it('no dia do vencimento ainda nao venceu', () => {
+    expect(situacoes([FAIXA[2]!], '2026-09-09')).toBe('aVencer');
+  });
+
+  it('sem "hoje" (antes de montar no cliente) so OVERDUE gravado e vencido', () => {
+    expect(situacoes(FAIXA, '')).toBe('vencido,vencido,aVencer,antecipar');
   });
 });
 

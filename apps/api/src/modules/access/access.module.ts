@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
 import { EdgeAuthModule } from '../edge-auth/edge-auth.module.js';
 import { BillingModule } from '../billing/billing.module.js';
+import { BiometricsModule } from '../biometrics/biometrics.module.js';
 import { DevicesModule } from '../devices/devices.module.js';
 import { AccessEventRepository } from './access-event.repository.js';
 import { AccessProjectionRepository } from './access-projection.repository.js';
@@ -26,8 +27,12 @@ import { RecordOfflinePassageUseCase } from './record-offline-passage.use-case.j
    * `BillingModule` entra pela liberacao financeira da F15: antes de negar por
    * divida, o acesso pergunta se ha liberacao viva. Consome o CASO DE USO
    * publico, nunca a tabela (regra de arquitetura no 9).
+   *
+   * `BiometricsModule` entra pelo vinculo no primeiro reconhecimento: numero
+   * sem `DeviceUser` mas com credencial vincula antes de negar -- pelo caso
+   * de uso publico do vinculo legado, com as travas dele.
    */
-  imports: [EdgeAuthModule, BillingModule, DevicesModule],
+  imports: [EdgeAuthModule, BillingModule, DevicesModule, BiometricsModule],
   controllers: [EdgeAccessController, ManualOverrideController],
   providers: [
     IdentityResolver,

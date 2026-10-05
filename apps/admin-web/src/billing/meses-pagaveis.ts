@@ -11,18 +11,48 @@ const DIAS_POR_MES_PAGO = 30;
 
 /**
  * Selecao inicial da tela: a cobranca em aberto do mes corrente (primeira
- * `OPEN`); sem ela, o vencido mais recente; sem nenhum, nada. A escolha dos
- * meses e LIVRE ("pagou usou", decisao do PI, 01/10/2026): nenhum mes
- * anterior vem marcado so porque esta em atraso.
+ * `OPEN`); sem ela, o vencido mais recente; sem nenhum, o primeiro mes da
+ * faixa -- o "A vencer" de quem esta em dia. A escolha dos meses e LIVRE
+ * ("pagou usou", decisao do PI, 01/10/2026): nenhum mes anterior vem marcado
+ * so porque esta em atraso.
  */
 export function selecaoInicial(faixa: readonly MesPagavelUI[]): ReadonlySet<string> {
   const aberto = faixa.find((m) => m.status === 'OPEN');
   if (aberto) return new Set([aberto.competencia]);
 
   const vencidos = faixa.filter((m) => m.status === 'OVERDUE');
-  const ultimo = vencidos[vencidos.length - 1];
+  const ultimo = vencidos[vencidos.length - 1] ?? faixa[0];
 
   return ultimo ? new Set([ultimo.competencia]) : new Set();
+}
+
+export type SituacaoDoMes = 'vencido' | 'aVencer' | 'antecipar';
+
+/**
+ * A situacao de cada chip da faixa, na ordem da faixa -- decisao do PI,
+ * 05/10/2026. O rotulo diz a SITUACAO do mes, nunca a acao: o antigo
+ * "Adiantado" para todo mes sem fatura era lido como "ja pago", e marcava o
+ * mes corrente de quem so tinha pago o anterior.
+ *
+ * - VENCIDO: `OVERDUE`, ou `OPEN` cujo `dueAt` ja passou (o job pode nao ter
+ *   gravado `OVERDUE` ainda). Mes SEM fatura nunca e vencido: sem fatura nao
+ *   ha divida ("pagou, usou").
+ * - A VENCER: o primeiro mes nao vencido -- o proximo a receber.
+ * - ANTECIPAR: os meses depois dele.
+ *
+ * `hoje` vazio (antes de montar no cliente) so reconhece o `OVERDUE` gravado.
+ */
+export function situacoesDosMeses(faixa: readonly MesPagavelUI[], hoje: string): SituacaoDoMes[] {
+  let jaTemAVencer = false;
+
+  return faixa.map((mes) => {
+    const venceuAberto = hoje !== '' && mes.status === 'OPEN' && mes.dueAt.slice(0, 10) < hoje;
+    if (mes.status === 'OVERDUE' || venceuAberto) return 'vencido';
+
+    if (jaTemAVencer) return 'antecipar';
+    jaTemAVencer = true;
+    return 'aVencer';
+  });
 }
 
 /**

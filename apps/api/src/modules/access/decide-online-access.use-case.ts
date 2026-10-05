@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   POLICY_VERSION,
   evaluateAccess,
@@ -11,6 +11,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import { AccessEventRepository } from './access-event.repository.js';
 import { AccessProjectionRepository } from './access-projection.repository.js';
 import { LiberacaoFinanceiraUseCase } from '../billing/liberacao-financeira.use-case.js';
+import { VincularCadastroLegadoUseCase } from '../biometrics/vincular-cadastro-legado.use-case.js';
 import { IdentityResolver, type ReferenciaDeDispositivo } from './identity-resolver.js';
 
 /**
@@ -66,12 +67,15 @@ export const DERIVA_MAXIMA_MS = 5 * 60_000;
 
 @Injectable()
 export class DecideOnlineAccessUseCase {
+  private readonly log = new Logger(DecideOnlineAccessUseCase.name);
+
   constructor(
     private readonly db: PrismaService,
     private readonly identidades: IdentityResolver,
     private readonly projecao: AccessProjectionRepository,
     private readonly eventos: AccessEventRepository,
     private readonly liberacaoFinanceira: LiberacaoFinanceiraUseCase,
+    private readonly vinculo: VincularCadastroLegadoUseCase,
   ) {}
 
   async executar(
@@ -83,11 +87,42 @@ export class DecideOnlineAccessUseCase {
     const avaliadoEm = new Date();
     const derivaMs = entrada.recognizedAt.getTime() - avaliadoEm.getTime();
 
-    const identidade = await this.identidades.resolver(
+    let identidade = await this.identidades.resolver(
       edge,
       entrada.dispositivo,
       entrada.externalUserId,
     );
+
+    /*
+     * NUMERO SEM VINCULO NESTE LEITOR: tenta vincular pela credencial do
+     * cadastro ANTES de negar (incidente de 05/10/2026, numero 861 -- aluna em
+     * dia barrada porque o vinculo nasceu 27 ms depois da decisao). As travas
+     * sao as do vinculo legado; na duvida ele nao vincula e a recusa segue.
+     */
+    let tentouVincular = false;
+
+    if (
+      !identidade.resolvida &&
+      identidade.motivo === 'UNKNOWN_EXTERNAL_USER' &&
+      identidade.deviceId !== undefined
+    ) {
+      tentouVincular = await this.tentarVincular(edge.tenantId, identidade.deviceId, entrada, avaliadoEm);
+
+      if (tentouVincular) {
+        identidade = await this.identidades.resolver(
+          edge,
+          entrada.dispositivo,
+          entrada.externalUserId,
+        );
+      }
+    }
+
+    // Marca no `detail` quando o vinculo desta decisao FEZ a identidade
+    // resolver: a auditoria distingue "ja era vinculado" de "vinculou na hora".
+    // So com a identidade resolvida -- perder a corrida para outro vinculo
+    // tambem conta como `alreadyLinked`, e marcar um DENY seria mentir.
+    const marcaDoVinculo =
+      tentouVincular && identidade.resolvida ? { identityLinkedOnRecognition: true } : {};
 
     // Identidade que nao resolve e DENY registrado, nao erro HTTP. O leitor
     // viu alguem; quem, nao sabemos -- e esse e justamente o evento que
@@ -103,7 +138,7 @@ export class DecideOnlineAccessUseCase {
         deviceId: identidade.deviceId ?? null,
         avaliadoEm,
         derivaMs,
-        detalheExtra: { identityResolution: identidade.motivo },
+        detalheExtra: { identityResolution: identidade.motivo, ...marcaDoVinculo },
       });
     }
 
@@ -155,7 +190,11 @@ export class DecideOnlineAccessUseCase {
           deviceId: identidade.deviceId,
           avaliadoEm,
           derivaMs,
-          detalheExtra: { financialOverrideId: liberacao.id, overrideReason: liberacao.reason },
+          detalheExtra: {
+            financialOverrideId: liberacao.id,
+            overrideReason: liberacao.reason,
+            ...marcaDoVinculo,
+          },
         });
       }
     }
@@ -171,6 +210,7 @@ export class DecideOnlineAccessUseCase {
       avaliadoEm,
       derivaMs,
       detalheExtra: {
+        ...marcaDoVinculo,
         // Entrada congelada do motor: e o que torna a decisao AUDITAVEL --
         // sem ela, "por que negou?" so se responde reconstruindo o estado do
         // banco naquele instante, que ja mudou.
@@ -183,6 +223,41 @@ export class DecideOnlineAccessUseCase {
         },
       },
     });
+  }
+
+  /**
+   * O vinculo e um EXTRA da decisao, nunca uma condicao dela: o `getuserlist`
+   * do proximo reinicio do Edge faria o mesmo. Excecao aqui (transacao
+   * estourada, conexao caida) vira "nao vinculou" e a recusa segue GRAVADA --
+   * propagar faria 500 e nenhum `AccessEvent` (`M1` §3: 100% das decisoes
+   * fisicas com evento). Achado da revisao adversarial de 05/10/2026.
+   *
+   * O log leva so codigos: numero do leitor e id de dispositivo, nunca nome
+   * nem dado do aluno.
+   */
+  private async tentarVincular(
+    tenantId: string,
+    deviceId: string,
+    entrada: ReconhecimentoRecebido,
+    avaliadoEm: Date,
+  ): Promise<boolean> {
+    try {
+      return await this.vinculo.vincularNoReconhecimento(
+        tenantId,
+        deviceId,
+        entrada.externalUserId,
+        entrada.correlationId,
+        avaliadoEm,
+      );
+    } catch (erro: unknown) {
+      this.log.warn(
+        `vinculo no reconhecimento falhou (correlationId=${entrada.correlationId}, deviceId=${deviceId}): ${
+          erro instanceof Error ? erro.name : 'erro desconhecido'
+        }`,
+      );
+
+      return false;
+    }
   }
 
   /**
