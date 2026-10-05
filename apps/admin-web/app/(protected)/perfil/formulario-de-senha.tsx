@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, useToast } from '@arenahub/ui';
+import { Button, PasswordField, useToast } from '@arenahub/ui';
 
 import { alterarSenha, type EstadoDaSenha } from '../../actions/perfil';
 import estilos from './perfil.module.css';
@@ -53,37 +53,28 @@ export function FormularioDeSenha() {
 
   return (
     <form ref={formulario} action={acao} className={estilos['formulario']} noValidate>
-      <Field
+      <PasswordField
         id="senha-atual"
         name="senhaAtual"
         label="Senha atual"
-        type="password"
         autoComplete="current-password"
         data-testid="campo-senha-atual"
       />
-      <Field
+      <PasswordField
         id="nova-senha"
         name="novaSenha"
         label="Nova senha"
-        type="password"
         autoComplete="new-password"
         data-testid="campo-nova-senha"
       />
-      <Field
+      <PasswordField
         id="confirmacao-de-senha"
         name="confirmacao"
         label="Confirmar nova senha"
-        type="password"
         autoComplete="new-password"
         data-testid="campo-confirmacao"
       />
-      <p className={estilos['dica']}>
-        Mínimo de 8 caracteres. Ao alterar, você continua conectado aqui e as outras sessões são
-        encerradas.
-      </p>
-      <div className={estilos['acoes']}>
-        <BotaoDeSalvar />
-      </div>
+      <BotaoDeSalvar />
     </form>
   );
 }

@@ -250,6 +250,8 @@ Painel de foto **70%** da largura, formulário **30%** (mínimo 320 px na foto).
 
 `grid-template-columns: 1fr 1fr; gap: 14px 16px`. Campo largo (endereço, observação) ocupa as duas colunas. Nunca três colunas em formulário — o olho perde o par label/campo.
 
+**Exceção de 05/10/2026, decisão do PI:** `/perfil` (troca de senha) põe os três campos curtos na mesma linha — são três senhas, sem par label/campo a perder, e o card ocupa a largura da página. Abaixo de 1000 px empilha em uma coluna. Não vale para formulário de ficha.
+
 ### 3.5 Grade de tabela
 
 Tabelas são **grid explícito**, não `<table>` — permite alinhar cabeçalho e linha com a mesma declaração e usar `minmax(0,1fr)` para a coluna que trunca.

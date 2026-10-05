@@ -8,35 +8,20 @@
 .pagina {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-/* Duas colunas no desktop; empilha no estreito, onde o formulario nao cabe ao lado. */
-.grade {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .grade {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.cartao {
-  background: var(--ah-surface-raised);
-  border: 1px solid var(--ah-border-subtle);
-  border-radius: var(--ah-radius-card);
-  padding: 24px;
-}
-
+/*
+ * A pagina e a unica moldura (o `section` do globals.css); identidade e resumo
+ * ficam soltos nela e a troca de senha e um `SectionCard`, igual a ficha do
+ * aluno. Antes eram dois quadros com borda propria dentro dela: moldura sobre
+ * moldura.
+ */
 .identidade {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  animation: subir 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .avatar {
@@ -51,9 +36,13 @@
   color: var(--ah-surface-raised);
   font-size: 22px;
   font-weight: 700;
+  /* Aro de 2px na cor do accent: o avatar e a unica marca de identidade da tela. */
+  box-shadow:
+    0 0 0 3px var(--ah-surface-raised),
+    0 0 0 5px color-mix(in srgb, var(--ah-accent-400) 55%, transparent);
 }
 
-/* E-mail longo quebra em vez de vazar o cartao. */
+/* E-mail longo quebra em vez de vazar. */
 .email {
   margin: 0;
   color: var(--ah-text-strong);
@@ -63,48 +52,104 @@
   overflow-wrap: anywhere;
 }
 
-.dados {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 12px 24px;
-  margin: 0;
-  color: var(--ah-text-default);
-  font-size: var(--ah-type-body-size);
-  line-height: var(--ah-type-body-lh);
+/* Mesma entrada escalonada da ficha: cadastro -> perfil -> senha. */
+.resumo > dl {
+  margin-bottom: 0;
 }
 
-.dados dt {
-  color: var(--ah-text-secondary);
+.resumo > dl > div {
+  animation: subir 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.dados dd {
-  margin: 0;
-  overflow-wrap: anywhere;
+.resumo > dl > div:nth-child(1) {
+  animation-delay: 50ms;
 }
 
-.tituloDoCartao {
-  margin: 0 0 16px;
-  color: var(--ah-text-strong);
-  font-size: var(--ah-type-heading-size);
-  line-height: var(--ah-type-heading-lh);
-  font-weight: var(--ah-type-heading-weight);
+.resumo > dl > div:nth-child(2) {
+  animation-delay: 100ms;
 }
 
+.resumo > dl > div:nth-child(3) {
+  animation-delay: 150ms;
+}
+
+/*
+ * Os tres cards do resumo no desenho do KPI do financeiro (decisao do PI,
+ * 05/10/2026): aresta de 3px no topo na cor cheia, fundo tingido a 7%, borda
+ * puxada para o tom e icone em selo. `--tom` viaja pela celula e so o glifo e o
+ * selo usam a cor cheia; o texto segue em carbono. A cor nunca e canal unico:
+ * rotulo e icone continuam em cada card.
+ */
+.resumo > dl > div {
+  border-color: color-mix(in srgb, var(--tom) 38%, var(--ah-border-default));
+  background: color-mix(in srgb, var(--tom) 7%, var(--ah-surface-raised));
+}
+
+.resumo > dl > div::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--tom);
+}
+
+.resumo > dl > div:nth-child(1) {
+  --tom: var(--ah-accent-500);
+}
+
+.resumo > dl > div:nth-child(2) {
+  --tom: var(--ah-state-info);
+}
+
+.resumo > dl > div:nth-child(3) {
+  --tom: var(--ah-state-success);
+}
+
+.resumo dt > svg {
+  box-sizing: content-box;
+  padding: 5px;
+  border-radius: 8px;
+  color: var(--tom);
+  background: color-mix(in srgb, var(--tom) 14%, transparent);
+}
+
+@keyframes subir {
+  from {
+    opacity: 0.001;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identidade,
+  .resumo > dl > div {
+    animation: none;
+  }
+}
+
+/*
+ * Os tres campos na MESMA linha (decisao do PI, 05/10/2026): o card ocupa a
+ * largura da pagina e nao sobra vazio ao lado. `auto-fit` criava uma quarta
+ * coluna vazia, entao sao tres fixas e empilha em tela estreita. Excecao consciente a
+ * regra "nunca tres colunas" do DS-PAINEL §3.4, que vale para formulario de ficha.
+ */
 .formulario {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 420px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 16px;
+  align-items: start;
 }
 
-.dica {
-  margin: 0;
-  color: var(--ah-text-secondary);
-  font-size: var(--ah-type-caption-size);
-  line-height: var(--ah-type-caption-lh);
+/* Botao no tamanho do proprio rotulo, nunca barra de largura inteira. */
+.formulario > [data-variant] {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-width: 168px;
 }
 
-.acoes {
-  display: flex;
-  justify-content: flex-end;
+/* Com a navegacao lateral, abaixo disso tres campos nao cabem lado a lado. */
+@media (max-width: 1000px) {
+  .formulario {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
