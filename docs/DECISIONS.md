@@ -4852,6 +4852,9 @@ lançamento"*.
 - O pagamento em lote ancora o vencimento da fatura seguinte (`dia + N × 30 dias`). O cancelamento
   devolve essa data ao padrão do ciclo **somente** quando o lote inteiro foi desfeito e a data ainda é a
   que o lote gravou; fora disso não toca (outra decisão ou pagamento já mexeu nela).
+- Se a fatura tem **outro** pagamento `CONFIRMED` (PIX pago por fora, cujo webhook mandou o valor para
+  crédito), o cancelamento do manual é **recusado** (409) — reabrir a fatura faria o aluno dever um mês
+  que pagou. Achado da revisão da F85.
 - O recibo de pagamento cancelado deixa de ser emitido e consultado (409 `BILLING_PAYMENT_CANCELLED`).
 - **Risco que continua aberto, e é do PI:** quem lança e cancela sozinho um pagamento manual consegue
   fazer o dinheiro sair do caixa sem aprovação — só a auditoria percebe depois. Se aparecer uso

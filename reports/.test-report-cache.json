@@ -6,10 +6,10 @@
     "coberturaPct": 64.75
   },
   "apps/api#test:integration": {
-    "testes": 1465,
-    "pass": 1465,
+    "testes": 1466,
+    "pass": 1466,
     "falha": 0,
-    "coberturaPct": 81.36
+    "coberturaPct": 81.37
   },
   "apps/admin-web#test": {
     "testes": 946,

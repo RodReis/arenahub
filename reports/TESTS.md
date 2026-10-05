@@ -17,7 +17,7 @@
 |---|---:|---:|---:|---:|
 | unitário | 4315 | 4315 | 0 | 73.9 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1547 | 1547 | 0 | 82.0 |
+| integração | 1548 | 1548 | 0 | 82.0 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -201,3 +201,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #558 | — | integração | 1530 | 1530 | 0 | 81.9 | [#560](https://github.com/RodReis/arenahub/pull/560) — número local do `test:report`; CI verde nos dois jobs |
 | 2026-10-05 | #571 | F85 | unitário | 4315 | 4315 | 0 | 73.9 | — |
 | 2026-10-05 | #571 | F85 | integração | 1547 | 1547 | 0 | 82.0 | — |
+| 2026-10-05 | #571 | F85 | unitário | 4315 | 4315 | 0 | 73.9 | — |
+| 2026-10-05 | #571 | F85 | integração | 1548 | 1548 | 0 | 82.0 | — |

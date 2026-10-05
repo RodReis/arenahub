@@ -346,6 +346,31 @@ describe('CancelarPagamentoManualUseCase', () => {
     await expect(cancelarPagamento(pix.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
   });
 
+  it('recusa cancelar o manual quando OUTRO pagamento confirmado cobre a mesma fatura (PIX pago por fora)', async () => {
+    const { subscriptionId } = await novaAssinatura();
+    await pagarLote(subscriptionId, ['2026-10']);
+    const manual = await pagamentoDe(subscriptionId, '2026-10');
+    // O webhook do PIX chegou com a fatura ja PAID: grava o pagamento
+    // confirmado e manda o valor para credito. Reabrir a fatura aqui faria o
+    // aluno "dever" um mes que pagou de verdade.
+    const pix = await db.payment.create({
+      data: {
+        tenantId: contexto.tenantId,
+        invoiceId: manual.invoiceId,
+        amountMinor: 10000,
+        method: 'PIX',
+        status: 'CONFIRMED',
+        paidAt: AGORA,
+      },
+    });
+
+    await expect(cancelarPagamento(manual.id)).rejects.toBeInstanceOf(PagamentoNaoCancelavelError);
+
+    expect((await db.payment.findUniqueOrThrow({ where: { id: manual.id } })).status).toBe('CONFIRMED');
+    expect((await db.payment.findUniqueOrThrow({ where: { id: pix.id } })).status).toBe('CONFIRMED');
+    expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
+  });
+
   it('recusa o segundo cancelamento do mesmo pagamento', async () => {
     const { subscriptionId } = await novaAssinatura();
     await pagarLote(subscriptionId, ['2026-10']);

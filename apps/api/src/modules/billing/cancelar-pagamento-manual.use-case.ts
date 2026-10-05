@@ -101,6 +101,29 @@ export class CancelarPagamentoManualUseCase {
       }
 
       /**
+       * OUTRO pagamento confirmado cobrindo a mesma fatura -- tipicamente um
+       * PIX pago por fora cujo webhook chegou com a fatura ja `PAID` (ele grava
+       * o pagamento e manda o valor para credito). Reabrir a fatura aqui faria
+       * o aluno "dever" um mes que pagou de verdade, e o credito do PIX ficaria
+       * disponivel sem ninguem para abate-lo. Quem decide esse caso e o gerente.
+       */
+      const outroConfirmado = await tx.payment.findFirst({
+        where: {
+          tenantId: contexto.tenantId,
+          invoiceId: pagamento.invoiceId,
+          status: 'CONFIRMED',
+          id: { not: pagamento.id },
+        },
+        select: { id: true },
+      });
+
+      if (outroConfirmado) {
+        throw new PagamentoNaoCancelavelError(
+          'esta cobranca tem outro pagamento confirmado; cancelar este a reabriria indevidamente',
+        );
+      }
+
+      /**
        * TRANSICAO CONDICIONADA, nao `update`: dois cancelamentos simultaneos
        * (duplo clique) leem ambos `CONFIRMED`; o filtro de status garante que
        * so UM move o pagamento. O outro recebe `count = 0` e a transacao
