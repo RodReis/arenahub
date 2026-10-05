@@ -2565,6 +2565,52 @@
         ]
       }
     },
+    "/api/v1/payments/{id}/cancel": {
+      "post": {
+        "operationId": "BillingController_cancelarPagamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paymentId",
+                    "invoiceId",
+                    "vencimentoRestaurado"
+                  ],
+                  "properties": {
+                    "paymentId": {
+                      "type": "string"
+                    },
+                    "invoiceId": {
+                      "type": "string"
+                    },
+                    "vencimentoRestaurado": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/subscriptions/{id}/payable-months": {
       "get": {
         "operationId": "BillingController_consultarMesesPagaveisRota",

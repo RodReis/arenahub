@@ -588,6 +588,17 @@ export class BillingController {
   @Post('payments/:id/cancel')
   @RequirePermissions('billing.payment.manual')
   @HttpCode(200)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['paymentId', 'invoiceId', 'vencimentoRestaurado'],
+      properties: {
+        paymentId: { type: 'string' },
+        invoiceId: { type: 'string' },
+        vencimentoRestaurado: { type: 'boolean' },
+      },
+    },
+  })
   async cancelarPagamento(
     @Param('id') id: string,
     @Body() corpo: unknown,

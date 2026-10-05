@@ -4812,3 +4812,49 @@ regra"* e *"todo com aceito true"*.
 - **Não muda nesta decisão:** a revogação feita pelo painel ainda bloqueia o acesso na hora (o
   `IdentityResolver` exige identidade `ACTIVE`), e o cadastro biométrico pelo painel ainda pede a
   decisão do aluno. Se o PI quiser o mesmo "aceito por padrão" ali, é outra entrega.
+
+---
+
+## ADR-065 — Cancelamento de pagamento manual lançado errado: emenda do INV-069 só para `MANUAL` (F85)
+
+**Data:** 05/10/2026
+**Status:** aceito *(decisão do PI em 05/10/2026 — emenda o INV-069 e realiza o "contra-lançamento auditado" do ADR-027, resposta 3)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#571](https://github.com/RodReis/arenahub/issues/571)
+
+**Contexto:** a recepção da Arena Positiva lançou um pagamento manual errado (nov/26 de uma aluna) e
+não havia como desfazer: o estorno do sistema recusa pagamento manual (ADR-027, resposta 3 — "só
+contra-lançamento auditado") e esse contra-lançamento nunca foi construído. A saída era script
+contra produção. Palavras do PI: *"precisamos deste botão do cancelamento com o motivo e remover o
+lançamento"*.
+
+### Decisão
+
+1. **Pagamento `MANUAL` e `CONFIRMED` pode ser cancelado pela tela**, com motivo obrigatório (mínimo
+   de 3 caracteres). PIX e cartão **não**: seguem só pelo estorno com provedor.
+2. **A fatura volta de `PAID` para `OPEN`** — o aluno volta a dever o mês. É a **emenda do INV-069**
+   ("fatura paga nunca volta a aberta"), e vale **somente** para cancelamento de pagamento manual.
+3. **O `Payment` não é apagado**: vira `CANCELLED` com `cancelled_at`, `cancelled_by_user_id` e
+   `cancel_reason`. `recognized_by_user_id` e `paid_at` permanecem — a trilha de quem lançou e quando
+   continua inteira. Para a recepção o lançamento "some" (a grade não lista `CANCELLED`); para a
+   auditoria ele fica (`AuditLog` `billing.payment.cancelled` + evento `PaymentCancelled`).
+4. **A própria recepção cancela**, com `billing.payment.manual` — sem permissão nova. O controle é o
+   motivo obrigatório e a auditoria: **detectivo, não preventivo**, o mesmo que o ADR-027 já aceitou
+   para o lançamento (consequência 3).
+5. **Cancelar não toca em `Entitlement` nem em `Subscription`** (regra de arquitetura nº 1). A fatura
+   reaberta entra no fluxo normal de inadimplência e só bloqueia quando passar de `blockAt`.
+
+### Consequências
+
+- Crédito de sobrepagamento gerado pelo pagamento e ainda `AVAILABLE` vira `EXPIRED`; se já foi
+  aplicado em outra fatura, o cancelamento é **recusado** (409 `BILLING_CREDIT_ALREADY_APPLIED`) — o
+  caso é do gerente.
+- O pagamento em lote ancora o vencimento da fatura seguinte (`dia + N × 30 dias`). O cancelamento
+  devolve essa data ao padrão do ciclo **somente** quando o lote inteiro foi desfeito e a data ainda é a
+  que o lote gravou; fora disso não toca (outra decisão ou pagamento já mexeu nela).
+- O recibo de pagamento cancelado deixa de ser emitido e consultado (409 `BILLING_PAYMENT_CANCELLED`).
+- **Risco que continua aberto, e é do PI:** quem lança e cancela sozinho um pagamento manual consegue
+  fazer o dinheiro sair do caixa sem aprovação — só a auditoria percebe depois. Se aparecer uso
+  indevido, a saída é permissão própria (`billing.payment.cancel`) para o gerente.
+- **Não muda:** estorno de PIX/cartão (ADR-027/F16), INV-073 (a ação manual não apaga o evento
+  original — aqui o `Payment` permanece) e a regra nº 6 (dinheiro continua inteiro em centavos).
