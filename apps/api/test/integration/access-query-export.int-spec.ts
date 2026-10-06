@@ -576,6 +576,35 @@ describe('F11 -- consulta e exportacao de eventos', () => {
       expect(resposta.status).toBe(404);
     });
 
+    it('404 no painel para job de saude do aluno, mesmo do proprio tenant (#600)', async () => {
+      const saude = await db.dataExportJob.create({
+        data: {
+          tenantId: a.tenantId,
+          requesterId: randomUUID(),
+          type: 'HEALTH_HISTORY',
+          status: 'COMPLETED',
+          objectKey: `saude-${randomUUID()}.csv`,
+          filters: {},
+          idempotencyKey: `saude-${randomUUID()}`,
+        },
+      });
+
+      for (const [metodo, rota] of [
+        ['get', `/api/v1/exports/${saude.id}`],
+        ['post', `/api/v1/exports/${saude.id}/download`],
+        ['post', `/api/v1/exports/${saude.id}/cancel`],
+      ] as const) {
+        const resposta = await request(servidor())[metodo](rota).set('Cookie', a.cookie);
+
+        expect(resposta.status).toBe(404);
+      }
+
+      // O cancelamento nao pode ter mexido no job de saude.
+      expect((await db.dataExportJob.findUniqueOrThrow({ where: { id: saude.id } })).status).toBe(
+        'COMPLETED',
+      );
+    });
+
     it('recusa download de exportacao que ainda nao terminou', async () => {
       const job = await db.dataExportJob.create({
         data: {

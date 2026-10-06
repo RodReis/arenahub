@@ -34,6 +34,14 @@ const VALIDADE_DA_URL_SEGUNDOS = 300;
 const TAMANHO_DA_PAGINA = 500;
 
 /**
+ * Tipo de job que ESTE servico enxerga. `data_export_jobs` tambem guarda o
+ * `HEALTH_HISTORY` (o aluno pedindo os proprios dados): sem o filtro, quem tem
+ * so `access.read` consultava, cancelava ou baixava o CSV de saude de um aluno
+ * sabendo o UUID do job (#600).
+ */
+const TIPO_DE_EXPORTACAO = 'ACCESS_EVENTS';
+
+/**
  * Marca de ordem de byte do UTF-8.
  *
  * Escrito por codigo, nao como caractere literal: o literal e invisivel no
@@ -119,7 +127,7 @@ export class ExportsService {
         data: {
           tenantId: contexto.tenantId,
           requesterId: contexto.actorId,
-          type: 'ACCESS_EVENTS',
+          type: TIPO_DE_EXPORTACAO,
           status: 'PENDING',
           filters: filtrosNormalizados,
           idempotencyKey: entrada.idempotencyKey,
@@ -272,7 +280,9 @@ export class ExportsService {
   }
 
   async encontrar(contexto: TenantContext, id: string): Promise<DataExportJob | null> {
-    return this.db.dataExportJob.findFirst({ where: { id, tenantId: contexto.tenantId } });
+    return this.db.dataExportJob.findFirst({
+      where: { id, tenantId: contexto.tenantId, type: TIPO_DE_EXPORTACAO },
+    });
   }
 
   async cancelar(contexto: TenantContext, id: string): Promise<DataExportJob | null> {
