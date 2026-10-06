@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 import { TokenService } from '../../src/modules/auth/token.service.js';
+import { StudentSessionRepository } from '../../src/modules/student-identity/student-session.repository.js';
 import { StudentIdentityService } from '../../src/modules/student-identity/student-identity.service.js';
 import type { StudentChannelContext } from '../../src/modules/student-identity/student-identity.service.js';
 import { ErroDeDominio } from '../../src/common/http/erro-de-dominio.js';
@@ -526,6 +527,36 @@ describe('F23 -- identidade do aluno', () => {
         servico.renovar({ refreshToken: renovada.refreshToken, agora: AGORA() }),
       );
       expect(erro.code).toBe('SESSAO_REVOGADA');
+    });
+
+    // #580: `renovar` le a sessao e so depois rotaciona, sem lock. Se a troca de
+    // senha ou o logout revoga no intervalo, a rotacao nao pode ressuscitar o
+    // elo revogado nem abrir um elo ACTIVE novo -- o refresh devolvido
+    // continuaria valendo depois da troca de senha.
+    it('revogacao entre a leitura e a rotacao NAO ressuscita o elo (#580)', async () => {
+      const repositorio = app.get(StudentSessionRepository);
+      const sessao = await entrar();
+      const elo = await db.studentSession.findUniqueOrThrow({ where: { id: sessao.sessionId } });
+
+      await repositorio.revogarTodasDaConta(contaId, 'password_reset', AGORA());
+
+      await expect(
+        repositorio.rotacionar({
+          sessaoAtualId: elo.id,
+          familyId: elo.familyId,
+          tenantId: elo.tenantId,
+          accountId: elo.accountId,
+          novoTokenHash: tokens.calcularHashDeRefresh(randomUUID()),
+          deviceLabel: elo.deviceLabel,
+          reauthenticatedAt: elo.reauthenticatedAt,
+          validoAte: new Date(Date.now() + 3_600_000),
+          agora: AGORA(),
+        }),
+      ).rejects.toMatchObject({ code: 'SESSAO_REVOGADA' });
+
+      const depois = await db.studentSession.findMany({ where: { familyId: elo.familyId } });
+      expect(depois).toHaveLength(1);
+      expect(depois[0]?.status).toBe('REVOKED');
     });
 
     it('nao guarda o refresh em claro -- so o hash', async () => {
