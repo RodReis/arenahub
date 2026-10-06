@@ -32,8 +32,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [INFRA] Auditoria de segurança: segunda onda nas áreas adiadas da run-1 (#587)
-- [FIX] Dispositivos e edge: POST /devices sem checagem de tenant e pequenas falhas de assinatura e escopo (#586)
 - [MVP7][SPEC-066][FIX] API sobe em produção com role do banco que ignora o RLS, sem nenhum aviso (#584)
 - [FIX] Painel: AuthGuard não confere o status da sessão, e revogar membro não derruba o refresh (#582)
 - [MVP1][FIX] Convite: quem convida define a senha de uma conta global, e ela sobrevive ao convite da pessoa em outra academia (#579)
@@ -48,6 +46,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [FIX] Dispositivos e edge: POST /devices sem checagem de tenant e pequenas falhas de assinatura e escopo (#586, finalizado em: 2026-10-06)
+- [INFRA] Auditoria de segurança: segunda onda nas áreas adiadas da run-1 (#587, finalizado em: 2026-10-06)
 - [MVP2][SPEC-085][F85] Cancelar pagamento manual lançado errado (#571, finalizado em: 2026-10-06)
 - [MVP1][FIX] aluna em dia barrada no primeiro reconhecimento e financeiro mostrando em dia como devedor (#566, finalizado em: 2026-10-05)
 - [INFRA] CI: job integração e E2E cancelado aos 25 min em todas as branches desde 05/10 (#568, finalizado em: 2026-10-05)
