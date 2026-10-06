@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -274,6 +274,22 @@ describe('convites e MFA', () => {
   });
 
   describe('MFA', () => {
+    // Cada caso parte de um usuario sem MFA: trocar um fator ENABLED passou a
+    // exigir o codigo do fator atual (#578), entao os casos nao herdam o
+    // estado uns dos outros.
+    beforeEach(async () => {
+      await db.user.updateMany({
+        where: { email: `dono-iam-${sufixo}@exemplo.test` },
+        data: {
+          mfaStatus: 'DISABLED',
+          mfaSecretCiphertext: null,
+          mfaSecretIv: null,
+          mfaSecretTag: null,
+          mfaLastCounter: null,
+        },
+      });
+    });
+
     it('inicia inscricao com segredo cifrado no banco', async () => {
       const resposta = await request(servidor())
         .post('/api/v1/auth/mfa/setup')
@@ -363,6 +379,56 @@ describe('convites e MFA', () => {
 
     it('exige autenticacao', async () => {
       expect((await request(servidor()).post('/api/v1/auth/mfa/setup')).status).toBe(401);
+    });
+
+    describe('trocar um fator ja ativo (#578)', () => {
+      let base32Ativo = '';
+
+      beforeEach(async () => {
+        const setup = await request(servidor())
+          .post('/api/v1/auth/mfa/setup')
+          .set('Cookie', cookieDoDono);
+        base32Ativo = (setup.body as { base32: string }).base32;
+
+        await request(servidor())
+          .post('/api/v1/auth/mfa/confirm')
+          .set('Cookie', cookieDoDono)
+          .send({ code: totp.gerarCodigo(base32ParaBuffer(base32Ativo), Math.floor(Date.now() / 1000)) });
+      });
+
+      it('recusa re-inscricao so com a sessao e nao troca o segredo', async () => {
+        const antes = await db.user.findFirstOrThrow({
+          where: { email: `dono-iam-${sufixo}@exemplo.test` },
+        });
+
+        const resposta = await request(servidor())
+          .post('/api/v1/auth/mfa/setup')
+          .set('Cookie', cookieDoDono);
+
+        expect(resposta.status).toBe(403);
+        expect(resposta.body).toMatchObject({ code: 'MFA_REQUIRED' });
+
+        const depois = await db.user.findFirstOrThrow({
+          where: { email: `dono-iam-${sufixo}@exemplo.test` },
+        });
+        expect(depois.mfaStatus).toBe('ENABLED');
+        expect(Buffer.from(depois.mfaSecretCiphertext ?? []).equals(Buffer.from(antes.mfaSecretCiphertext ?? []))).toBe(true);
+      });
+
+      it('aceita a troca com o codigo do fator atual', async () => {
+        const codigoAtual = totp.gerarCodigo(
+          base32ParaBuffer(base32Ativo),
+          Math.floor(Date.now() / 1000) + 30,
+        );
+
+        const resposta = await request(servidor())
+          .post('/api/v1/auth/mfa/setup')
+          .set('Cookie', cookieDoDono)
+          .send({ code: codigoAtual });
+
+        expect(resposta.status).toBe(201);
+        expect((resposta.body as { base32: string }).base32).not.toBe(base32Ativo);
+      });
     });
   });
 
