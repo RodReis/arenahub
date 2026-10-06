@@ -5,9 +5,14 @@
 > `DS-APP.md` e `DS-TOTEM.md` (contrato de implementação por superfície, ADR-026).
 > Onde divergir, o documento normativo vence.
 
-## Register
+<!-- impeccable:product-schema 1 -->
 
-product
+## Platform
+
+web
+
+> O painel (`admin-web`) e o totem (`kiosk`) são web. O app do aluno (`mobile`, Expo) tem contrato
+> próprio em `docs/design/DS-APP.md` e não é coberto por este registro.
 
 ## Users
 
@@ -45,6 +50,67 @@ Duas verdades estruturais que a interface precisa respeitar, e que não são neg
 - **A nuvem é a fonte da verdade; o Edge é executor físico.** O painel mostra a idade do cache
   offline, não apenas online/offline — "desatualizado" e "indisponível" são situações diferentes e
   pedem ações diferentes.
+
+## Positioning
+
+**Cadeia única** (confirmado pelo PI em 05/10/2026). Matrícula → cobrança → direito de acesso →
+catraca facial → frequência → retenção vivem **num modelo só**, e não em sistemas costurados. Duas
+consequências que um concorrente que integra módulos separados não pode afirmar com verdade:
+
+- **Pagamento não abre catraca — entitlement abre.** A catraca nunca consulta assinatura nem
+  fatura; a decisão de acesso tem uma razão própria (`NO_ENTITLEMENT`, `WRONG_UNIT`, …).
+- **A recepção vê a razão exata de cada negação**, no mesmo lugar onde cobra e onde libera — não
+  "acesso negado" genérico.
+
+Catraca facial, recorrência, avaliação física e gamificação **não** são diferencial em 2026 — são
+exigência mínima do mercado (`docs/LANDSCAPE.md` §1, §2, §5).
+
+## Operating Context
+
+- **Balcão da academia:** recepção de pé, luz fluorescente, aluno esperando, monitor de 1280 px.
+  Abre o painel quando algo deu errado na catraca ou para receber no balcão.
+- **Maquininha física não integrada:** a academia recebe por ela (dinheiro, PIX, débito, crédito)
+  e dá baixa manual no painel (`billing.payment.manual`). O lançamento manual é controlado por
+  auditoria, não por aprovação dupla (ADR-027).
+- **Catraca Topdata Inner Fit com leitor facial** na unidade; um Edge (PC da academia) executa o
+  acesso offline. A nuvem é a fonte da verdade.
+- **Totem** de autoatendimento na entrada (pagamento, personalização com patrocinador).
+- **Cliente inaugural:** Complexo Arena Positiva, em produção.
+
+## Capabilities and Constraints
+
+- Monorepo NestJS (API) + Next.js 16 (painel, totem) + Expo (app); PostgreSQL com RLS por tenant.
+- Multi-tenant: o tenant vem da identidade autenticada, nunca do corpo da requisição.
+- Dinheiro sempre inteiro em centavos; erro de domínio com código estável e `problem+json`.
+- Toda decisão de produto é do PI (Rodrigo Reis); o Code implementa a partir do `CLAUDE.md`,
+  `docs/` e da Slice do PRD.
+- **Fora do produto:** não é ERP contábil, não emite nota fiscal, não é prontuário médico, não é
+  adquirente, não substitui prescrição profissional (`docs/prd/README.md` §3).
+
+## Evidence on Hand
+
+Liberado pelo PI em 05/10/2026 para uso em tela:
+
+- **Logo e identidade da Arena Positiva** — o arquivo **não está no repositório**; entra pelo
+  upload do tenant (Personalização do totem) ou pedido ao PI. Não recriar nem aproximar a marca.
+- **Fotos reais da unidade** — **não estão no repositório**; pedir ao PI. `apps/admin-web/public/login/hero.jpg`
+  é render, não foto da unidade.
+- **Dados reais agregados de operação** (alunos ativos, receita, frequência) — **sempre sem dado
+  pessoal**; nunca nome, CPF, foto ou dado de saúde de aluno real em tela de exemplo, fixture ou
+  golden file.
+
+Não existem e **não devem ser inventados**: depoimentos, logos de outros clientes, números de
+mercado próprios, prêmios ou certificações.
+
+## Product Principles
+
+1. **A cadeia é uma só.** Toda tela mostra em que elo o aluno está e por quê; nenhuma tela trata
+   cobrança e acesso como assuntos separados.
+2. **A razão certa, nunca a confortável.** Estado, razão e próximo passo aparecem juntos; achatar
+   razões distintas faz a recepção agir errado com confiança.
+3. **O balcão vence.** Quando o uso da recepção e o da gerência conflitam, a recepção ganha.
+4. **Toda exceção deixa rastro.** Liberação, cancelamento e baixa manual exigem motivo e entram em
+   auditoria — o controle é detectivo, e a tela precisa torná-lo visível.
 
 ## Brand Personality
 
