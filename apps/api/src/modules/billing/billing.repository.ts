@@ -41,6 +41,20 @@ export class PlanoSemPrecoVigenteError extends ErroDeDominio {
   }
 }
 
+/**
+ * A correcao de valor existe para restaurar o preco vigente do plano na
+ * competencia (issue #419), nao para editar o valor livremente.
+ */
+export class ValorForaDoPrecoVigenteError extends ErroDeDominio {
+  constructor() {
+    super(
+      'BILLING_AMOUNT_NOT_PLAN_PRICE',
+      422,
+      'A correcao so aceita o preco vigente do plano na competencia da fatura',
+    );
+  }
+}
+
 export class InvoiceNaoEncontradaError extends ErroDeDominio {
   constructor() {
     super('INVOICE_NOT_FOUND', 404, 'Invoice nao encontrada');
@@ -342,7 +356,7 @@ export class BillingRepository {
   ): Promise<Invoice> {
     const invoice = await this.db.invoice.findFirst({
       where: { id: entrada.invoiceId, tenantId: contexto.tenantId },
-      include: { items: true },
+      include: { items: true, subscription: { include: { plan: { include: { prices: true } } } } },
     });
 
     if (!invoice) {
@@ -355,6 +369,18 @@ export class BillingRepository {
       throw new InvoiceComMaisDeUmItemError();
     }
 
+    // Sem esta conferencia, `billing.manage` (que o Financeiro padrao tem, e
+    // `billing.payment.manual` nao) levava uma fatura de 12000 a 1 e a 0.
+    const preco = precoVigenteEm(invoice.subscription.plan.prices, invoice.billingPeriod);
+
+    if (!preco) {
+      throw new PlanoSemPrecoVigenteError();
+    }
+
+    if (preco.amountMinor !== entrada.novoValorUnitarioMinor) {
+      throw new ValorForaDoPrecoVigenteError();
+    }
+
     const item = invoice.items[0]!;
     const totais = corrigirValorDaInvoice({
       quantity: item.quantity,
@@ -363,6 +389,23 @@ export class BillingRepository {
     });
 
     return this.db.$transaction(async (tx) => {
+      // O status e conferido DENTRO da transacao, na propria escrita: um
+      // pagamento que fechou a invoice depois da leitura acima nao pode ser
+      // sobrescrito (a invoice PAID ja tem dinheiro reconhecido contra o valor
+      // anterior, INV-069).
+      const marcada = await tx.invoice.updateMany({
+        where: { id: invoice.id, status: { in: ['OPEN', 'OVERDUE'] } },
+        data: {
+          subtotalMinor: totais.subtotalMinor,
+          totalMinor: totais.totalMinor,
+          version: { increment: 1 },
+        },
+      });
+
+      if (marcada.count === 0) {
+        throw new TransicaoDeInvoiceConcorrenteError(invoice.id);
+      }
+
       await tx.invoiceItem.update({
         where: { id: item.id },
         data: {
@@ -371,14 +414,7 @@ export class BillingRepository {
         },
       });
 
-      const atualizada = await tx.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          subtotalMinor: totais.subtotalMinor,
-          totalMinor: totais.totalMinor,
-          version: { increment: 1 },
-        },
-      });
+      const atualizada = await tx.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
 
       await tx.studentTimelineEvent.create({
         data: {
