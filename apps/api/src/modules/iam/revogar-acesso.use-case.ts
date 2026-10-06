@@ -155,6 +155,16 @@ export class RevogarAcessoUseCase {
         });
       }
 
+      /*
+       * Os convites PENDENTES que esta pessoa emitiu morrem com o acesso dela
+       * (#598): sem isto um gerente revogado deixava um convite MANAGER vivo
+       * por ate 24 h. Convites anteriores a coluna `invitedById` nao entram.
+       */
+      await tx.invitation.updateMany({
+        where: { tenantId, invitedById: userId, status: 'PENDING' },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      });
+
       await tx.auditLog.create({
         data: {
           tenantId,

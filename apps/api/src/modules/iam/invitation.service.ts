@@ -110,6 +110,7 @@ export class InvitationService {
           tenantId: contexto.tenantId,
           email: dados.email.trim().toLowerCase(),
           roleId: dados.roleId,
+          invitedById: contexto.actorId,
           ...(dados.gymUnitId ? { gymUnitId: dados.gymUnitId } : {}),
           tokenHash: this.hashDe(token),
           expiresAt: new Date(Date.now() + VALIDO_POR_HORAS * 60 * 60 * 1000),

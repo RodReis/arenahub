@@ -1392,18 +1392,21 @@ model Session {
 /// Convite de uso unico. Tambem guarda so o hash: o link e mostrado uma vez
 /// a quem convidou e nunca mais recuperavel.
 model Invitation {
-  id         String           @id @default(uuid()) @db.Uuid
-  tenantId   String           @map("tenant_id") @db.Uuid
-  email      String
-  roleId     String           @map("role_id") @db.Uuid
-  gymUnitId  String?          @map("gym_unit_id") @db.Uuid
-  tokenHash  String           @unique @map("token_hash")
-  status     InvitationStatus @default(PENDING)
-  expiresAt  DateTime         @map("expires_at")
-  acceptedAt DateTime?        @map("accepted_at")
-  revokedAt  DateTime?        @map("revoked_at")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  email       String
+  roleId      String           @map("role_id") @db.Uuid
+  gymUnitId   String?          @map("gym_unit_id") @db.Uuid
+  /// Quem emitiu o convite. Nulo nos anteriores a #598. Sem FK, como `gymUnitId`:
+  /// serve para revogar os pendentes de quem perde o acesso.
+  invitedById String?          @map("invited_by_id") @db.Uuid
+  tokenHash   String           @unique @map("token_hash")
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime         @map("expires_at")
+  acceptedAt  DateTime?        @map("accepted_at")
+  revokedAt   DateTime?        @map("revoked_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
