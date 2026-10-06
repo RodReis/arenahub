@@ -24,14 +24,19 @@ function contadorFake(): ThrottlerStorage & { chaves: string[] } {
 
   return {
     chaves,
-    increment: (async (chave: string, _ttl: number, limite: number) => {
+    increment: (chave: string, _ttl: number, limite: number) => {
       chaves.push(chave);
       const total = (hits.get(chave) ?? 0) + 1;
       hits.set(chave, total);
 
-      return { totalHits: total, timeToExpire: 0, isBlocked: total > limite, timeToBlockExpire: 0 };
-    }) as unknown as ThrottlerStorage['increment'],
-  } as ThrottlerStorage & { chaves: string[] };
+      return Promise.resolve({
+        totalHits: total,
+        timeToExpire: 0,
+        isBlocked: total > limite,
+        timeToBlockExpire: 0,
+      });
+    },
+  };
 }
 
 function montarServico(opcoes: {
@@ -168,8 +173,8 @@ describe('StudentIdentityService.entrar -- teto por conta', () => {
 
   it('o bloqueio e da conta: outra conta segue entrando', async () => {
     const encontrar = jest.fn() as MockQualquer;
-    encontrar.mockImplementation(async (_t: string, identificador: string) =>
-      conta(identificador === 'a' ? 'conta-a' : 'conta-b'),
+    encontrar.mockImplementation((_t: string, identificador: string) =>
+      Promise.resolve(conta(identificador === 'a' ? 'conta-a' : 'conta-b')),
     );
     const { servico, senhas } = montarServico({
       contas: { encontrarPorIdentificador: encontrar },
