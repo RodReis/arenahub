@@ -231,6 +231,48 @@ describe('perfis de sistema e revogacao de acesso', () => {
       expect(papeis).toBe(0);
     });
 
+    // #582: o vinculo e os papeis morriam, mas a sessao seguia renovavel.
+    it('derruba as sessoes do usuario NESTE tenant e deixa as de outro tenant', async () => {
+      const contexto = await criarSuperAdmin();
+      const tenantId = await criarTenantDeTeste(contexto);
+      const outroTenantId = await criarTenantDeTeste(contexto);
+      const dono = await criarMembro(tenantId, 'OWNER');
+      const alvo = await criarMembro(tenantId, 'RECEPTION');
+
+      const abrirSessao = (dono_: string, tenant: string) =>
+        db.session.create({
+          data: {
+            userId: dono_,
+            tenantId: tenant,
+            tokenHash: randomUUID(),
+            familyId: randomUUID(),
+            expiresAt: new Date(Date.now() + 3_600_000),
+          },
+        });
+
+      const daqui = await abrirSessao(alvo, tenantId);
+      const rotacionada = await db.session.create({
+        data: {
+          userId: alvo,
+          tenantId,
+          tokenHash: randomUUID(),
+          familyId: randomUUID(),
+          status: 'ROTATED',
+          expiresAt: new Date(Date.now() + 3_600_000),
+        },
+      });
+      const deOutro = await abrirSessao(alvo, outroTenantId);
+
+      await revogar.executar(contextoDe(tenantId, dono), alvo, MOTIVO, `corr-${randomUUID()}`);
+
+      const status = async (id: string) =>
+        (await db.session.findUniqueOrThrow({ where: { id } })).status;
+
+      expect(await status(daqui.id)).toBe('REVOKED');
+      expect(await status(rotacionada.id)).toBe('REVOKED');
+      expect(await status(deOutro.id)).toBe('ACTIVE');
+    });
+
     it('nao apaga o usuario -- identidade e global, o vinculo e por tenant', async () => {
       const contexto = await criarSuperAdmin();
       const tenantId = await criarTenantDeTeste(contexto);

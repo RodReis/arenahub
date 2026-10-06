@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { InjectThrottlerStorage, minutes, type ThrottlerStorage } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import { MfaService } from '../auth/mfa.service.js';
@@ -77,6 +78,23 @@ const esquemaDeFiltroDeItens = z
   })
   .strict();
 
+/**
+ * Teto de tentativas do codigo de step-up POR USUARIO. Soma TODA tentativa (como
+ * o MFA do login): `ThrottlerStorage` so expoe `increment`, e um contador que
+ * so soma em erro nunca travaria o codigo CERTO acertado depois do estouro. So
+ * existia o limite global por IP -- quem tem a sessao trocando de IP tentava
+ * seis digitos sem teto por usuario.
+ */
+const JANELA_DE_TENTATIVAS_DO_STEP_UP_MS = minutes(1);
+const LIMITE_DE_TENTATIVAS_DO_STEP_UP = 5;
+const BLOQUEIO_DO_STEP_UP_MS = minutes(5);
+
+export class StepUpBloqueadoPorTentativasError extends ErroDeDominio {
+  constructor() {
+    super('BILLING_STEP_UP_LOCKED', 429, 'muitas tentativas de confirmacao; aguarde alguns minutos');
+  }
+}
+
 export class StepUpNaoConfirmadoError extends ErroDeDominio {
   constructor() {
     /**
@@ -123,6 +141,7 @@ export class EstornoConciliacaoController {
     private readonly mfa: MfaService,
     private readonly db: PrismaService,
     private readonly contexto: TenantContextService,
+    @InjectThrottlerStorage() private readonly forcaBruta: ThrottlerStorage,
   ) {}
 
   /**
@@ -149,6 +168,16 @@ export class EstornoConciliacaoController {
      * nao confirmou -- e o indice parcial travaria o estorno legitimo
      * seguinte.
      */
+    const tentativas = await this.forcaBruta.increment(
+      `stepup:${contexto.actorId}`,
+      JANELA_DE_TENTATIVAS_DO_STEP_UP_MS,
+      LIMITE_DE_TENTATIVAS_DO_STEP_UP,
+      BLOQUEIO_DO_STEP_UP_MS,
+      'refund-stepup-bruteforce',
+    );
+
+    if (tentativas.isBlocked) throw new StepUpBloqueadoPorTentativasError();
+
     try {
       await this.mfa.verificar(contexto.actorId, dados.codigoMfa);
     } catch {

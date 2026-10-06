@@ -64,6 +64,8 @@ export class AuthGuard implements CanActivate {
        */
       if (claims.canal === 'MOBILE') throw new NaoAutenticadoError();
 
+      await this.exigirSessaoNaoRevogada(claims.sessionId);
+
       // Token SEM tenant = sessao de plataforma. E o unico caminho em que
       // nao existe `TenantContext`, e toda rota de tenant o rejeita.
       if (claims.tenantId === null || claims.tenantId === undefined) {
@@ -88,6 +90,26 @@ export class AuthGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  /**
+   * Logout, troca de senha e revogacao de acesso derrubam a SESSAO, mas o token
+   * de acesso vale dez minutos: sem esta leitura, ele seguia aceito ate la.
+   *
+   * So recusa a sessao que EXISTE e esta `REVOKED`. `ROTATED` passa de
+   * proposito: depois de um refresh, as requisicoes em voo ainda levam o token
+   * do elo anterior, e recusa-las deslogaria o painel a cada renovacao.
+   * Linha ausente tambem passa -- manter o que valia antes desta checagem.
+   */
+  private async exigirSessaoNaoRevogada(sessionId: string | undefined): Promise<void> {
+    if (!sessionId) return;
+
+    const sessao = await this.db.session.findUnique({
+      where: { id: sessionId },
+      select: { status: true },
+    });
+
+    if (sessao?.status === 'REVOKED') throw new NaoAutenticadoError();
   }
 
   /**
