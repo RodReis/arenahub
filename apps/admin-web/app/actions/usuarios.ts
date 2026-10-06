@@ -97,6 +97,14 @@ const MENSAGEM: Record<string, string> = {
   INVITATION_INVALID: 'Convite inválido ou expirado. Peça um novo à academia.',
 
   /*
+   * E-mail que já tem conta (de outra academia, por exemplo): a identidade é
+   * global, então o convite só se aceita provando a senha dessa conta.
+   */
+  INVITATION_EXISTING_ACCOUNT:
+    'Este e-mail já tem conta no ArenaHub. Digite a senha que você já usa para entrar, nos dois campos.',
+  INVITATION_LOCKED: 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
+
+  /*
    * Recusas da revogação de acesso (F80). Cada uma pede um ato diferente de
    * quem está na tela, então cada uma tem frase própria.
    */

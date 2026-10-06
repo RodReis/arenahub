@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectThrottlerStorage, minutes, type ThrottlerStorage } from '@nestjs/throttler';
 import { comContexto, type Invitation } from '@arenahub/database';
 
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
@@ -12,6 +13,17 @@ import { ehDono, SoDonoMexeEmDonoError } from './protecao-do-dono.js';
 const VALIDO_POR_HORAS = 24;
 const BYTES_DE_TOKEN = 32;
 
+/**
+ * Teto de senhas erradas por e-mail ao aceitar convite para conta que ja
+ * existe. A rota e publica e o token vale para qualquer e-mail que quem
+ * convida escolha: sem teto, ela viraria um oraculo de senha contra a conta de
+ * qualquer pessoa. Soma por E-MAIL (nao por IP) porque o atacante controla os
+ * convites -- e os IPs.
+ */
+const JANELA_DE_SENHA_DE_CONVITE_MS = minutes(1);
+const LIMITE_DE_SENHAS_ERRADAS_NO_CONVITE = 5;
+const BLOQUEIO_DE_SENHA_DE_CONVITE_MS = minutes(5);
+
 export class ConviteInvalidoError extends ErroDeDominio {
   constructor() {
     // UM erro para expirado, ja aceito, revogado e inexistente. Distinguir
@@ -20,11 +32,30 @@ export class ConviteInvalidoError extends ErroDeDominio {
   }
 }
 
+export class ConviteDeContaExistenteError extends ErroDeDominio {
+  constructor() {
+    // Dito de forma explicita porque quem chega aqui tem o token do convite:
+    // o e-mail dele e o do convite, entao nao revela nada a um terceiro.
+    super(
+      'INVITATION_EXISTING_ACCOUNT',
+      409,
+      'Este e-mail ja tem conta. Informe a senha atual dela para aceitar o convite',
+    );
+  }
+}
+
+export class ConviteBloqueadoPorTentativasError extends ErroDeDominio {
+  constructor() {
+    super('INVITATION_LOCKED', 429, 'Muitas tentativas. Aguarde alguns minutos');
+  }
+}
+
 @Injectable()
 export class InvitationService {
   constructor(
     private readonly db: PrismaService,
     private readonly senhas: PasswordService,
+    @InjectThrottlerStorage() private readonly forcaBruta: ThrottlerStorage,
   ) {}
 
   /**
@@ -93,6 +124,11 @@ export class InvitationService {
    *
    * Parcial seria pior que nada -- usuario sem papel nao entra, e papel sem
    * vinculo e permissao orfa num tenant.
+   *
+   * `User` e GLOBAL (e-mail unico). Se o e-mail ja tem conta, a senha enviada
+   * precisa ser a DESSA conta: aceitar qualquer senha e descarta-la em silencio
+   * deixava quem convidou primeiro (e escolheu a senha) como dono da conta, e a
+   * pessoa real, convidada depois por outra academia, entrava com a senha dele.
    */
   async aceitar(
     token: string,
@@ -105,6 +141,13 @@ export class InvitationService {
 
     if (!convite || convite.status !== 'PENDING') throw new ConviteInvalidoError();
     if (convite.expiresAt.getTime() <= Date.now()) throw new ConviteInvalidoError();
+
+    const existente = await this.db.user.findUnique({
+      where: { email: convite.email },
+      select: { passwordHash: true },
+    });
+
+    if (existente) await this.exigirSenhaDaContaExistente(convite.email, senha, existente.passwordHash);
 
     const passwordHash = await this.senhas.gerarHash(senha);
 
@@ -163,6 +206,25 @@ export class InvitationService {
         return { userId: usuario.id, tenantId: convite.tenantId };
       }),
     );
+  }
+
+  /** Soma TODA tentativa, como o MFA: contador que so soma em erro nunca travaria o acerto. */
+  private async exigirSenhaDaContaExistente(
+    email: string,
+    senha: string,
+    hashDaConta: string,
+  ): Promise<void> {
+    const registro = await this.forcaBruta.increment(
+      `convite-senha:${email}`,
+      JANELA_DE_SENHA_DE_CONVITE_MS,
+      LIMITE_DE_SENHAS_ERRADAS_NO_CONVITE,
+      BLOQUEIO_DE_SENHA_DE_CONVITE_MS,
+      'invitation-password-bruteforce',
+    );
+
+    if (registro.isBlocked) throw new ConviteBloqueadoPorTentativasError();
+
+    if (!(await this.senhas.conferir(senha, hashDaConta))) throw new ConviteDeContaExistenteError();
   }
 
   private hashDe(token: string): string {
