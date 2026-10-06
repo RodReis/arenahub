@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -32,6 +32,7 @@ _(vazio)_
 ### Sem épico
 
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][SPEC-085][F85] Cancelar pagamento manual lançado errado (#571, finalizado em: 2026-10-06)
 - [MVP1][FIX] aluna em dia barrada no primeiro reconhecimento e financeiro mostrando em dia como devedor (#566, finalizado em: 2026-10-05)
 - [INFRA] CI: job integração e E2E cancelado aos 25 min em todas as branches desde 05/10 (#568, finalizado em: 2026-10-05)
 - [MVP1][FIX] Recepção não consegue adicionar/alterar plano do aluno (#564, finalizado em: 2026-10-05)
