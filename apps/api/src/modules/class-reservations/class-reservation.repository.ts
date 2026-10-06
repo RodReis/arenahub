@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { ClassAttendance, ClassReservation } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
@@ -53,6 +53,16 @@ export class ClassReservationRepository {
 
     const ocorrencia = resolverOcorrencia(aula.trainerId, entrada.occurrenceDate, excecoes);
     if (!ocorrencia.ocorre) throw new OcorrenciaCanceladaError();
+
+    // O aluno tem de ser DESTE tenant: a FK so prova que a linha existe, e com
+    // a excecao ligada nada mais olhava o aluno antes de gravar.
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id: entrada.studentId, tenantId: contexto.tenantId },
+        select: { id: true },
+      }),
+    );
+    if (!aluno) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND' });
 
     if (!entrada.overriddenById) {
       await this.validarEntitlement(contexto, entrada.studentId, aula.modalityId);

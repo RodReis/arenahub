@@ -332,6 +332,52 @@ describe('F78 -- reserva, presenca e aulas inclusas no plano', () => {
     expect(corpo.overriddenById).toBe(conta.userId);
   });
 
+  // #586: o id vindo do corpo gravava como autor da excecao alguem que nao fez
+  // a chamada. Quem sobrescreve e sempre o ator autenticado.
+  it('grava como autor da excecao o ator, nao o id enviado no corpo', async () => {
+    const modalidadeDaAula = await criarModalidade(conta, 'Capoeira');
+    const outraModalidade = await criarModalidade(conta, 'Boxe');
+    const aula = await criarAula(conta, modalidadeDaAula.id, {
+      dayOfWeek: 4,
+      startMinute: 480,
+      capacity: 10,
+    });
+    const aluno = await criarAlunoComAssinatura(conta, outraModalidade.id);
+
+    const resposta = await request(servidor())
+      .post(`/api/v1/units/${conta.unidadeId}/classes/${aula.id}/reservations`)
+      .set('Cookie', conta.cookie)
+      .send({
+        studentId: aluno.id,
+        occurrenceDate: '2026-10-01',
+        overriddenById: randomUUID(),
+      });
+
+    expect(resposta.status).toBe(201);
+    expect((resposta.body as { overriddenById: string | null }).overriddenById).toBe(conta.userId);
+  });
+
+  it('recusa aluno de OUTRO tenant mesmo com a excecao ligada (#586)', async () => {
+    const modalidade = await criarModalidade(conta, 'Natacao');
+    const aula = await criarAula(conta, modalidade.id, {
+      dayOfWeek: 4,
+      startMinute: 540,
+      capacity: 10,
+    });
+
+    const resposta = await request(servidor())
+      .post(`/api/v1/units/${conta.unidadeId}/classes/${aula.id}/reservations`)
+      .set('Cookie', conta.cookie)
+      .send({
+        studentId: randomUUID(),
+        occurrenceDate: '2026-10-01',
+        overriddenById: conta.userId,
+      });
+
+    expect(resposta.status).toBe(404);
+    expect(resposta.body).toMatchObject({ code: 'STUDENT_NOT_FOUND' });
+  });
+
   it('recusa a reserva quando a capacidade da aula ja esta esgotada', async () => {
     const modalidade = await criarModalidade(conta, 'Lotada');
     const aula = await criarAula(conta, modalidade.id, {

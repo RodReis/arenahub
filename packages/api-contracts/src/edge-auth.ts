@@ -143,9 +143,15 @@ export function assinar(requisicao: RequisicaoAssinavel, segredo: string): strin
  * exige buffers do mesmo tamanho, dai a checagem de comprimento antes.
  */
 export function assinaturaConfere(esperada: string, recebida: string): boolean {
-  if (esperada.length !== recebida.length) return false;
+  const a = Buffer.from(esperada, 'utf8');
+  const b = Buffer.from(recebida, 'utf8');
 
-  return timingSafeEqual(Buffer.from(esperada, 'utf8'), Buffer.from(recebida, 'utf8'));
+  // O tamanho que importa e o EM BYTES: um cabecalho multibyte com o mesmo
+  // numero de caracteres passava na checagem de `length` e fazia
+  // `timingSafeEqual` lancar RangeError (500 em vez de 401).
+  if (a.length !== b.length) return false;
+
+  return timingSafeEqual(a, b);
 }
 
 /** Hash do nonce, para guardar sem reter o valor bruto. */

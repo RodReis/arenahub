@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -67,6 +67,13 @@ export class EdgeCommandsController {
     await this.sync.materializarComandos(edge.edgeNodeId, edge.tenantId, agora);
 
     const take = Math.min(Number(limite) || 50, 50);
+
+    // `BigInt('abc')` lanca SyntaxError (500). A sequencia que o Edge devolve e
+    // sempre um inteiro decimal em string, entao qualquer outra coisa e 400.
+    if (after && !/^\d{1,18}$/.test(after)) {
+      throw new BadRequestException({ code: 'VALIDATION_FAILED' });
+    }
+
     const sequencia = after ? BigInt(after) : 0n;
 
     const comandos = await this.sync.listarComandosDisponiveis(
