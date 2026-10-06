@@ -32,8 +32,6 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP7][SPEC-066][FIX] API sobe em produção com role do banco que ignora o RLS, sem nenhum aviso (#584)
-- [FIX] Painel: AuthGuard não confere o status da sessão, e revogar membro não derruba o refresh (#582)
 - [MVP1][FIX] Convite: quem convida define a senha de uma conta global, e ela sobrevive ao convite da pessoa em outra academia (#579)
 - [MVP2][SPEC-016][FIX] Estorno: o step-up de MFA cai com a sessão sozinha, que troca o autenticador (#578)
 - [MVP2][FIX] Cobrança: valores sem teto Int32, pagamento manual com data futura e observe de estorno sob billing.read (#583)
@@ -46,6 +44,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [FIX] Painel: AuthGuard não confere o status da sessão, e revogar membro não derruba o refresh (#582, finalizado em: 2026-10-06)
+- [MVP7][SPEC-066][FIX] API sobe em produção com role do banco que ignora o RLS, sem nenhum aviso (#584, finalizado em: 2026-10-06)
 - [FIX] Dispositivos e edge: POST /devices sem checagem de tenant e pequenas falhas de assinatura e escopo (#586, finalizado em: 2026-10-06)
 - [INFRA] Auditoria de segurança: segunda onda nas áreas adiadas da run-1 (#587, finalizado em: 2026-10-06)
 - [MVP2][SPEC-085][F85] Cancelar pagamento manual lançado errado (#571, finalizado em: 2026-10-06)
