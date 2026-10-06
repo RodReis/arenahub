@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
+import { comContexto } from '@arenahub/database';
+
 import type { EventoDeOutbox } from './domain/mapa-de-avisos.js';
 import { PORTA_DE_DISPATCH, type EventoPendente, type PortaDeDispatch } from './outbox-dispatcher.repository.js';
 
@@ -100,7 +102,11 @@ export class OutboxDispatcherService {
       if (jaProcessado) continue;
 
       try {
-        await consumidor.processar(evento, agora);
+        // `students` tem RLS: o despachante nao passa pelo interceptor que abre
+        // o escopo nas rotas, entao cada entrega abre o do tenant do evento.
+        await comContexto({ kind: 'system', tenantId: evento.tenantId }, () =>
+          consumidor.processar(evento, agora),
+        );
         await this.porta.registrarProcessado(consumidor.nome, evento.id);
         entregas += 1;
       } catch (erro: unknown) {
