@@ -99,8 +99,17 @@ mostra.
 `ANTHROPIC_API_KEY`, `CONTRATADA_CNPJ`, `CONTRATADA_EMAIL`, `CONTRATADA_ENDERECO`,
 `CONTRATADA_RAZAO_SOCIAL`, `CONTRATADA_REPRESENTANTE`, `DATABASE_URL`, `JWT_PRIVATE_KEY`,
 `JWT_PUBLIC_KEY`, `MFA_ENCRYPTION_KEY`, `NODE_ENV`, `PORT`, `RAILPACK_DEPLOY_APT_PACKAGES`,
-`REDIS_URL`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_BUCKET`, `STORAGE_ENDPOINT`, `STORAGE_REGION`,
-`STORAGE_SECRET_ACCESS_KEY` — mais as `RAILWAY_*` injetadas automaticamente pela plataforma.
+`REDIS_URL`, `RUNTIME_DATABASE_URL` (ver abaixo), `STORAGE_ACCESS_KEY_ID`, `STORAGE_BUCKET`,
+`STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_SECRET_ACCESS_KEY` — mais as `RAILWAY_*` injetadas
+automaticamente pela plataforma.
+
+**`RUNTIME_DATABASE_URL` e o RLS.** A segunda camada de isolamento por tenant (RLS) só protege se a
+API conectar como o role `arenahub_app` (`NOBYPASSRLS`, sem superusuário): o dono do banco e o
+superusuário ignoram as políticas, mesmo com `FORCE`. Quando `RUNTIME_DATABASE_URL` falta, a API cai
+em silêncio para `DATABASE_URL` (o role dono). Desde a issue #584, a API **avisa no log, em
+produção, na subida** (`RLS DESLIGADO NA PRATICA`) se o role da conexão é superusuário ou tem
+`BYPASSRLS`. Hoje só avisa; transformar em falha de boot depende de conferir antes o estado real da
+produção, senão o deploy derruba o serviço.
 
 ### 3.2 `@arenahub/admin-web`
 

@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import {
   aplicarContextoNaTransacao,
   contextoRls,
@@ -8,6 +8,8 @@ import {
   SemContextoDeTenantError,
   type TenantDbContext,
 } from '@arenahub/database';
+
+import { avisoDeRoleSemRls, type AtributosDoRole } from './role-do-banco.js';
 
 /**
  * Modelos com politica RLS ativa (F66). So eles exigem contexto.
@@ -140,6 +142,28 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit(): Promise<void> {
     await this.$connect();
+    await this.avisarSeRoleIgnoraRls();
+  }
+
+  /**
+   * Em producao, avisa no log se o role da conexao ignora o RLS (issue #584).
+   * Nunca lanca: so informa. Falhar o boot antes de confirmar o estado real da
+   * producao derrubaria o servico.
+   */
+  private async avisarSeRoleIgnoraRls(): Promise<void> {
+    if (process.env['NODE_ENV'] !== 'production') return;
+
+    try {
+      const [role] = await this.$queryRaw<AtributosDoRole[]>`
+        select rolname, rolsuper, rolbypassrls from pg_roles where rolname = current_user
+      `;
+      const aviso = role ? avisoDeRoleSemRls(role) : null;
+
+      if (aviso) new Logger(PrismaService.name).error(aviso);
+    } catch {
+      // Sem permissao para ler `pg_roles` (ou qualquer outra falha): o aviso e
+      // um extra, nao pode derrubar a subida.
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
