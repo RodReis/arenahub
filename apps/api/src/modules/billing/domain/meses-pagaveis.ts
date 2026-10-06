@@ -190,6 +190,21 @@ export function instanteDoPagamento(dia: Date, agora: Date): Date {
   return dia.getTime() === hoje ? agora : new Date(dia.getTime() + 12 * 60 * 60 * 1000);
 }
 
+/**
+ * Recusa pagamento manual datado depois de hoje. Compara o DIA (UTC), como
+ * `instanteDoPagamento` faz no lote: o painel manda o instante de agora, e uma
+ * comparacao de instante exato recusaria um pagamento legitimo por milissegundos
+ * de diferenca entre os relogios do painel e da API.
+ */
+export function exigirPagamentoNaoFuturo(paidAt: Date, agora: Date): void {
+  const dia = Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth(), paidAt.getUTCDate());
+  const hoje = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate());
+
+  if (dia > hoje) {
+    throw new DataDePagamentoFuturaError();
+  }
+}
+
 /** Fim da vigencia: data do pagamento + 30 dias por mes pago, acumulando. */
 export function vencimentoAposPagamento(dia: Date, mesesPagos: number): Date {
   return new Date(dia.getTime() + mesesPagos * DIAS_POR_MES_PAGO * MS_POR_DIA);
