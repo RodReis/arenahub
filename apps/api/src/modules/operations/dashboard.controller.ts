@@ -119,7 +119,19 @@ const ESQUEMA_DO_DASHBOARD = {
             enum: ['DELINQUENCY', 'STUDENT_REQUEST', 'MEDICAL', 'CONDUCT'],
           },
           quantidade: { type: 'integer' },
-          alunos: { type: 'array', items: { type: 'string' } },
+          alunos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['id', 'nome', 'temFoto', 'nota'],
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                nome: { type: 'string' },
+                temFoto: { type: 'boolean' },
+                nota: { type: 'string', nullable: true },
+              },
+            },
+          },
         },
       },
     },

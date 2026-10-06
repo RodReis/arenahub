@@ -56,6 +56,16 @@ export interface ResumoDoDia {
   override: number;
 }
 
+/** Uma pessoa do bloco: o que o cartao precisa para mostrar foto, nome e o caso concreto. */
+export interface PessoaRestrita {
+  id: string;
+  nome: string;
+  /** So a existencia da foto -- ela e servida por `/fotos-de-aluno/:id`. */
+  temFoto: boolean;
+  /** `statusReasonNote`: o "o que exatamente" ao lado da razao fechada. */
+  nota: string | null;
+}
+
 export interface ContagemDeSituacao {
   /** `SUSPENDED` ou `BLOCKED`. */
   status: string;
@@ -63,13 +73,13 @@ export interface ContagemDeSituacao {
   motivo: string | null;
   quantidade: number;
   /**
-   * QUEM sao -- ate cinco nomes, para a recepcao reconhecer sem abrir a grid.
+   * QUEM sao -- ate cinco pessoas, para a recepcao reconhecer sem abrir a grid.
    *
    * "2 bloqueados" nao ajuda quem esta no balcao: a pergunta e "quem?". Cinco
    * cabem na linha sem quebrar o cartao; acima disso a lista vira parede de
    * texto e a contagem ao lado passa a ser a informacao util.
    */
-  alunos: readonly string[];
+  alunos: readonly PessoaRestrita[];
 }
 
 /**
@@ -162,7 +172,14 @@ export class DashboardRepository {
           gymUnitId,
           status: { in: ['SUSPENDED', 'BLOCKED'] },
         },
-        select: { fullName: true, status: true, statusReason: true },
+        select: {
+          id: true,
+          fullName: true,
+          status: true,
+          statusReason: true,
+          statusReasonNote: true,
+          photoObjectKey: true,
+        },
         // Ordem ESTAVEL na lista de nomes tambem: sem isto os cinco exibidos
         // trocariam entre dois carregamentos, e a recepcao leria nomes
         // diferentes para a mesma situacao.
@@ -170,17 +187,25 @@ export class DashboardRepository {
       }),
     );
 
-    const porGrupo = new Map<string, { status: string; motivo: string | null; nomes: string[] }>();
+    const porGrupo = new Map<
+      string,
+      { status: string; motivo: string | null; pessoas: PessoaRestrita[] }
+    >();
 
     for (const aluno of alunos) {
       const chave = `${aluno.status}::${aluno.statusReason ?? ''}`;
       const grupo = porGrupo.get(chave) ?? {
         status: aluno.status,
         motivo: aluno.statusReason,
-        nomes: [],
+        pessoas: [],
       };
 
-      grupo.nomes.push(aluno.fullName);
+      grupo.pessoas.push({
+        id: aluno.id,
+        nome: aluno.fullName,
+        temFoto: aluno.photoObjectKey !== null,
+        nota: aluno.statusReasonNote,
+      });
       porGrupo.set(chave, grupo);
     }
 
@@ -188,8 +213,8 @@ export class DashboardRepository {
       .map((g) => ({
         status: g.status,
         motivo: g.motivo,
-        quantidade: g.nomes.length,
-        alunos: g.nomes.slice(0, NOMES_POR_SITUACAO),
+        quantidade: g.pessoas.length,
+        alunos: g.pessoas.slice(0, NOMES_POR_SITUACAO),
       }))
       .sort(compararSituacoes);
   }

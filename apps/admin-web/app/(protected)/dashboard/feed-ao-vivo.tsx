@@ -190,7 +190,9 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes, ani
   if (situacoes !== undefined) {
     abas.push({
       id: 'bloqueados',
-      label: 'Bloqueados e suspensos',
+      // Soma DUAS coisas -- cadastro travado e barrados na catraca --, e o
+      // título diz as duas: era "Bloqueados e suspensos" com o 4 de 2 + 2.
+      label: 'Restrições e recusas',
       icon: 'user-x',
       contador: totalDeBloqueados(situacoes) + recusados.length,
       // Com alguem travado ou barrado, o contador fica vermelho mesmo com a
@@ -198,6 +200,7 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes, ani
       ...(totalDeBloqueados(situacoes) + recusados.length > 0 ? { tomDoContador: 'danger' as const } : {}),
       content: (
         <ConteudoDeBloqueados
+          gymUnitId={gymUnitId}
           situacoes={situacoes}
           recusados={recusados}
           agora={agora}
