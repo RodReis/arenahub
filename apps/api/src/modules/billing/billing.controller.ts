@@ -26,6 +26,7 @@ import {
 import { ConsultarStatusDePagamentoUseCase } from './consultar-status-de-pagamento.use-case.js';
 import { ConsultarTentativaUseCase } from './consultar-tentativa.use-case.js';
 import { ConsultarMesesPagaveisUseCase } from './consultar-meses-pagaveis.use-case.js';
+import { exigirPagamentoNaoFuturo } from './domain/meses-pagaveis.js';
 import { RegistrarPagamentoEmLoteUseCase } from './registrar-pagamento-em-lote.use-case.js';
 import { CancelarPagamentoManualUseCase, type PagamentoCancelado } from './cancelar-pagamento-manual.use-case.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
@@ -193,6 +194,13 @@ const esquemaDoResumo = z
   })
   .strict();
 
+/**
+ * Teto de qualquer valor em centavos que chega do corpo: as colunas de dinheiro
+ * sao `Int` (32 bits). Sem o `.max()`, um valor maior passava pelo schema e
+ * estourava no banco como 500 dentro da transacao, em vez de 4xx.
+ */
+const TETO_DE_CENTAVOS = 2_147_483_647;
+
 const esquemaDePagamentoManual = z
   .object({
     /**
@@ -200,7 +208,7 @@ const esquemaDePagamentoManual = z
      * chegar ao dominio, que recusa de novo. Duas barreiras porque valor
      * vindo de fora e a entrada classica de float em dinheiro.
      */
-    amountMinor: z.number().int().min(0),
+    amountMinor: z.number().int().min(0).max(TETO_DE_CENTAVOS),
     paidAt: z.iso.datetime(),
     /**
      * Razao obrigatoria: com a dupla permissao fora do MVP 2, a trilha e o
@@ -220,7 +228,7 @@ const esquemaDePagamentoManual = z
 /** Correcao de valor de invoice ainda nao paga. Issue #419. */
 const esquemaDeCorrecaoDeValor = z
   .object({
-    novoValorUnitarioMinor: z.number().int().min(0),
+    novoValorUnitarioMinor: z.number().int().min(0).max(TETO_DE_CENTAVOS),
     reason: z.string().min(3).max(300),
   })
   .strict();
@@ -235,8 +243,8 @@ const esquemaDePagamentoEmLote = z
     /** Dia em que o aluno pagou ('YYYY-MM-DD'), informado pela recepcao. */
     paidAt: z.iso.date(),
     channel: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
-    expectedTotalMinor: z.number().int().min(0),
-    receivedAmountMinor: z.number().int().min(0).optional(),
+    expectedTotalMinor: z.number().int().min(0).max(TETO_DE_CENTAVOS),
+    receivedAmountMinor: z.number().int().min(0).max(TETO_DE_CENTAVOS).optional(),
   })
   .strict();
 
@@ -565,6 +573,10 @@ export class BillingController {
     @Req() requisicao: Request,
   ): Promise<InvoiceDto> {
     const dados = esquemaDePagamentoManual.parse(corpo);
+
+    // Data futura distorce o resumo financeiro e as janelas de conciliacao, que
+    // usam `paidAt`; o lote ja recusava, o recebimento avulso nao.
+    exigirPagamentoNaoFuturo(new Date(dados.paidAt), new Date());
 
     await this.billing.registrarPagamentoManual(
       this.contexto.require(),

@@ -492,4 +492,133 @@ describe('F12 -- endpoints de invoice e pagamento manual', () => {
       expect(resposta.status).toBe(401);
     });
   });
+
+  /**
+   * #581 e #583 -- hardening de cobranca da auditoria run-1. A correcao de
+   * valor existe para restaurar o preco vigente do plano (#419); `billing.manage`
+   * (que o Financeiro padrao tem, e `billing.payment.manual` nao) levava uma
+   * fatura de 12000 a 1 e a 0. O Int32 vazava como 500.
+   */
+  describe('correcao de valor e datas do pagamento manual', () => {
+    const PRECO_NOVO = 17_000;
+    let invoiceId = '';
+
+    const corrigir = (corpo: Record<string, unknown>) =>
+      request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/correct-amount`)
+        .set('Cookie', cenario.cookieGestor)
+        .send(corpo);
+
+    const totalNoBanco = async (): Promise<number> =>
+      (await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } })).totalMinor;
+
+    beforeAll(async () => {
+      const aberta = await request(servidor())
+        .post('/api/v1/invoices')
+        .set('Cookie', cenario.cookieGestor)
+        .send({ subscriptionId: cenario.subscriptionId, emQue: '2026-09-12T12:00:00.000Z' });
+      invoiceId = (aberta.body as { id: string }).id;
+
+      // Reajuste que nao propagou: a invoice ja nasceu com 15000 e o preco
+      // vigente na competencia passou a ser 17000.
+      const plano = await db.plan.findFirstOrThrow({ where: { tenantId: cenario.tenantId } });
+      await db.planPrice.create({
+        data: {
+          tenantId: cenario.tenantId,
+          planId: plano.id,
+          amountMinor: PRECO_NOVO,
+          validFrom: new Date('2026-09-01T00:00:00Z'),
+        },
+      });
+    });
+
+    it('recusa valor diferente do preco vigente do plano', async () => {
+      const resposta = await corrigir({ novoValorUnitarioMinor: 1, reason: 'tentativa de baixar' });
+
+      expect(resposta.status).toBe(422);
+      expect(resposta.body).toMatchObject({ code: 'BILLING_AMOUNT_NOT_PLAN_PRICE' });
+      expect(await totalNoBanco()).toBe(PRECO_MINOR);
+    });
+
+    it('recusa zerar a fatura', async () => {
+      const resposta = await corrigir({ novoValorUnitarioMinor: 0, reason: 'tentativa de zerar' });
+
+      expect(resposta.status).toBe(422);
+      expect(await totalNoBanco()).toBe(PRECO_MINOR);
+    });
+
+    it('valor acima do teto de Int e 4xx, nao 500', async () => {
+      const resposta = await corrigir({
+        novoValorUnitarioMinor: 999_999_999_999,
+        reason: 'valor gigante',
+      });
+
+      expect(resposta.status).toBe(400);
+    });
+
+    it('aceita restaurar o preco vigente do plano', async () => {
+      const resposta = await corrigir({
+        novoValorUnitarioMinor: PRECO_NOVO,
+        reason: 'reajuste nao propagou',
+      });
+
+      expect(resposta.status).toBe(201);
+      expect(await totalNoBanco()).toBe(PRECO_NOVO);
+    });
+
+    it('pagamento manual com valor acima do teto de Int e 4xx, nao 500', async () => {
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/manual-payment`)
+        .set('Cookie', cenario.cookieCaixa)
+        .send({
+          amountMinor: 999_999_999_999,
+          paidAt: new Date().toISOString(),
+          reason: 'valor gigante',
+          receivedVia: 'DINHEIRO',
+        });
+
+      expect(resposta.status).toBe(400);
+    });
+
+    it('pagamento manual com data futura e recusado', async () => {
+      const amanha = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/manual-payment`)
+        .set('Cookie', cenario.cookieCaixa)
+        .send({
+          amountMinor: PRECO_NOVO,
+          paidAt: amanha,
+          reason: 'data no futuro',
+          receivedVia: 'DINHEIRO',
+        });
+
+      expect(resposta.status).toBe(422);
+      expect(resposta.body).toMatchObject({ code: 'BILLING_PAID_AT_IN_FUTURE' });
+    });
+
+    it('pagamento manual de AGORA continua passando (o painel manda o instante atual)', async () => {
+      const resposta = await request(servidor())
+        .post(`/api/v1/invoices/${invoiceId}/manual-payment`)
+        .set('Cookie', cenario.cookieCaixa)
+        .send({
+          amountMinor: PRECO_NOVO,
+          paidAt: new Date().toISOString(),
+          reason: 'dinheiro na recepcao',
+          receivedVia: 'DINHEIRO',
+        });
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ status: 'PAID' });
+    });
+
+    it('fatura paga nao aceita correcao', async () => {
+      const resposta = await corrigir({
+        novoValorUnitarioMinor: PRECO_NOVO,
+        reason: 'depois de paga',
+      });
+
+      expect(resposta.status).toBe(422);
+    });
+  });
 });
