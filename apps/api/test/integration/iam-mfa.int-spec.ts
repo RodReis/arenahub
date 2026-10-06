@@ -219,6 +219,77 @@ describe('convites e MFA', () => {
       expect(segunda.body).toMatchObject({ code: 'INVITATION_INVALID' });
     });
 
+    // #579: `User` e global. O aceite descartava em silencio a senha de quem ja
+    // tinha conta e deixava a senha de quem convidou primeiro valendo.
+    describe('e-mail que ja tem conta', () => {
+      const SENHA_DA_CONTA = 'senha-da-conta-que-ja-existe';
+
+      const criarContaExistente = async (email: string): Promise<string> => {
+        const conta = await db.user.create({
+          data: { email, passwordHash: await app.get(PasswordService).gerarHash(SENHA_DA_CONTA) },
+        });
+
+        return conta.id;
+      };
+
+      it('recusa senha diferente da da conta e nao mexe em nada', async () => {
+        const email = `ja-tem-${sufixo}@exemplo.test`;
+        const contaId = await criarContaExistente(email);
+        const antes = await db.user.findUniqueOrThrow({ where: { id: contaId } });
+        const convite = await convidar(email);
+        const token = (convite.body as { token: string }).token;
+
+        const resposta = await request(servidor())
+          .post('/api/v1/users/invitations/accept')
+          .send({ token, password: SENHA_NOVA });
+
+        expect(resposta.status).toBe(409);
+        expect(resposta.body).toMatchObject({ code: 'INVITATION_EXISTING_ACCOUNT' });
+
+        const depois = await db.user.findUniqueOrThrow({ where: { id: contaId } });
+        expect(depois.passwordHash).toBe(antes.passwordHash);
+        expect(await db.tenantMembership.count({ where: { tenantId, userId: contaId } })).toBe(0);
+        expect(
+          (await db.invitation.findFirstOrThrow({ where: { email } })).status,
+        ).toBe('PENDING');
+      });
+
+      it('aceita com a senha da conta e cria so o vinculo e o papel', async () => {
+        const email = `ja-tem-ok-${sufixo}@exemplo.test`;
+        const contaId = await criarContaExistente(email);
+        const antes = await db.user.findUniqueOrThrow({ where: { id: contaId } });
+        const convite = await convidar(email);
+
+        const resposta = await request(servidor())
+          .post('/api/v1/users/invitations/accept')
+          .send({ token: (convite.body as { token: string }).token, password: SENHA_DA_CONTA });
+
+        expect(resposta.status).toBe(200);
+        expect(await db.tenantMembership.count({ where: { tenantId, userId: contaId } })).toBe(1);
+        expect(
+          (await db.user.findUniqueOrThrow({ where: { id: contaId } })).passwordHash,
+        ).toBe(antes.passwordHash);
+      });
+
+      it('trava depois de varias senhas erradas: a rota nao vira oraculo de senha', async () => {
+        const email = `ja-tem-trava-${sufixo}@exemplo.test`;
+        await criarContaExistente(email);
+        const convite = await convidar(email);
+        const token = (convite.body as { token: string }).token;
+
+        let ultima = 0;
+        for (let tentativa = 0; tentativa < 7; tentativa += 1) {
+          ultima = (
+            await request(servidor())
+              .post('/api/v1/users/invitations/accept')
+              .send({ token, password: `chute-numero-${tentativa}` })
+          ).status;
+        }
+
+        expect(ultima).toBe(429);
+      });
+    });
+
     it('recusa convite expirado', async () => {
       const convite = await convidar(`expirado-${sufixo}@exemplo.test`);
       const token = (convite.body as { token: string }).token;

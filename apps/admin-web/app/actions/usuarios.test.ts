@@ -256,4 +256,13 @@ describe('aceitarConvite', () => {
 
     expect(estado.erro).toBe('Convite inválido ou expirado. Peça um novo à academia.');
   });
+
+  it('diz o que fazer quando o e-mail ja tem conta (#579)', async () => {
+    vi.mocked(chamarApi).mockResolvedValue(recusa('INVITATION_EXISTING_ACCOUNT'));
+
+    const estado = await aceitarConvite({}, formularioDeAceite());
+
+    expect(estado.erro).toContain('já tem conta');
+    expect(estado.erro).toContain('senha que você já usa');
+  });
 });
