@@ -324,14 +324,14 @@ export function EditarPlano({
             </fieldset>
 
             {/*
-              QUEM JÁ TEM ASSINATURA NÃO É AFETADO: o direito de acesso guarda
-              um SNAPSHOT da política, copiado quando nasce. Dizer isso evita
-              a recepção achar que corrigiu o acesso de quem já está dentro --
-              e sair procurando por que a catraca não mudou.
+              QUEM JÁ TEM O PLANO RECEBE A ALTERAÇÃO (decisão do PI, 06/10/2026):
+              o horário editado passa a valer na catraca para todos os alunos
+              atuais. Dizer o lado perigoso -- encurtar tira o acesso de quem
+              está dentro -- evita a recepção editar sem saber o alcance.
             */}
             <p role="note" className={estilos['notaDoDialogo']}>
-              A alteração vale para assinaturas novas. Quem já tem plano mantém o acesso que
-              recebeu — para mudar, use “Alterar plano” na ficha do aluno.
+              A alteração vale já para todos os alunos que têm este plano. Se você encurtar o
+              horário ou tirar um dia, quem está dentro perde esse acesso na hora.
             </p>
 
             {/* O preço tem rota própria, com histórico. Ver o botão ao lado. */}

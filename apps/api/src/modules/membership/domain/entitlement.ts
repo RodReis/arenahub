@@ -161,9 +161,10 @@ export function direitoEhEfetivo(
 /**
  * Snapshot imutavel das regras do plano, congelado na derivacao.
  *
- * Existe porque editar um plano NAO pode reescrever retroativamente quem
- * podia entrar ontem. O snapshot e o que o entitlement carrega para sempre;
- * o plano segue a vida dele.
+ * REGISTRO do que valia na concessao -- nao e o que decide o acesso. Quem
+ * decide e `EntitlementUnitWindow`, que `editarPlano` mantem igual ao plano
+ * (decisao do PI, 06/10/2026: o horario editado tem de chegar a quem ja tem
+ * o plano; congelar barrou aluno dentro do horario).
  */
 export interface SnapshotDePolitica {
   /**

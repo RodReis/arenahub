@@ -1031,6 +1031,168 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect(resposta.status).toBe(404);
       expect((resposta.body as { code: string }).code).toBe('PLAN_NOT_FOUND');
     });
+
+    /**
+     * O HORARIO DO PLANO CHEGA A QUEM JA TEM O PLANO (decisao do PI,
+     * 06/10/2026). Ate entao a edicao so valia para assinaturas novas: o
+     * plano "Individuais - Protocolos" foi de 06:00-22:00 para 05:00-23:00 em
+     * 04/10 e o aluno que tentou entrar as 05:18 foi barrado por
+     * `OUTSIDE_SCHEDULE` -- a catraca lia a copia da janela gravada na
+     * ativacao, nao o plano. 541 dos 543 direitos ativos estavam assim.
+     */
+    describe('propaga a quem ja tem o plano', () => {
+      const ativar = async (planId: string, nome: string): Promise<string> => {
+        const criado = await criarAluno(contas.a, { fullName: nome });
+        const assinatura = await request(servidor())
+          .post('/api/v1/subscriptions')
+          .set('Cookie', contas.a.cookie)
+          .send({
+            studentId: (criado.body as { id: string }).id,
+            planId,
+            startsAt: '2026-08-01T00:00:00.000Z',
+            endsAt: '2027-08-01T00:00:00.000Z',
+            reason: 'para testar a propagacao do horario',
+          });
+
+        expect(assinatura.status).toBe(201);
+
+        return (assinatura.body as { entitlement: { id: string } }).entitlement.id;
+      };
+
+      const editarHorario = (planId: string, dias: number[], inicio: number, fim: number) =>
+        request(servidor())
+          .patch(`/api/v1/plans/${planId}`)
+          .set('Cookie', contas.a.cookie)
+          .send({
+            name: `Editado ${randomUUID().slice(0, 6)}`,
+            gymUnitIds: [contas.a.unidadeId],
+            janelas: dias.map((dia) => ({
+              gymUnitId: contas.a.unidadeId,
+              dayOfWeek: dia,
+              startMinute: inicio,
+              endMinute: fim,
+            })),
+          });
+
+      const janelasDoDireito = async (entitlementId: string) =>
+        (
+          await db.entitlementUnitWindow.findMany({
+            where: { entitlementId },
+            orderBy: { dayOfWeek: 'asc' },
+          })
+        ).map((j) => [j.dayOfWeek, j.startMinute, j.endMinute]);
+
+      it('troca as janelas do direito ativo pelas do plano, incluindo dia novo', async () => {
+        const planId = await criarPlano(contas.a);
+        const entitlementId = await ativar(planId, 'Horario Mudou');
+
+        // De seg-sex 06:00-22:00 para seg-sab 05:00-23:00, como o caso real.
+        const resposta = await editarHorario(planId, [1, 2, 3, 4, 5, 6], 300, 1380);
+
+        expect(resposta.status).toBe(200);
+        expect(await janelasDoDireito(entitlementId)).toEqual(
+          [1, 2, 3, 4, 5, 6].map((dia) => [dia, 300, 1380]),
+        );
+      });
+
+      it('encurtar o plano tambem vale: o direito nunca fica com mais do que o plano tem', async () => {
+        const planId = await criarPlano(contas.a);
+        const entitlementId = await ativar(planId, 'Plano Encurtado');
+
+        await editarHorario(planId, [2], 480, 720);
+
+        expect(await janelasDoDireito(entitlementId)).toEqual([[2, 480, 720]]);
+      });
+
+      it('nao toca em direito de outro plano nem em direito ja encerrado', async () => {
+        const planId = await criarPlano(contas.a);
+        const outroPlanoId = await criarPlano(contas.a);
+        const ativoId = await ativar(planId, 'Ativo Do Plano');
+        const revogadoId = await ativar(planId, 'Revogado Do Plano');
+        const deOutroPlanoId = await ativar(outroPlanoId, 'De Outro Plano');
+
+        await db.entitlement.update({ where: { id: revogadoId }, data: { status: 'REVOKED' } });
+
+        await editarHorario(planId, [1], 300, 1380);
+
+        expect(await janelasDoDireito(ativoId)).toEqual([[1, 300, 1380]]);
+        // Encerrado e historico: o que valia quando acabou continua gravado.
+        expect(await janelasDoDireito(revogadoId)).toEqual(
+          [1, 2, 3, 4, 5].map((dia) => [dia, 360, 1320]),
+        );
+        expect(await janelasDoDireito(deOutroPlanoId)).toEqual(
+          [1, 2, 3, 4, 5].map((dia) => [dia, 360, 1320]),
+        );
+      });
+
+      it('direito suspenso recebe (a pausa volta com o horario novo); o vencido nao', async () => {
+        const planId = await criarPlano(contas.a);
+        const suspensoId = await ativar(planId, 'Pausado Do Plano');
+        const vencidoId = await ativar(planId, 'Vencido Do Plano');
+
+        await db.entitlement.update({ where: { id: suspensoId }, data: { status: 'SUSPENDED' } });
+        // Ainda ACTIVE no status, mas ja passou da data: o job de expiracao pode atrasar.
+        await db.entitlement.update({
+          where: { id: vencidoId },
+          data: { endsAt: new Date('2026-09-01T00:00:00.000Z') },
+        });
+
+        await editarHorario(planId, [3], 300, 1380);
+
+        expect(await janelasDoDireito(suspensoId)).toEqual([[3, 300, 1380]]);
+        expect(await janelasDoDireito(vencidoId)).toEqual(
+          [1, 2, 3, 4, 5].map((dia) => [dia, 360, 1320]),
+        );
+      });
+
+      it('atualiza todos quando ha mais direitos que um lote', async () => {
+        const planId = await criarPlano(contas.a);
+        const primeiroId = await ativar(planId, 'Lote Primeiro');
+
+        // 520 > 500 (DIREITOS_POR_LOTE): clona o direito direto no banco, sem 520 HTTP.
+        const modelo = await db.entitlement.findUniqueOrThrow({ where: { id: primeiroId } });
+        const clones = Array.from({ length: 520 }, () => randomUUID());
+
+        await db.entitlement.createMany({
+          data: clones.map((id) => ({
+            id,
+            tenantId: modelo.tenantId,
+            studentId: modelo.studentId,
+            source: modelo.source,
+            subscriptionId: modelo.subscriptionId,
+            status: 'ACTIVE' as const,
+            startsAt: modelo.startsAt,
+            endsAt: modelo.endsAt,
+            policySnapshot: {},
+          })),
+        });
+
+        await editarHorario(planId, [1, 2], 300, 1380);
+
+        const comJanelaNova = await db.entitlementUnitWindow.groupBy({
+          by: ['entitlementId'],
+          where: { entitlementId: { in: [primeiroId, ...clones] }, startMinute: 300 },
+          _count: true,
+        });
+
+        expect(comJanelaNova).toHaveLength(521);
+        expect(comJanelaNova.every((g) => g._count === 2)).toBe(true);
+      });
+
+      it('deixa na auditoria quantos direitos a edicao atualizou', async () => {
+        const planId = await criarPlano(contas.a);
+
+        await ativar(planId, 'Auditoria Um');
+        await ativar(planId, 'Auditoria Dois');
+        await editarHorario(planId, [1], 300, 1380);
+
+        const registro = await db.auditLog.findFirstOrThrow({
+          where: { action: 'plan.updated', targetId: planId },
+        });
+
+        expect((registro.metadata as { direitosAtualizados: number }).direitosAtualizados).toBe(2);
+      });
+    });
   });
 
   describe('ativacao de plano', () => {
@@ -1425,8 +1587,9 @@ describe('F7 -- aluno, plano e entitlement', () => {
     });
 
     /**
-     * O snapshot e imutavel: editar o plano depois NAO altera o direito ja
-     * concedido. E o que impede reescrever retroativamente quem podia entrar.
+     * O SNAPSHOT segue imutavel: e o registro do que valia na concessao. O
+     * horario, esse sim, acompanha o plano -- ver 'propaga a quem ja tem o
+     * plano'. Aqui o plano muda direto no Prisma, fora do `editarPlano`.
      */
     it('mantem o snapshot intacto quando o plano muda depois', async () => {
       const criado = await criarAluno(contas.a, { fullName: 'Snapshot Congelado' });

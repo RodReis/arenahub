@@ -2112,10 +2112,13 @@ model Entitlement {
 
 /// Janela de acesso ja resolvida para o entitlement.
 ///
-/// Duplica a forma de `PlanAccessWindow` de proposito: aquela pertence ao
-/// plano e MUDA quando o plano muda; esta pertence ao direito concedido e
-/// NAO muda. Ler a do plano no momento da decisao reintroduziria exatamente
-/// a retroatividade que o snapshot existe para impedir.
+/// Duplica a forma de `PlanAccessWindow`, mas por outro motivo desde
+/// 06/10/2026 (decisao do PI): o motor le ESTA tabela por direito, e editar o
+/// plano a REESCREVE para todo direito vivo (`editarPlano`). A copia existe
+/// para o motor ler uma tabela so por aluno, nao para congelar o horario --
+/// congelar deixou 541 de 543 direitos com o horario velho e barrou na
+/// catraca quem estava dentro do plano. O que o direito carrega de imutavel
+/// e o `policySnapshot`, que registra o que valia na concessao.
 model EntitlementUnitWindow {
   id       String @id @default(uuid()) @db.Uuid
   /// F67 (ADR-054 §5): `tenant_id` proprio, e nao JOIN ate entitlements.
