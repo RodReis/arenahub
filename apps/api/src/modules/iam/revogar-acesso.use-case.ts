@@ -131,6 +131,23 @@ export class RevogarAcessoUseCase {
 
       await tx.userRole.deleteMany({ where: { tenantId, userId } });
 
+      /*
+       * Derruba as sessoes DESTE tenant: sem isto o refresh seguia valendo e o
+       * membro revogado mantinha uma sessao renovavel (com permissoes vazias,
+       * so alcanca rotas sem permissao). So as deste tenant -- a identidade e
+       * global e o vinculo em outra academia continua valendo.
+       *
+       * DUAS PASSADAS, como `SessionRepository.varrer` (issue #558): um refresh
+       * em voo inseriu o elo novo, ainda nao comitado, que a primeira passada
+       * nao enxerga; cada comando da transacao tira snapshot novo.
+       */
+      for (let passada = 0; passada < 2; passada += 1) {
+        await tx.session.updateMany({
+          where: { userId, tenantId, status: { in: ['ACTIVE', 'ROTATED'] } },
+          data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: 'access_revoked' },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           tenantId,
