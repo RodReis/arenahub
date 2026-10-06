@@ -1354,3 +1354,195 @@ details[open] > summary.cabecalhoDoCartao svg:last-child {
     opacity: 0;
   }
 }
+
+/* ─── Bloqueados e suspensos: blocos no tom do estado ───────────────────────
+ *
+ * Emenda de 05/10/2026 (pedido do PI: "mais destaque, cores, efeitos"). Cada
+ * situacao e um BLOCO tingido pelo proprio estado -- bloqueado `danger`,
+ * suspenso `warning` -- no mesmo idioma do `PainelDeEstado` (DS-PAINEL §4.6b):
+ * aresta superior de 3 px, degrade de 165° que some antes do meio, selo no tom.
+ * Cor e do estado, nunca enfeite; rotulo, motivo e numero continuam escritos.
+ *
+ * Movimento que comunica: os blocos ENTRAM escalonados (o olho le "isto e uma
+ * lista de problemas, um por um") e sobem 2 px no hover. `reduced-motion`
+ * desliga os dois.
+ * ------------------------------------------------------------------------- */
+.blocosDeSituacao {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blocoDeSituacao {
+  --tom: var(--ah-state-neutral);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border: 1px solid color-mix(in srgb, var(--tom) 24%, var(--ah-border-subtle));
+  border-top: 3px solid var(--tom);
+  border-radius: var(--ah-radius-card);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--tom) 10%, var(--ah-surface-raised)) 0%,
+    var(--ah-surface-raised) 58%
+  );
+  box-shadow: var(--ah-elev-1);
+  animation: ah-surge 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--ordem, 0) * 60ms);
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms ease-out;
+}
+
+.blocoDeSituacao[data-tom='danger'] { --tom: var(--ah-state-danger); }
+.blocoDeSituacao[data-tom='warning'] { --tom: var(--ah-state-warning); }
+
+.blocoDeSituacao:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ah-elev-2);
+}
+
+.cabecalhoDaSituacao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Selo de 34 px no tom cheio, com halo suave: o "alerta" do bloco. */
+.seloDaSituacao {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tom) 14%, var(--ah-surface-raised));
+  color: var(--tom);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tom) 7%, transparent);
+}
+
+.seloDaSituacao svg {
+  width: 17px;
+  height: 17px;
+}
+
+.tituloDaSituacao {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.tituloDaSituacao strong {
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: 700;
+  color: var(--ah-text-strong);
+}
+
+.motivoDaSituacao {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ah-text-secondary);
+}
+
+/* "Motivo nao informado" e uma pendencia: italico, sem cor de alarme. */
+.motivoDaSituacao[data-sem-motivo] {
+  font-style: italic;
+}
+
+/* O NUMERO e a manchete do bloco: grande, tabular, no tom do estado. */
+.contagemDaSituacao {
+  flex-shrink: 0;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--tom);
+  font-variant-numeric: tabular-nums;
+}
+
+.pessoasDaSituacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px dashed color-mix(in srgb, var(--tom) 22%, var(--ah-border-subtle));
+  list-style: none;
+}
+
+.pessoa,
+.maisPessoas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px 0 3px;
+  border: 1px solid var(--ah-border-subtle);
+  border-radius: 999px;
+  background: var(--ah-surface-raised);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 550;
+  color: var(--ah-text-default);
+}
+
+.maisPessoas {
+  padding: 0 10px;
+  color: var(--ah-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.iniciais {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tom) 16%, var(--ah-surface-raised));
+  color: var(--tom);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+/* Recusados de hoje: a contagem vira pilula no tom de perigo. */
+.subtituloDoCartao .contagemDeRecusas {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ah-state-danger) 11%, var(--ah-surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ah-state-danger) 26%, transparent);
+}
+
+@keyframes ah-surge {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blocoDeSituacao {
+    animation: none;
+    transition: none;
+  }
+
+  .blocoDeSituacao:hover {
+    transform: none;
+  }
+}

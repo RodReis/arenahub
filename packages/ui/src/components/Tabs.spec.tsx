@@ -119,3 +119,29 @@ describe('Tabs', () => {
     expect(aba).toHaveAttribute('aria-controls', painel.id);
   });
 });
+
+/*
+ * CONTADOR NO TOM DO ESTADO -- emenda de 05/10/2026 (decisao do PI): a aba
+ * "Bloqueados e suspensos" com gente travada pinta o contador em `danger`,
+ * para a recepcao ver da aba fechada que ha algo a resolver. Sem tom, o
+ * contador fica neutro como sempre. O numero continua escrito: cor nunca e
+ * canal unico.
+ */
+describe('Tabs com contador no tom do estado', () => {
+  it('pinta o contador com o tom pedido e mantem o numero', () => {
+    render(
+      <Tabs
+        label="Painel do dia"
+        abas={[
+          { id: 'acessos', label: 'Acessos', contador: 17, content: <p>a</p> },
+          { id: 'bloqueados', label: 'Bloqueados', contador: 4, tomDoContador: 'danger', content: <p>b</p> },
+        ]}
+      />,
+    );
+
+    const contador = screen.getByTestId('aba-bloqueados').querySelector('[data-tom]');
+    expect(contador).toHaveAttribute('data-tom', 'danger');
+    expect(contador).toHaveTextContent('4');
+    expect(screen.getByTestId('aba-acessos').querySelector('[data-tom]')).toBeNull();
+  });
+});

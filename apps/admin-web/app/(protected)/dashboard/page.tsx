@@ -448,6 +448,7 @@ export default async function PaginaDoDashboard({
                       label: 'Bloqueados e suspensos',
                       icon: 'user-x',
                       contador: totalDeBloqueados(dados.situacoes),
+                      ...(totalDeBloqueados(dados.situacoes) > 0 ? { tomDoContador: 'danger' as const } : {}),
                       content: <ConteudoDeBloqueados situacoes={dados.situacoes} timeZone={fuso} />,
                     },
                     abaDeAniversariantes,

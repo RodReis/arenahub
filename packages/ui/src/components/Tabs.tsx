@@ -11,6 +11,12 @@ export interface Aba {
   readonly icon?: IconName;
   /** Numero ao lado do rotulo -- quantos itens a aba fechada guarda. */
   readonly contador?: number;
+  /**
+   * Tom do contador quando o numero e um PROBLEMA a resolver (emenda de
+   * 05/10/2026, decisao do PI): "Bloqueados e suspensos" com gente travada
+   * pinta `danger`. Sem tom, neutro. O numero continua escrito.
+   */
+  readonly tomDoContador?: 'danger' | 'warning';
   readonly content: ReactNode;
 }
 
@@ -99,7 +105,12 @@ export function Tabs({ abas, label, defaultId, testId }: Props) {
               {aba.icon !== undefined ? <Icon name={aba.icon} /> : null}
               {aba.label}
               {aba.contador !== undefined ? (
-                <span className={estilos['contador']}>{aba.contador}</span>
+                <span
+                  className={estilos['contador']}
+                  {...(aba.tomDoContador !== undefined ? { 'data-tom': aba.tomDoContador } : {})}
+                >
+                  {aba.contador}
+                </span>
               ) : null}
             </button>
           );
