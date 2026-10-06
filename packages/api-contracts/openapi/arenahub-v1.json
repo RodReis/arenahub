@@ -3881,6 +3881,56 @@
         ]
       }
     },
+    "/api/v1/subscriptions/{id}/trocar-plano-agora": {
+      "post": {
+        "operationId": "MembershipController_trocarPlanoAgora",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "subscriptionId",
+                    "planId",
+                    "effectiveFrom",
+                    "parcelasReabertas"
+                  ],
+                  "properties": {
+                    "subscriptionId": {
+                      "type": "string"
+                    },
+                    "planId": {
+                      "type": "string"
+                    },
+                    "effectiveFrom": {
+                      "type": "string"
+                    },
+                    "parcelasReabertas": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Membership"
+        ]
+      }
+    },
     "/api/v1/subscriptions/{id}/guest-passes": {
       "post": {
         "operationId": "MembershipController_registrarConvidado",

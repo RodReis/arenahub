@@ -86,10 +86,10 @@ export interface EstadoDoReajuste {
 export interface EstadoDaAssinatura {
   erro?: string;
   /**
-   * `vigenteApartirDe` so existe na TROCA de plano (#337): ela e agendada para o
-   * proximo ciclo, entao nao ha direito novo (`entitlementId`) a devolver.
+   * `parcelasReabertas` so existe na TROCA de plano: ela vale no ato, e as
+   * parcelas abertas do plano antigo saem de cena e voltam no plano novo.
    */
-  sucesso?: { subscriptionId: string; entitlementId?: string; vigenteApartirDe?: string };
+  sucesso?: { subscriptionId: string; entitlementId?: string; parcelasReabertas?: number };
   valores?: { planId?: string; startsAt?: string; endsAt?: string; reason?: string };
 }
 
@@ -370,10 +370,11 @@ export async function atribuirPlano(
   }
 
   /*
-   * TROCA DE PLANO: uma chamada so (F82) -- POST /subscriptions/:id/trocar-plano.
-   * Desde o #337 ela AGENDA a troca para o proximo ciclo (sem proracao, sem
-   * credito): nada muda no acesso agora, e o job do backend aplica a troca
-   * atomica no dia 1. Sem janela de falha parcial do lado da tela.
+   * TROCA DE PLANO: uma chamada so (F82) -- POST
+   * /subscriptions/:id/trocar-plano-agora. Vale NO ATO (decisao do PI,
+   * 06/10/2026): troca atomica, vigencia mantida, parcelas abertas do plano
+   * antigo canceladas e reabertas no novo. Sem janela de falha parcial do
+   * lado da tela.
    */
   if (validado.data.substituiSubscriptionId !== undefined) {
     if (validado.data.substituiVersion === undefined) {
@@ -382,9 +383,10 @@ export async function atribuirPlano(
 
     const troca = await chamarApi<{
       subscriptionId: string;
-      scheduledPlanId: string;
+      planId: string;
       effectiveFrom: string;
-    }>(`/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/trocar-plano`, {
+      parcelasReabertas: number;
+    }>(`/api/v1/subscriptions/${validado.data.substituiSubscriptionId}/trocar-plano-agora`, {
       metodo: 'POST',
       corpo: {
         planId: validado.data.planId,
@@ -402,7 +404,7 @@ export async function atribuirPlano(
     return {
       sucesso: {
         subscriptionId: troca.dados.subscriptionId,
-        vigenteApartirDe: troca.dados.effectiveFrom,
+        parcelasReabertas: troca.dados.parcelasReabertas,
       },
     };
   }

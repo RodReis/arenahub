@@ -8,7 +8,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
-import { inicioDoProximoCiclo } from '../../src/modules/billing/domain/ciclo-de-cobranca.js';
+import { competenciaDe, inicioDoProximoCiclo } from '../../src/modules/billing/domain/ciclo-de-cobranca.js';
 import { AplicarTrocasAgendadasSchedulerService } from '../../src/modules/membership/aplicar-trocas-agendadas-scheduler.service.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
 import { StudentRepository } from '../../src/modules/students/student.repository.js';
@@ -2151,6 +2151,13 @@ describe('F7 -- aluno, plano e entitlement', () => {
         },
       });
 
+      // A aplicacao REABRE a parcela pelo contador real (`invoice_sequences`);
+      // a invoice acima entrou a mao e o contador ainda nao a conhece.
+      await db.$executeRaw`
+        UPDATE invoice_sequences SET next_value = ${invoicePendente.number + 1}
+        WHERE tenant_id = ${contas.a.tenantId}::uuid AND next_value <= ${invoicePendente.number}
+      `;
+
       await request(servidor())
         .post(`/api/v1/subscriptions/${subscriptionAntigaId}/trocar-plano`)
         .set('Cookie', contas.a.cookie)
@@ -2181,6 +2188,177 @@ describe('F7 -- aluno, plano e entitlement', () => {
       });
       expect(auditoria?.metadata).toMatchObject({
         cancelledInvoiceIds: [invoicePendente.id],
+      });
+    });
+
+    /**
+     * TROCA NO ATO (decisao do PI, 06/10/2026): o plano novo vale agora, a
+     * parcela ABERTA do plano antigo e cancelada e refeita no plano novo; a
+     * PAGA fica como esta.
+     */
+    describe('troca no ato (trocar-plano-agora)', () => {
+      const trocarAgora = (subscriptionId: string, planId: string, version = 0): request.Test =>
+        request(servidor())
+          .post(`/api/v1/subscriptions/${subscriptionId}/trocar-plano-agora`)
+          .set('Cookie', contas.a.cookie)
+          .send({ planId, version, reason: 'plano cadastrado errado' });
+
+      it('troca na hora, cancela a parcela aberta e reabre no plano novo; a paga fica intacta', async () => {
+        const { alunoId, subscriptionId, entitlementId, planNovoId } =
+          await assinarComPlano('Troca No Ato');
+
+        await db.billingSettings.upsert({
+          where: { tenantId: contas.a.tenantId },
+          create: { tenantId: contas.a.tenantId, dueDay: 10, graceDays: 5 },
+          update: {},
+        });
+
+        // As invoices abaixo entram a mao, fora do contador; a REABERTA nasce
+        // pelo contador real. Sem alinhar `invoice_sequences`, ele devolveria um
+        // numero que outro teste desta suite ja ocupou.
+        const NUMERO_FORA_DO_CONTADOR = 900_000_000;
+        const competenciaCorrente = competenciaDe(new Date());
+        const aberta = await db.invoice.create({
+          data: {
+            tenantId: contas.a.tenantId,
+            subscriptionId,
+            studentId: alunoId,
+            billingPeriod: competenciaCorrente,
+            status: 'OPEN',
+            number: NUMERO_FORA_DO_CONTADOR + 1,
+            currency: 'BRL',
+            subtotalMinor: 15000,
+            totalMinor: 15000,
+            dueAt: new Date('2026-08-10T00:00:00.000Z'),
+          },
+        });
+        const paga = await db.invoice.create({
+          data: {
+            tenantId: contas.a.tenantId,
+            subscriptionId,
+            studentId: alunoId,
+            billingPeriod: new Date(
+              Date.UTC(competenciaCorrente.getUTCFullYear(), competenciaCorrente.getUTCMonth() - 1, 1),
+            ),
+            status: 'PAID',
+            number: NUMERO_FORA_DO_CONTADOR + 2,
+            currency: 'BRL',
+            subtotalMinor: 15000,
+            totalMinor: 15000,
+            dueAt: new Date('2026-07-10T00:00:00.000Z'),
+          },
+        });
+
+        await db.$executeRaw`
+          INSERT INTO invoice_sequences (tenant_id, next_value, updated_at)
+          VALUES (${contas.a.tenantId}::uuid, ${NUMERO_FORA_DO_CONTADOR + 3}, now())
+          ON CONFLICT (tenant_id) DO UPDATE SET next_value = EXCLUDED.next_value
+        `;
+
+        const mesesDepois = (n: number): Date =>
+          new Date(
+            Date.UTC(competenciaCorrente.getUTCFullYear(), competenciaCorrente.getUTCMonth() + n, 1),
+          );
+        // Parcela ABERTA de mes futuro (a mudanca do `gte`) e divida de DOIS
+        // meses atras, que a troca nao pode perdoar.
+        const futura = await db.invoice.create({
+          data: {
+            tenantId: contas.a.tenantId,
+            subscriptionId,
+            studentId: alunoId,
+            billingPeriod: mesesDepois(1),
+            status: 'OPEN',
+            number: NUMERO_FORA_DO_CONTADOR + 3,
+            currency: 'BRL',
+            subtotalMinor: 15000,
+            totalMinor: 15000,
+            dueAt: new Date('2027-01-10T00:00:00.000Z'),
+          },
+        });
+        const emAtraso = await db.invoice.create({
+          data: {
+            tenantId: contas.a.tenantId,
+            subscriptionId,
+            studentId: alunoId,
+            billingPeriod: mesesDepois(-2),
+            status: 'OVERDUE',
+            number: NUMERO_FORA_DO_CONTADOR + 4,
+            currency: 'BRL',
+            subtotalMinor: 15000,
+            totalMinor: 15000,
+            dueAt: new Date('2026-06-10T00:00:00.000Z'),
+          },
+        });
+        await db.$executeRaw`
+          UPDATE invoice_sequences SET next_value = ${NUMERO_FORA_DO_CONTADOR + 5}
+          WHERE tenant_id = ${contas.a.tenantId}::uuid
+        `;
+
+        const resposta = await trocarAgora(subscriptionId, planNovoId);
+
+        expect(resposta.status).toBe(201);
+
+        const corpo = resposta.body as {
+          subscriptionId: string;
+          planId: string;
+          parcelasReabertas: number;
+        };
+        expect(corpo.planId).toBe(planNovoId);
+        expect(corpo.parcelasReabertas).toBe(2);
+        expect(corpo.subscriptionId).not.toBe(subscriptionId);
+
+        // Valeu na hora: antiga cancelada, nova ACTIVE no plano novo, acesso trocado.
+        const antiga = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+        expect(antiga.status).toBe('CANCELLED');
+        const nova = await db.subscription.findUniqueOrThrow({ where: { id: corpo.subscriptionId } });
+        expect(nova.status).toBe('ACTIVE');
+        expect(nova.planId).toBe(planNovoId);
+        const entitlementAntigo = await db.entitlement.findUniqueOrThrow({ where: { id: entitlementId } });
+        expect(entitlementAntigo.status).toBe('REVOKED');
+
+        // Parcela aberta antiga cancelada; refeita no plano novo; paga intacta.
+        const antigaDepois = await db.invoice.findUniqueOrThrow({ where: { id: aberta.id } });
+        expect(antigaDepois.status).toBe('CANCELLED');
+        const reaberta = await db.invoice.findFirstOrThrow({
+          where: { tenantId: contas.a.tenantId, subscriptionId: nova.id, billingPeriod: competenciaCorrente },
+        });
+        expect(reaberta.status).toBe('OPEN');
+        const pagaDepois = await db.invoice.findUniqueOrThrow({ where: { id: paga.id } });
+        expect(pagaDepois.status).toBe('PAID');
+
+        // A reaberta nasce no plano NOVO: item com o nome dele, valor do preco vigente.
+        const planoNovo = await db.plan.findUniqueOrThrow({ where: { id: planNovoId } });
+        const itens = await db.invoiceItem.findMany({ where: { invoiceId: reaberta.id } });
+        expect(itens).toHaveLength(1);
+        expect(itens[0]?.description).toBe(planoNovo.name);
+        expect(reaberta.totalMinor).toBe(15000);
+
+        // Parcela futura aberta: cancelada e refeita; divida antiga segue cobravel.
+        expect((await db.invoice.findUniqueOrThrow({ where: { id: futura.id } })).status).toBe('CANCELLED');
+        const futuraNova = await db.invoice.findFirstOrThrow({
+          where: { tenantId: contas.a.tenantId, subscriptionId: nova.id, billingPeriod: mesesDepois(1) },
+        });
+        expect(futuraNova.status).toBe('OPEN');
+        expect((await db.invoice.findUniqueOrThrow({ where: { id: emAtraso.id } })).status).toBe('OVERDUE');
+      });
+
+      it('recusa trocar para o plano que a assinatura ja tem', async () => {
+        const { subscriptionId, planAntigoId } = await assinarComPlano('Troca No Ato Mesmo Plano');
+
+        const resposta = await trocarAgora(subscriptionId, planAntigoId);
+
+        expect(resposta.status).toBe(422);
+        expect((resposta.body as { code: string }).code).toBe('SUBSCRIPTION_PLAN_UNCHANGED');
+      });
+
+      it('conflito de versao devolve 409 e nada muda', async () => {
+        const { subscriptionId, planNovoId } = await assinarComPlano('Troca No Ato Versao');
+
+        const resposta = await trocarAgora(subscriptionId, planNovoId, 99);
+
+        expect(resposta.status).toBe(409);
+        const antiga = await db.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
+        expect(antiga.status).toBe('ACTIVE');
       });
     });
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
-import { criarPlano } from './cadastro-de-plano';
+import { criarPlano, escolherPlano } from './cadastro-de-plano';
 
 /**
  * F53 Task 13 -- o aceite do PI, ponta a ponta.
@@ -109,7 +109,7 @@ test('a recepcao acha o aluno, cobra e emite recibo', async ({ page }) => {
   await page.getByTestId('aba-plano').click();
   await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
 
-  await page.getByTestId('campo-plano').selectOption({ label: nomeDoPlano });
+  await escolherPlano(page, nomeDoPlano);
   await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
   await page.getByTestId('campo-fim').fill('2027-01-01T22:00');
   await page.getByTestId('campo-motivo-atribuicao').fill('matricula presencial na bancada de teste');

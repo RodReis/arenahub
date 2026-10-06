@@ -75,13 +75,14 @@ describe('atribuirPlano', () => {
    * janela em que o aluno fique com duas assinaturas ativas nem sem nenhuma.
    */
   it('com assinatura vigente, chama a rota de troca -- nao cancela e cria em duas chamadas', async () => {
-    // #337: a troca e AGENDADA para o proximo ciclo; nao ha direito novo.
+    // A troca vale no ato; nao ha direito novo a devolver, so as parcelas.
     vi.mocked(chamarApi).mockResolvedValueOnce({
       ok: true,
       dados: {
         subscriptionId: ASSINATURA_ANTIGA,
-        scheduledPlanId: PLANO,
-        effectiveFrom: '2026-11-01T00:00:00.000Z',
+        planId: PLANO,
+        effectiveFrom: '2026-10-06T12:00:00.000Z',
+        parcelasReabertas: 1,
       },
       cookiesDaApi: [],
     });
@@ -93,13 +94,13 @@ describe('atribuirPlano', () => {
 
     expect(estado.sucesso).toEqual({
       subscriptionId: ASSINATURA_ANTIGA,
-      vigenteApartirDe: '2026-11-01T00:00:00.000Z',
+      parcelasReabertas: 1,
     });
 
     const chamadas = vi.mocked(chamarApi).mock.calls;
     expect(chamadas).toHaveLength(1);
 
-    expect(chamadas[0]?.[0]).toBe(`/api/v1/subscriptions/${ASSINATURA_ANTIGA}/trocar-plano`);
+    expect(chamadas[0]?.[0]).toBe(`/api/v1/subscriptions/${ASSINATURA_ANTIGA}/trocar-plano-agora`);
     expect(chamadas[0]?.[1]).toMatchObject({
       corpo: { planId: PLANO, version: 4, reason: 'Aluno pediu upgrade do plano' },
     });

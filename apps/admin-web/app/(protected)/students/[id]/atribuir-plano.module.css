@@ -1,0 +1,145 @@
+/**
+ * Painel de troca de plano.
+ *
+ * O formulario antigo era uma coluna de 64ch colada a esquerda do cartao: o
+ * seletor abria apertado e o "o que vai acontecer" ficava em prosa, longe do
+ * campo. Aqui a decisao e lida de uma vez: escolha a esquerda, consequencia a
+ * direita -- empilha no estreito, sem media query de dispositivo.
+ */
+.painel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 20px 32px;
+  align-items: start;
+  width: 100%;
+  max-width: 880px;
+  box-sizing: border-box;
+}
+
+.campos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.consequencia {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/**
+ * Resumo De -> Para. So existe depois de escolher o plano: antes disso a
+ * recepcao nao tem o que conferir, e um cartao vazio seria ruido.
+ * Entra por opacidade/transform (compositor) e some com reduced-motion.
+ */
+.resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-left: 3px solid var(--ah-accent-500);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  animation: resumo-entra var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+@keyframes resumo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resumo {
+    animation: none;
+  }
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.rotuloDaLinha {
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nomeDoPlano {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ah-text-strong);
+}
+
+.novo .nomeDoPlano {
+  font-weight: 600;
+  color: var(--ah-accent-700);
+}
+
+.preco {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ah-text-strong);
+}
+
+.diferenca {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ah-border-subtle);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+.diferenca output {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ah-text-strong);
+}
+
+/** Lista curta do que acontece ao confirmar -- verbo no inicio de cada item. */
+.efeitos {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  color: var(--ah-text-secondary);
+}
+
+/** Confirmacao depois da troca. */
+.feito {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-left: 3px solid var(--ah-success);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  max-width: 880px;
+  box-sizing: border-box;
+  animation: resumo-entra var(--ah-motion-control) var(--ah-motion-easing);
+}
+
+.feito p {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feito {
+    animation: none;
+  }
+}

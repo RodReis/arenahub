@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -73,7 +73,14 @@ function responder(direitos: unknown[]) {
     if (caminho === '/api/v1/plans') {
       return Promise.resolve({
         ok: true,
-        dados: [{ id: 'plano-1', name: 'Programa Adultos', isActive: true }],
+        dados: [
+          {
+            id: 'plano-1',
+            name: 'Programa Adultos',
+            isActive: true,
+            currentPrice: { amountMinor: 15000, currency: 'BRL' },
+          },
+        ],
         cookiesDaApi: [],
       });
     }
@@ -191,6 +198,48 @@ describe('ficha do aluno', () => {
     await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
 
     expect(screen.getByTestId('troca-ja-agendada')).toBeInTheDocument();
+  });
+
+  /**
+   * A combo mostra o PRECO ao lado do nome, e escolher um plano abre o resumo
+   * De/Para com a diferenca -- planos parecidos eram escolhidos no palpite.
+   */
+  it('mostra o preco na combo e o resumo De/Para ao escolher o plano', async () => {
+    const usuario = userEvent.setup();
+
+    responder([
+      entitlement({
+        planName: 'Plano Ajuda',
+        planCurrentPrice: { amountMinor: 10000, currency: 'BRL' },
+      }),
+    ]);
+
+    await renderizar();
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
+    expect(screen.queryByTestId('resumo-da-troca')).not.toBeInTheDocument();
+
+    const combo = screen.getByTestId('campo-plano');
+    const opcao = within(combo).getByRole('option', { name: /Programa Adultos/, hidden: true });
+    expect(opcao.textContent).toMatch(/150,00/);
+
+    await usuario.selectOptions(combo, 'plano-1');
+
+    const resumo = screen.getByTestId('resumo-da-troca');
+    expect(resumo.textContent).toContain('Plano Ajuda');
+    expect(resumo.textContent).toContain('Programa Adultos');
+    expect(screen.getByTestId('diferenca-de-preco').textContent).toMatch(/sobe.*50,00/);
+  });
+
+  it('avisa que a recorrencia no cartao nao acompanha a troca', async () => {
+    const usuario = userEvent.setup();
+
+    responder([entitlement({ recorrenciaAtiva: true })]);
+
+    await renderizar();
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
+    expect(screen.getByTestId('aviso-de-recorrencia')).toBeInTheDocument();
   });
 
   it('sem troca agendada, nao mostra o aviso de agendamento', async () => {

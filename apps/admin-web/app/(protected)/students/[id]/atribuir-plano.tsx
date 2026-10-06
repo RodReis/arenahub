@@ -3,16 +3,32 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { Button, Field, SelectField, TenantDateTime, TextareaField, useToastDeErro } from '@arenahub/ui';
+import {
+  Button,
+  Field,
+  SelectField,
+  TenantDateTime,
+  TextareaField,
+  formatarDinheiro,
+  useToastDeErro,
+} from '@arenahub/ui';
 
 import estilos from '../../../formulario.module.css';
+import painel from './atribuir-plano.module.css';
 
 import { atribuirPlano, type EstadoDaAssinatura } from '../../../actions/membership';
+
+interface Preco {
+  amountMinor: number;
+  currency: string;
+}
 
 interface Plano {
   id: string;
   name: string;
   isActive: boolean;
+  /** Preco vigente hoje. Nulo = plano sem vigencia de preco. */
+  currentPrice?: Preco | null;
 }
 
 /**
@@ -26,6 +42,10 @@ export interface AssinaturaVigente {
   subscriptionId: string;
   version: number;
   planName: string | null;
+  /** Preco vigente do plano atual -- o "De" do resumo da troca. */
+  planCurrentPrice?: Preco | null;
+  /** Ha cobranca recorrente no provedor: a troca NAO a leva para o plano novo. */
+  recorrenciaAtiva?: boolean;
   /**
    * Fim da vigência ATUAL, em ISO.
    *
@@ -61,6 +81,20 @@ interface Props {
 }
 
 const ESTADO_INICIAL: EstadoDaAssinatura = {};
+
+/** "Plano Ajuda — R$ 120,00": sem o preco, planos parecidos viram palpite. */
+function rotuloDoPlano(plano: Plano): string {
+  return plano.currentPrice
+    ? `${plano.name} — ${formatarDinheiro(plano.currentPrice.amountMinor, plano.currentPrice.currency)}`
+    : `${plano.name} — sem preço vigente`;
+}
+
+/** Diferenca so quando as duas moedas coincidem; senao, subtrair e inventar. */
+function diferencaDePreco(de: Preco | null | undefined, para: Preco | null | undefined): number | null {
+  if (!de || !para || de.currency !== para.currency) return null;
+
+  return para.amountMinor - de.amountMinor;
+}
 
 /**
  * Botão que sabe quando está enviando.
@@ -105,6 +139,9 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
    */
   const [aberto, setAberto] = useState(false);
   const [estado, acao] = useActionState(atribuirPlano, ESTADO_INICIAL);
+  // O resumo da troca acompanha a escolha; o campo segue NAO controlado, e o
+  // valor reenviado depois de um erro entra como ponto de partida.
+  const [planoEscolhido, setPlanoEscolhido] = useState(estado.valores?.planId ?? '');
   // Erro vira TOAST -- CLAUDE.md: "sempre usar Toast para: Info, Warn e
   // error". O toast ja carrega `role="alert"`, entao o anuncio ao leitor de
   // tela nao regride com a saida do `<p role="alert">`.
@@ -125,23 +162,24 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
   const troca = vigente !== undefined;
 
   if (estado.sucesso) {
+    const reabertas = estado.sucesso.parcelasReabertas ?? 0;
+
     return (
-      <div role="status" data-testid="plano-atribuido">
-        <p>
-          {troca ? (
-            <>
-              Troca agendada. O plano atual segue valendo e o novo passa a valer em{' '}
-              {estado.sucesso.vigenteApartirDe ? (
-                <TenantDateTime iso={estado.sucesso.vigenteApartirDe} timeZone={timezone} format="date" />
-              ) : (
-                'o próximo ciclo'
-              )}
-              , com a vigência mantida.
-            </>
-          ) : (
-            'Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.'
-          )}
-        </p>
+      <div role="status" className={painel['feito']} data-testid="plano-atribuido">
+        {troca ? (
+          <>
+            <p>
+              <strong>Plano trocado.</strong> O plano novo já vale, com a vigência mantida.
+            </p>
+            <p className={estilos['nota']}>
+              {reabertas > 0
+                ? `${reabertas === 1 ? '1 parcela aberta foi refeita' : `${reabertas} parcelas abertas foram refeitas`} no plano novo; a do plano anterior foi cancelada.`
+                : 'Não havia parcela aberta para refazer. A próxima cobrança já sai no plano novo.'}
+            </p>
+          </>
+        ) : (
+          <p>Plano atribuído. O direito de acesso foi criado e já vale a partir do início da vigência.</p>
+        )}
         <p>
           <a href={`/students/${studentId}`}>Atualizar a ficha</a>
         </p>
@@ -166,42 +204,11 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
     );
   }
 
+  const escolhido = ativos.find((plano) => plano.id === planoEscolhido);
+  const diferenca = escolhido ? diferencaDePreco(vigente?.planCurrentPrice, escolhido.currentPrice) : null;
+
   return (
-    <form className={estilos['formulario']} action={acao}>
-
-      {/*
-        Aviso ANTES da tentativa. A API recusaria com `STUDENT_NOT_ELIGIBLE`,
-        mas descobrir isso depois de preencher vigência e motivo é trabalho
-        jogado fora.
-      */}
-      {impedido ? (
-        <p role="alert" data-testid="aviso-de-inelegibilidade">
-          A situação atual deste aluno impede o acesso. Atribuir um plano agora não vai liberar a
-          catraca — regularize a situação primeiro.
-        </p>
-      ) : null}
-
-      {/*
-        TROCA: a recepção precisa saber QUANDO o plano muda, e que não há
-        proração nem crédito (decisão do PI, 04/10/2026, #337). Sem esta frase,
-        "alterar plano" parece trocar na hora.
-      */}
-      {troca ? (
-        <p role="note" className={estilos['nota']} data-testid="aviso-de-troca">
-          A troca vale no próximo ciclo: o plano{vigente.planName ? ` ${vigente.planName}` : ''}{' '}
-          segue até lá, sem proração e sem crédito.
-        </p>
-      ) : null}
-
-      {troca && vigente.trocaAgendada ? (
-        <p role="status" className={estilos['nota']} data-testid="troca-ja-agendada">
-          Já há uma troca agendada
-          {vigente.trocaAgendada.planName ? ` para ${vigente.trocaAgendada.planName}` : ''} em{' '}
-          <TenantDateTime iso={vigente.trocaAgendada.effectiveFrom} timeZone={timezone} format="date" />.
-          Agendar de novo substitui essa troca.
-        </p>
-      ) : null}
-
+    <form className={painel['painel']} action={acao}>
       <input type="hidden" name="studentId" value={studentId} />
 
       {/*
@@ -216,81 +223,153 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
         </>
       ) : null}
 
-      {/*
-        `data-testid` PRÓPRIO porque "Plano" virou nome ambíguo: a aba da
-        ficha também se chama assim, e `getByLabel('Plano')` passou a casar
-        com os dois (o painel leva `aria-labelledby="aba-plano"`). Os dois
-        rótulos estão certos onde estão -- quem precisa desempatar é o teste.
-      */}
-      <SelectField
-        id="plano"
-        name="planId"
-        label="Plano"
-        data-testid="campo-plano"
-        defaultValue={estado.valores?.planId ?? ''}
-        required
-      >
-        <option value="">Selecione…</option>
-        {ativos.map((plano) => (
-          <option key={plano.id} value={plano.id}>
-            {plano.name}
-          </option>
-        ))}
-      </SelectField>
+      <div className={painel['campos']}>
+        {/*
+          Aviso ANTES da tentativa. A API recusaria com `STUDENT_NOT_ELIGIBLE`,
+          mas descobrir isso depois de preencher vigência e motivo é trabalho
+          jogado fora.
+        */}
+        {impedido ? (
+          <p role="alert" data-testid="aviso-de-inelegibilidade">
+            A situação atual deste aluno impede o acesso. Atribuir um plano agora não vai liberar a
+            catraca — regularize a situação primeiro.
+          </p>
+        ) : null}
+
+        {/*
+          `data-testid` PRÓPRIO porque "Plano" virou nome ambíguo: a aba da
+          ficha também se chama assim, e `getByLabel('Plano')` passou a casar
+          com os dois (o painel leva `aria-labelledby="aba-plano"`). Os dois
+          rótulos estão certos onde estão -- quem precisa desempatar é o teste.
+
+          O PREÇO vai no texto da opção: dois planos de nome parecido e valores
+          diferentes eram escolhidos no palpite.
+        */}
+        <SelectField
+          id="plano"
+          name="planId"
+          label="Plano"
+          data-testid="campo-plano"
+          defaultValue={estado.valores?.planId ?? ''}
+          onChange={(evento) => setPlanoEscolhido(evento.target.value)}
+          required
+        >
+          <option value="">Selecione…</option>
+          {ativos.map((plano) => (
+            <option key={plano.id} value={plano.id}>
+              {rotuloDoPlano(plano)}
+            </option>
+          ))}
+        </SelectField>
+
+        {/* Atribuição nova: início e fim lado a lado, a mesma decisão. */}
+        {troca ? null : (
+          <div className={estilos['par']}>
+            <Field
+              id="inicio"
+              name="startsAt"
+              label="Início da vigência"
+              type="datetime-local"
+              defaultValue={estado.valores?.startsAt ?? ''}
+              required
+              data-testid="campo-inicio"
+            />
+
+            <Field
+              id="fim"
+              name="endsAt"
+              label="Fim da vigência"
+              type="datetime-local"
+              defaultValue={estado.valores?.endsAt ?? ''}
+              required
+              data-testid="campo-fim"
+            />
+          </div>
+        )}
+
+        <TextareaField
+          id="motivo-atribuicao"
+          name="reason"
+          label="Motivo"
+          defaultValue={estado.valores?.reason ?? ''}
+          rows={2}
+          maxLength={300}
+          required
+          data-testid="campo-motivo-atribuicao"
+          hint="Registrado na auditoria. Ex.: “plano cadastrado errado”, “aluno pediu upgrade”."
+        />
+
+        <div className={estilos['acoes']}>
+          <BotaoDeAtribuicao troca={troca} />
+          <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
 
       {/*
-        TROCA: a rota atômica herda `endsAt` da assinatura antiga e ignora
-        início/fim -- pedir os dois campos era ruído que a recepção
-        preenchia para nada (achado da revisão de branch inteiro). No lugar,
-        uma linha informativa com a vigência que CONTINUA valendo.
+        TROCA: o que MUDA, ao lado de onde se escolhe. A troca vale no ato
+        (decisão do PI, 06/10/2026), sem proração nem crédito -- e a recepção
+        precisa ver o De/Para e o que acontece com as parcelas ANTES de
+        confirmar, não descobrir depois.
       */}
       {troca ? (
-        <p data-testid="vigencia-mantida">
-          Vigência mantida até <TenantDateTime iso={vigente.endsAt} timeZone={timezone} format="date" />.
-        </p>
-      ) : (
-        /* Início e fim lado a lado: são a mesma decisão, lida de uma vez. */
-        <div className={estilos['par']}>
-          <Field
-            id="inicio"
-            name="startsAt"
-            label="Início da vigência"
-            type="datetime-local"
-            defaultValue={estado.valores?.startsAt ?? ''}
-            required
-            data-testid="campo-inicio"
-          />
+        <div className={painel['consequencia']} aria-live="polite">
+          {escolhido ? (
+            <div className={painel['resumo']} data-testid="resumo-da-troca">
+              <div className={painel['linha']}>
+                <span className={painel['rotuloDaLinha']}>De</span>
+                <span className={painel['nomeDoPlano']}>{vigente.planName ?? 'Plano atual'}</span>
+                <span className={painel['preco']}>
+                  {vigente.planCurrentPrice
+                    ? formatarDinheiro(vigente.planCurrentPrice.amountMinor, vigente.planCurrentPrice.currency)
+                    : '—'}
+                </span>
+              </div>
+              <div className={`${painel['linha']} ${painel['novo']}`}>
+                <span className={painel['rotuloDaLinha']}>Para</span>
+                <span className={painel['nomeDoPlano']}>{escolhido.name}</span>
+                <span className={painel['preco']}>
+                  {escolhido.currentPrice
+                    ? formatarDinheiro(escolhido.currentPrice.amountMinor, escolhido.currentPrice.currency)
+                    : '—'}
+                </span>
+              </div>
+              {diferenca !== null && diferenca !== 0 ? (
+                <p className={painel['diferenca']} data-testid="diferenca-de-preco">
+                  Mensalidade {diferenca > 0 ? 'sobe' : 'cai'}{' '}
+                  <output>{formatarDinheiro(Math.abs(diferenca), escolhido.currentPrice?.currency)}</output>.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
-          <Field
-            id="fim"
-            name="endsAt"
-            label="Fim da vigência"
-            type="datetime-local"
-            defaultValue={estado.valores?.endsAt ?? ''}
-            required
-            data-testid="campo-fim"
-          />
+          <ul className={painel['efeitos']} data-testid="aviso-de-troca">
+            <li>O plano novo vale na hora, sem proração e sem crédito.</li>
+            <li>
+              Vigência mantida até{' '}
+              <TenantDateTime iso={vigente.endsAt} timeZone={timezone} format="date" />.
+            </li>
+            <li>Parcelas abertas do plano atual são canceladas e refeitas no plano novo.</li>
+            <li>Parcela já paga e mês anterior em atraso não mudam.</li>
+            {vigente.recorrenciaAtiva ? (
+              <li data-testid="aviso-de-recorrencia">
+                Este aluno tem cobrança recorrente no cartão: ela não passa para o plano novo.
+                Encerre e ative de novo em “Cobrança recorrente”.
+              </li>
+            ) : null}
+          </ul>
+
+          {vigente.trocaAgendada ? (
+            <p role="status" className={estilos['nota']} data-testid="troca-ja-agendada">
+              Havia uma troca agendada
+              {vigente.trocaAgendada.planName ? ` para ${vigente.trocaAgendada.planName}` : ''} em{' '}
+              <TenantDateTime iso={vigente.trocaAgendada.effectiveFrom} timeZone={timezone} format="date" />.
+              Trocar agora a substitui.
+            </p>
+          ) : null}
         </div>
-      )}
-
-      <TextareaField
-        id="motivo-atribuicao"
-        name="reason"
-        label="Motivo"
-        defaultValue={estado.valores?.reason ?? ''}
-        rows={2}
-        maxLength={300}
-        required
-        data-testid="campo-motivo-atribuicao"
-        hint="Registrado na auditoria. Ex.: “matrícula presencial, pagamento em dinheiro, recibo 481”."
-      />
-
-      <div className={estilos['acoes']}>
-        <BotaoDeAtribuicao troca={troca} />
-        <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
-          Cancelar
-        </Button>
-      </div>
+      ) : null}
     </form>
   );
 }

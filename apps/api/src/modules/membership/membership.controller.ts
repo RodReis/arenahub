@@ -15,6 +15,7 @@ import { z } from 'zod';
 
 import { RequirePermissions } from '../../common/security/permissions.decorator.js';
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { BillingRepository } from '../billing/billing.repository.js';
 import { precoVigenteEm } from '../billing/domain/dinheiro.js';
 import { MINUTOS_POR_DIA } from './domain/plan.js';
 import {
@@ -219,6 +220,7 @@ interface EntitlementDto {
 export class MembershipController {
   constructor(
     private readonly membership: MembershipRepository,
+    private readonly billing: BillingRepository,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -527,6 +529,67 @@ export class MembershipController {
       subscriptionId: agendada.id,
       scheduledPlanId: agendada.scheduledPlanId,
       effectiveFrom: agendada.scheduledPlanFrom.toISOString(),
+    };
+  }
+
+  /**
+   * TROCA o plano NO ATO (decisao do PI, 06/10/2026): o plano novo vale agora,
+   * com a vigencia do contrato mantida. As parcelas abertas do plano antigo
+   * (corrente e futuras) sao canceladas e reabertas no plano novo; parcela
+   * PAGA nao e tocada, e mes anterior em atraso continua cobravel.
+   *
+   * Complementa `trocar-plano` (agenda p/ o proximo ciclo), que segue valendo.
+   */
+  @Post('subscriptions/:id/trocar-plano-agora')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['subscriptionId', 'planId', 'effectiveFrom', 'parcelasReabertas'],
+      properties: {
+        subscriptionId: { type: 'string' },
+        planId: { type: 'string' },
+        effectiveFrom: { type: 'string' },
+        parcelasReabertas: { type: 'integer' },
+      },
+    },
+  })
+  @RequirePermissions('subscription.manage')
+  async trocarPlanoAgora(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{
+    subscriptionId: string;
+    planId: string;
+    effectiveFrom: string;
+    parcelasReabertas: number;
+  }> {
+    const dados = esquemaDeTrocaDePlano.parse(corpo);
+    const contexto = this.contexto.require();
+    const agora = new Date();
+
+    const existente = await this.membership.encontrarAssinatura(contexto, id);
+    if (!existente) throw new NotFoundException({ code: 'SUBSCRIPTION_NOT_FOUND' });
+
+    // A parcela e refeita DENTRO da transacao da troca: se faltar preco ou
+    // configuracao financeira, a troca volta atras e a recepcao ve o erro.
+    const trocada = await this.membership.trocarPlanoDaAssinatura(
+      contexto,
+      id,
+      { planId: dados.planId, versaoEsperada: dados.version, reason: dados.reason },
+      requisicao.correlationId ?? 'sem-correlacao',
+      agora,
+      (tx, subscriptionId, competencia) =>
+        this.billing.abrirInvoiceDoPeriodo(contexto, { subscriptionId, emQue: competencia }, tx),
+    );
+
+    if (!trocada) throw new ConflitoDeVersaoError();
+
+    return {
+      subscriptionId: trocada.subscription.id,
+      planId: dados.planId,
+      effectiveFrom: agora.toISOString(),
+      parcelasReabertas: trocada.parcelasReabertas,
     };
   }
 

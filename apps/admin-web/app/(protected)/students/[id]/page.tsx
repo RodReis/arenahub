@@ -132,6 +132,7 @@ interface Plano {
   id: string;
   name: string;
   isActive: boolean;
+  currentPrice?: { amountMinor: number; currency: string } | null;
 }
 
 interface Unidade {
@@ -297,7 +298,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
         ? {
             subscriptionId: direito.subscriptionId,
             version: direito.subscriptionVersion,
-            planName: null,
+            planName: direito.planName,
             // Vigencia MANTIDA pela troca de plano (achado da revisao de
             // branch inteiro): o formulario de troca nao pede mais
             // inicio/fim -- so informa ate quando o acesso atual vale.

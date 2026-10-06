@@ -4,6 +4,7 @@ import { comContexto } from '@arenahub/database';
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
+import { BillingRepository } from '../billing/billing.repository.js';
 import { MembershipRepository } from './membership.repository.js';
 
 export interface ResultadoDoCiclo {
@@ -32,7 +33,10 @@ export class AplicarTrocasAgendadasSchedulerService {
 
   private executando = false;
 
-  constructor(private readonly membership: MembershipRepository) {}
+  constructor(
+    private readonly membership: MembershipRepository,
+    private readonly billing: BillingRepository,
+  ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: 'aplicar-trocas-de-plano-agendadas' })
   async executarComTrava(): Promise<void> {
@@ -78,6 +82,9 @@ export class AplicarTrocasAgendadasSchedulerService {
             { planId: troca.scheduledPlanId, versaoEsperada: troca.version, reason: troca.lastReason },
             randomUUID(),
             agora,
+            // Mesma regra da troca no ato: parcela aberta cancelada volta no plano novo.
+            (tx, subscriptionId, competencia) =>
+              this.billing.abrirInvoiceDoPeriodo(contexto, { subscriptionId, emQue: competencia }, tx),
           ),
         );
 

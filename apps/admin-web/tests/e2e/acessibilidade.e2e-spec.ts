@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
-import { criarPlano } from './cadastro-de-plano';
+import { criarPlano, escolherPlano } from './cadastro-de-plano';
 
 /**
  * WCAG 2.2 AA nos fluxos essenciais -- DS-PAINEL.md §10.
@@ -61,7 +61,7 @@ async function criarAlunoAtivoComPlano(page: Page): Promise<void> {
     .first()
     .click();
 
-  await page.getByTestId('campo-plano').selectOption({ label: `Plano A11y ${sufixo}` });
+  await escolherPlano(page, `Plano A11y ${sufixo}`);
   await page.getByTestId('campo-inicio').fill('2026-01-01T06:00');
   await page.getByTestId('campo-fim').fill('2027-01-01T22:00');
   await page.getByTestId('campo-motivo-atribuicao').fill('cenario de varredura de acessibilidade');
