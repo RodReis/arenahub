@@ -55,6 +55,9 @@ const esquemaDeRevogacaoDeAcesso = z
 
 const esquemaDeCodigo = z.object({ code: z.string().length(6) }).strict();
 
+/** Codigo do fator ATUAL: so e exigido de quem ja tem MFA ativo e quer trocar. */
+const esquemaDeTrocaDeFator = z.object({ code: z.string().length(6).optional() }).strict();
+
 /*
  * Schema de resposta de `GET /roles` -- declarado, e nao adicionado a
  * `OPERACOES_SEM_SCHEMA_DE_RESPOSTA`: aquela lista e divida herdada e so pode
@@ -281,7 +284,8 @@ export class IamController {
   }
 
   @Post('auth/mfa/setup')
-  async iniciarMfa() {
+  async iniciarMfa(@Body() corpo: unknown) {
+    const dados = esquemaDeTrocaDeFator.parse(corpo ?? {});
     const contexto = this.contexto.require();
 
     const usuario = await this.db.user.findUniqueOrThrow({
@@ -289,7 +293,7 @@ export class IamController {
       select: { email: true },
     });
 
-    return this.mfa.iniciarInscricao(contexto.actorId, usuario.email);
+    return this.mfa.iniciarInscricao(contexto.actorId, usuario.email, dados.code);
   }
 
   @Post('auth/mfa/confirm')

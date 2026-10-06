@@ -50,8 +50,17 @@ export class MfaService {
    * vez troca a chave debaixo do usuario que acabou de cadastrar a anterior
    * no autenticador -- o codigo dele nunca bate porque o app tem a chave
    * velha e o banco ja tem outra.
+   *
+   * Trocar um fator `ENABLED` exige um codigo do fator ATUAL (`codigoAtual`).
+   * Sem isso, quem tem so a sessao de um usuario com `billing.refund` trocaria
+   * o autenticador dele e passaria o step-up do INV-074 -- que existe
+   * justamente para proteger contra sessao roubada.
    */
-  async iniciarInscricao(userId: string, email: string): Promise<{ uri: string; base32: string }> {
+  async iniciarInscricao(
+    userId: string,
+    email: string,
+    codigoAtual?: string,
+  ): Promise<{ uri: string; base32: string }> {
     const usuario = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
@@ -61,6 +70,12 @@ export class MfaService {
         mfaSecretTag: true,
       },
     });
+
+    if (usuario.mfaStatus === 'ENABLED') {
+      if (!codigoAtual) throw new MfaObrigatorioError();
+
+      await this.verificar(userId, codigoAtual);
+    }
 
     if (
       usuario.mfaStatus === 'PENDING' &&
@@ -105,25 +120,53 @@ export class MfaService {
 
   /** Confirma a inscricao com um codigo valido e ativa o segundo fator. */
   async confirmarInscricao(userId: string, codigo: string): Promise<void> {
-    const contador = await this.conferirCodigo(userId, codigo);
+    const contador = await this.conferirCodigo(userId, codigo, false);
 
-    await this.db.user.update({
-      where: { id: userId },
-      data: { mfaStatus: 'ENABLED', mfaLastCounter: contador },
-    });
+    await this.gravarContador(userId, contador, { mfaStatus: 'ENABLED' });
   }
 
-  /** Verifica no login. Grava o contador para barrar o reuso. */
+  /**
+   * Verifica no login e no step-up. Grava o contador para barrar o reuso.
+   *
+   * So vale para fator `ENABLED`: um segredo `PENDING` ainda nao foi provado
+   * pelo dono, entao um codigo dele nao e prova de nada.
+   */
   async verificar(userId: string, codigo: string): Promise<void> {
-    const contador = await this.conferirCodigo(userId, codigo);
+    const contador = await this.conferirCodigo(userId, codigo, true);
 
-    await this.db.user.update({ where: { id: userId }, data: { mfaLastCounter: contador } });
+    await this.gravarContador(userId, contador, {});
   }
 
-  private async conferirCodigo(userId: string, codigo: string): Promise<bigint> {
+  /**
+   * Grava o contador SO se ele ainda for maior que o ultimo. Ler e depois
+   * gravar sem condicao deixava dois envios simultaneos do mesmo codigo
+   * passarem: os dois liam o contador antigo e os dois gravavam.
+   */
+  private async gravarContador(
+    userId: string,
+    contador: bigint,
+    extra: { mfaStatus?: 'ENABLED' },
+  ): Promise<void> {
+    const { count } = await this.db.user.updateMany({
+      where: {
+        id: userId,
+        OR: [{ mfaLastCounter: null }, { mfaLastCounter: { lt: contador } }],
+      },
+      data: { ...extra, mfaLastCounter: contador },
+    });
+
+    if (count === 0) throw new CodigoMfaReutilizadoError();
+  }
+
+  private async conferirCodigo(
+    userId: string,
+    codigo: string,
+    exigirAtivo: boolean,
+  ): Promise<bigint> {
     const usuario = await this.db.user.findUnique({
       where: { id: userId },
       select: {
+        mfaStatus: true,
         mfaSecretCiphertext: true,
         mfaSecretIv: true,
         mfaSecretTag: true,
@@ -134,6 +177,8 @@ export class MfaService {
     if (!usuario?.mfaSecretCiphertext || !usuario.mfaSecretIv || !usuario.mfaSecretTag) {
       throw new CodigoMfaInvalidoError();
     }
+
+    if (exigirAtivo && usuario.mfaStatus !== 'ENABLED') throw new CodigoMfaInvalidoError();
 
     const segredo = this.cifrador.decifrar({
       ciphertext: Buffer.from(usuario.mfaSecretCiphertext),
