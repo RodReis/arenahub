@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectThrottlerStorage, minutes, type ThrottlerStorage } from '@nestjs/throttler';
 
 import {
   CredencialInvalidaError,
@@ -66,6 +67,26 @@ const SENHA_DESCARTAVEL = randomBytes(32).toString('base64url');
  */
 const TENANT_INEXISTENTE = '00000000-0000-0000-0000-000000000000';
 
+/**
+ * Tetos de tentativa POR CONTA (#599). O identificador do login e o CPF
+ * (semi-publico) e a senha minima e 10 caracteres: so havia o throttle global
+ * por IP, e atras do proxy ele nem distingue clientes. A chave e a CONTA --
+ * nunca o IP --, entao o NAT Wi-Fi da academia nao vira um balde so.
+ *
+ * Soma TODA tentativa, nao so as falhas: `ThrottlerStorage` so expoe
+ * `increment`, sem leitura nem zeragem. Com tetos largos o aluno de verdade
+ * nao chega perto (login e raro; o refresh nao passa por aqui).
+ */
+const JANELA_DO_LOGIN_MS = minutes(15);
+const LIMITE_DO_LOGIN = 20;
+const BLOQUEIO_DO_LOGIN_MS = minutes(5);
+const JANELA_DA_REAUTENTICACAO_MS = minutes(5);
+const LIMITE_DA_REAUTENTICACAO = 10;
+const BLOQUEIO_DA_REAUTENTICACAO_MS = minutes(5);
+/** Um e-mail de recuperacao por minuto por conta (#599). */
+const JANELA_DA_RECUPERACAO_MS = minutes(1);
+const LIMITE_DA_RECUPERACAO = 1;
+
 @Injectable()
 export class StudentIdentityService {
   private readonly logger = new Logger(StudentIdentityService.name);
@@ -97,7 +118,26 @@ export class StudentIdentityService {
     private readonly senhas: PasswordService,
     private readonly tokens: TokenService,
     private readonly email: EmailDeAtivacaoService,
+    @InjectThrottlerStorage() private readonly forcaBruta: ThrottlerStorage,
   ) {}
+
+  /** Conta uma tentativa na chave e diz se ela JA estourou o teto. */
+  private async estourou(
+    chave: string,
+    janelaMs: number,
+    limite: number,
+    bloqueioMs: number,
+  ): Promise<boolean> {
+    const registro = await this.forcaBruta.increment(
+      chave,
+      janelaMs,
+      limite,
+      bloqueioMs,
+      'aluno-bruteforce',
+    );
+
+    return registro.isBlocked;
+  }
 
   private alvoDescartavel(): Promise<string> {
     this.envelopeDescartavel ??= this.senhas.gerarHash(SENHA_DESCARTAVEL);
@@ -286,6 +326,18 @@ export class StudentIdentityService {
       dados.identificador,
     );
 
+    /*
+     * Chave pela CONTA quando ela existe (CPF com ou sem pontos cai na mesma),
+     * e pelo identificador digitado quando nao -- conta que nao existe conta
+     * igual, para o teto nao revelar qual identificador e real. Bloqueado sai
+     * pelo MESMO erro de credencial, e antes do scrypt (poupa CPU).
+     */
+    const chave = `aluno-login:${dados.tenantId ?? '-'}:${conta?.id ?? dados.identificador.trim().toLowerCase()}`;
+
+    if (await this.estourou(chave, JANELA_DO_LOGIN_MS, LIMITE_DO_LOGIN, BLOQUEIO_DO_LOGIN_MS)) {
+      throw new CredencialInvalidaError();
+    }
+
     const envelope = conta?.passwordHash ?? (await this.alvoDescartavel());
     const senhaConfere = await this.senhas.conferir(dados.senha, envelope);
 
@@ -318,7 +370,21 @@ export class StudentIdentityService {
       ? await this.contas.encontrarPorIdentificador(dados.tenantId, dados.identificador)
       : null;
 
-    if (conta && conta.status === 'ACTIVE') {
+    /*
+     * Um pedido por minuto por conta (#599). Pedido a mais responde igual e
+     * NAO emite token: cada um revogava o link anterior da vitima, entao
+     * repetir o pedido a deixava sem link valido.
+     */
+    const limitado =
+      conta?.status === 'ACTIVE' &&
+      (await this.estourou(
+        `aluno-recuperacao:${conta.id}`,
+        JANELA_DA_RECUPERACAO_MS,
+        LIMITE_DA_RECUPERACAO,
+        JANELA_DA_RECUPERACAO_MS,
+      ));
+
+    if (conta && conta.status === 'ACTIVE' && !limitado) {
       const { token, tokenHash } = this.gerarTokenDeUsoUnico();
 
       await this.contas.revogarTokensPendentes({
@@ -335,11 +401,14 @@ export class StudentIdentityService {
         validoAte,
       });
 
-      await this.email.enviarRecuperacao({
-        destino: conta.identifier,
-        token,
-        validoAte,
-      });
+      /*
+       * FORA do caminho da resposta: esperar o provedor de e-mail so quando a
+       * conta existe fazia o pedido demorar mais para conta real (oraculo de
+       * tempo). Falha de envio so vai para o log, sem identificador.
+       */
+      void Promise.resolve(
+        this.email.enviarRecuperacao({ destino: conta.identifier, token, validoAte }),
+      ).catch(() => this.logger.warn('Falha ao enviar o e-mail de recuperacao de senha.'));
     }
 
     return { aceito: true };
@@ -460,6 +529,17 @@ export class StudentIdentityService {
     senha: string,
     agora: Date,
   ): Promise<void> {
+    if (
+      await this.estourou(
+        `aluno-reauth:${ctx.accountId}`,
+        JANELA_DA_REAUTENTICACAO_MS,
+        LIMITE_DA_REAUTENTICACAO,
+        BLOQUEIO_DA_REAUTENTICACAO_MS,
+      )
+    ) {
+      throw new CredencialInvalidaError();
+    }
+
     const conta = await this.contas.encontrarPorId(ctx.accountId);
     const envelope = conta?.passwordHash ?? (await this.alvoDescartavel());
 
