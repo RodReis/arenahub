@@ -12,6 +12,7 @@ import { aplicarParserComCorpoCru } from '../../src/common/http/bootstrap-http.j
 import { BiometricIdentityRepository } from '../../src/modules/biometrics/biometric-identity.repository.js';
 import { VincularCadastroLegadoUseCase } from '../../src/modules/biometrics/vincular-cadastro-legado.use-case.js';
 import { DeviceRepository } from '../../src/modules/devices/device.repository.js';
+import { TETO_DE_NUMEROS_POR_LEITOR } from '../../src/modules/devices/device-reader-number.repository.js';
 import { EdgeAuthService } from '../../src/modules/edge-auth/edge-auth.service.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
@@ -684,6 +685,67 @@ describe('#468 -- vinculo legado do leitor', () => {
       const r = await vincular({ deviceSerial: serial, externalUserIds: [cartao] });
 
       expect((r.body as { studentAlreadyLinked: string[] }).studentAlreadyLinked).toEqual([cartao]);
+    });
+  });
+
+  /* #601: o lote do Edge nao infla a tabela de numeros do leitor. */
+  describe('formato e teto dos numeros do leitor (#601)', () => {
+    it('descarta em silencio o numero fora do formato, sem recusar o lote', async () => {
+      const resposta = await vincular({
+        deviceSerial: serial,
+        externalUserIds: ['9999101', 'abc', '12-3', '1'.repeat(19)],
+      });
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ withoutStudent: ['9999101'] });
+
+      const registrados = await db.deviceReaderNumber.findMany({
+        where: { deviceId: ctx.deviceId, externalUserId: { in: ['9999101', 'abc', '12-3', '1'.repeat(19)] } },
+        select: { externalUserId: true },
+      });
+      expect(registrados.map((r) => r.externalUserId)).toEqual(['9999101']);
+    });
+
+    it('no teto, numero novo nao entra e o ja registrado segue atualizando', async () => {
+      const ocupantes = Array.from(
+        { length: TETO_DE_NUMEROS_POR_LEITOR },
+        (_, i) => `77${String(i).padStart(10, '0')}`,
+      );
+      const visto = new Date('2026-01-01T00:00:00.000Z');
+
+      try {
+        const atual = await db.deviceReaderNumber.count({ where: { deviceId: ctx.deviceId } });
+        await db.deviceReaderNumber.createMany({
+          data: ocupantes.slice(0, TETO_DE_NUMEROS_POR_LEITOR - atual).map((externalUserId) => ({
+            tenantId: ctx.tenantId,
+            deviceId: ctx.deviceId,
+            externalUserId,
+            seenAt: visto,
+          })),
+        });
+
+        const resposta = await vincular({
+          deviceSerial: serial,
+          externalUserIds: ['9999102', ocupantes[0]!],
+        });
+
+        expect(resposta.status).toBe(201);
+        expect(
+          await db.deviceReaderNumber.count({
+            where: { deviceId: ctx.deviceId, externalUserId: '9999102' },
+          }),
+        ).toBe(0);
+        const existente = await db.deviceReaderNumber.findUniqueOrThrow({
+          where: {
+            deviceId_externalUserId: { deviceId: ctx.deviceId, externalUserId: ocupantes[0]! },
+          },
+        });
+        expect(existente.seenAt.getTime()).toBeGreaterThan(visto.getTime());
+      } finally {
+        await db.deviceReaderNumber.deleteMany({
+          where: { deviceId: ctx.deviceId, externalUserId: { startsWith: '77' } },
+        });
+      }
     });
   });
 });

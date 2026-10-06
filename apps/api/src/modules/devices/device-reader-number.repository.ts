@@ -10,6 +10,14 @@ import { PrismaService } from '../../persistence/prisma.service.js';
  * feito direto no equipamento sem passar pela nuvem). Alimentado pelo mesmo
  * caminho que ja recebe a base do leitor (#468, `legacy-links`).
  */
+/**
+ * Teto de numeros registrados por leitor (#601): o leitor comporta 5.000
+ * usuarios, o teto e o dobro. Sem ele, um Edge com chave valida inflava a
+ * tabela sem limite -- e `listarNumerosDoTenant` carrega tudo a cada sugestao
+ * de numero livre.
+ */
+export const TETO_DE_NUMEROS_POR_LEITOR = 10_000;
+
 @Injectable()
 export class DeviceReaderNumberRepository {
   constructor(private readonly db: PrismaService) {}
@@ -17,17 +25,35 @@ export class DeviceReaderNumberRepository {
   /**
    * Registra que o leitor tem este numero -- idempotente (regra de
    * arquitetura no 4): reenviar a mesma base so atualiza `seenAt`.
+   *
+   * Numero ja registrado sempre atualiza; numero NOVO so entra enquanto o
+   * leitor estiver abaixo do teto. Devolve quantos novos ficaram de fora.
    */
   async registrarLote(
     tenantId: string,
     deviceId: string,
     externalUserIds: readonly string[],
     vistoEm: Date,
-  ): Promise<void> {
-    if (externalUserIds.length === 0) return;
+  ): Promise<{ ignorados: number }> {
+    if (externalUserIds.length === 0) return { ignorados: 0 };
+
+    // ponytail: contagem fora da transacao -- dois lotes simultaneos podem
+    // passar do teto por ate um lote (1.000). O teto e de protecao, nao exato.
+    const [total, conhecidos] = await Promise.all([
+      this.db.deviceReaderNumber.count({ where: { deviceId } }),
+      this.db.deviceReaderNumber.findMany({
+        where: { deviceId, externalUserId: { in: [...externalUserIds] } },
+        select: { externalUserId: true },
+      }),
+    ]);
+
+    const jaRegistrados = new Set(conhecidos.map((c) => c.externalUserId));
+    const novos = externalUserIds.filter((n) => !jaRegistrados.has(n));
+    const vagas = Math.max(0, TETO_DE_NUMEROS_POR_LEITOR - total);
+    const aceitos = [...externalUserIds.filter((n) => jaRegistrados.has(n)), ...novos.slice(0, vagas)];
 
     await this.db.$transaction(
-      externalUserIds.map((externalUserId) =>
+      aceitos.map((externalUserId) =>
         this.db.deviceReaderNumber.upsert({
           where: { deviceId_externalUserId: { deviceId, externalUserId } },
           create: { tenantId, deviceId, externalUserId, seenAt: vistoEm },
@@ -35,6 +61,8 @@ export class DeviceReaderNumberRepository {
         }),
       ),
     );
+
+    return { ignorados: novos.length - Math.min(novos.length, vagas) };
   }
 
   /**
