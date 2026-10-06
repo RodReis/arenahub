@@ -9,7 +9,6 @@ updated: 2026-10-06
 
 ### Sem épico
 
-- [MVP0][FIX] Foto do leitor pode sobrescrever a da recepção; externalUserIds sem formato nem cota (#601)
 - [FIX] API atrás do proxy da Railway: sem trust proxy o throttle por IP enxerga o IP do proxy (#605)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
 - [MVP5][INFRA] Decisão: canal externo ao aluno (WhatsApp e e-mail) — duas decisões registradas em sentidos opostos, nenhuma virou fatia (#344)
@@ -36,6 +35,7 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP0][FIX] Foto do leitor pode sobrescrever a da recepção; externalUserIds sem formato nem cota (#601, finalizado em: 2026-10-06)
 - [MVP4][FIX] Aluno no mobile: login, refresh e reautenticação sem contador de falhas por conta (#599, finalizado em: 2026-10-06)
 - [FIX] Exportações do painel entregam job de exportação de saúde a quem só tem access.read (#600, finalizado em: 2026-10-06)
 - [MVP1][FIX] Convite: gerente restrito a uma unidade convida e revoga com escopo maior (#597, finalizado em: 2026-10-06)
