@@ -102,14 +102,18 @@ export class ClassReservationController {
     @Req() requisicao: Request,
   ): Promise<ReservaDto> {
     const dados = esquemaDeReserva.parse(corpo);
+    const contexto = this.contexto.require();
 
     const reserva = await this.reservas.reservar(
-      this.contexto.require(),
+      contexto,
       {
         classId,
         studentId: dados.studentId,
         occurrenceDate: paraData(dados.occurrenceDate),
-        overriddenById: dados.overriddenById,
+        // Quem sobrescreve e SEMPRE o ator autenticado: o id vindo do corpo
+        // gravava como autor da excecao alguem que nao fez a chamada. O campo
+        // do corpo segue aceito, como pedido de excecao.
+        overriddenById: dados.overriddenById ? contexto.actorId : undefined,
       },
       requisicao.correlationId ?? 'sem-correlacao',
     );

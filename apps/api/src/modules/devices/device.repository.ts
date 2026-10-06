@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Device } from '@arenahub/database';
 
 import { EdgeNodeNaoEncontradoError } from '../../common/http/erro-de-dominio.js';
@@ -29,6 +29,31 @@ export class DeviceRepository {
     correlationId: string,
   ): Promise<Device> {
     return this.db.$transaction(async (tx) => {
+      // A FK so prova que a linha existe, nao de quem ela e: sem isto o corpo
+      // da requisicao apontava para unidade ou no de OUTRO tenant. 404, como o
+      // resto, para nao confirmar o UUID a quem o tentou. Mesma regra do
+      // `atualizar` (Edge do mesmo tenant, da mesma unidade, ACTIVE).
+      const unidade = await tx.gymUnit.findFirst({
+        where: { id: dados.gymUnitId, tenantId: contexto.tenantId },
+        select: { id: true },
+      });
+
+      if (!unidade) throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
+
+      if (dados.edgeNodeId) {
+        const edge = await tx.edgeNode.findFirst({
+          where: {
+            id: dados.edgeNodeId,
+            tenantId: contexto.tenantId,
+            gymUnitId: dados.gymUnitId,
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        });
+
+        if (!edge) throw new EdgeNodeNaoEncontradoError();
+      }
+
       const dispositivo = await tx.device.create({
         data: {
           tenantId: contexto.tenantId,

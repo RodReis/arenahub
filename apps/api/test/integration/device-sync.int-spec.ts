@@ -274,6 +274,12 @@ describe('F8 -- fila de sincronizacao', () => {
       expect(comandos.some((c) => c.type === 'DEVICE_USER_UPSERT')).toBe(true);
     });
 
+    it('cursor `after` que nao e inteiro e 400, nao 500 (#586)', async () => {
+      const resposta = await comoEdge('get', '/api/v1/edge/commands?after=abc');
+
+      expect(resposta.status).toBe(400);
+    });
+
     it('nunca inclui template bruto no payload (INV-022)', async () => {
       await criarAlunoComIdentidade();
 

@@ -156,6 +156,12 @@ describe('assinaturaConfere', () => {
     // de comprimento antes e o que evita transformar 401 em 500.
     expect(assinaturaConfere('abc', 'abcd')).toBe(false);
   });
+
+  it('cabecalho multibyte com o mesmo numero de caracteres da falso, nao lanca (#586)', () => {
+    // 4 caracteres nos dois, mas 4 bytes contra 8: comparar so o `length` deixava
+    // `timingSafeEqual` lancar RangeError, e a API respondia 500 em vez de 401.
+    expect(assinaturaConfere('abcd', 'éééé')).toBe(false);
+  });
 });
 
 describe('timestampEstaNaJanela', () => {

@@ -229,4 +229,62 @@ describe('#490 -- reatribuir o Edge de um dispositivo', () => {
     expect(ids).not.toContain(edgeDeOutroTenantId);
     expect(ids).toContain(edgeDeOutraUnidadeId);
   });
+
+  /**
+   * #586 -- `POST /devices` gravava `gymUnitId` e `edgeNodeId` do corpo sem
+   * conferir o tenant (a FK so prova que a linha existe), ao contrario do PATCH.
+   */
+  describe('cadastro de dispositivo confere unidade e Edge do tenant', () => {
+    const criar = (corpo: object) =>
+      request(servidor()).post('/api/v1/devices').set('Cookie', cookie).send(corpo);
+
+    const corpoBase = () => ({
+      kind: 'FACIAL_READER',
+      model: 'Inner Fit',
+      serial: `SN-NOVO-${randomUUID().slice(0, 8)}`,
+    });
+
+    it('cadastra com unidade e Edge do proprio tenant', async () => {
+      const resposta = await criar({
+        ...corpoBase(),
+        gymUnitId: unidadeId,
+        edgeNodeId: edgeDaUnidadeId,
+      });
+
+      expect(resposta.status).toBe(201);
+    });
+
+    it('recusa unidade de OUTRO tenant e nao grava nada', async () => {
+      const unidadeDeOutro = await db.gymUnit.findFirstOrThrow({
+        where: { tenantId: outroTenantId },
+      });
+      const corpo = { ...corpoBase(), gymUnitId: unidadeDeOutro.id };
+
+      const resposta = await criar(corpo);
+
+      expect(resposta.status).toBe(404);
+      expect(resposta.body).toMatchObject({ code: 'GYM_UNIT_NOT_FOUND' });
+      expect(await db.device.count({ where: { serial: corpo.serial } })).toBe(0);
+    });
+
+    it('recusa Edge de OUTRO tenant, mesmo apontando para a mesma unidade', async () => {
+      const corpo = { ...corpoBase(), gymUnitId: unidadeId, edgeNodeId: edgeDeOutroTenantId };
+
+      const resposta = await criar(corpo);
+
+      expect(resposta.status).toBe(404);
+      expect(resposta.body).toMatchObject({ code: 'EDGE_NODE_NOT_FOUND' });
+      expect(await db.device.count({ where: { serial: corpo.serial } })).toBe(0);
+    });
+
+    it('recusa Edge de outra unidade do mesmo tenant', async () => {
+      const resposta = await criar({
+        ...corpoBase(),
+        gymUnitId: unidadeId,
+        edgeNodeId: edgeDeOutraUnidadeId,
+      });
+
+      expect(resposta.status).toBe(404);
+    });
+  });
 });
