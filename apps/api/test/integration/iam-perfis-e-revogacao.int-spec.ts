@@ -659,4 +659,39 @@ describe('perfis de sistema e revogacao de acesso', () => {
       }
     });
   });
+
+  /* #598: o convite pendente nao sobrevive a quem o emitiu. */
+  describe('convite pendente de quem perde o acesso (#598)', () => {
+    it('revogar o convidador invalida o convite pendente, e so o dele', async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      const dono = await criarMembro(tenantId, 'OWNER');
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+      const { id: roleId } = await db.role.findFirstOrThrow({
+        where: { tenantId, name: 'MANAGER' },
+        select: { id: true },
+      });
+      const convidar = (actorId: string) =>
+        app.get(InvitationService).convidar(
+          contextoDe(tenantId, actorId),
+          { email: `c-${randomUUID()}@exemplo.test`, roleId },
+          `corr-${randomUUID()}`,
+        );
+
+      const doGerente = await convidar(gerente);
+      const doDono = await convidar(dono);
+
+      await revogar.executar(contextoDe(tenantId, dono), gerente, MOTIVO, `corr-${randomUUID()}`);
+
+      await expect(
+        app.get(InvitationService).aceitar(doGerente.token, 'senha-nova-123', `corr-${randomUUID()}`),
+      ).rejects.toMatchObject({ code: 'INVITATION_INVALID' });
+      expect(
+        (await db.invitation.findUniqueOrThrow({ where: { id: doGerente.convite.id } })).status,
+      ).toBe('REVOKED');
+      // O convite de quem segue com acesso continua valendo.
+      expect(
+        (await db.invitation.findUniqueOrThrow({ where: { id: doDono.convite.id } })).status,
+      ).toBe('PENDING');
+    });
+  });
 });
