@@ -52,6 +52,9 @@ export class PrecoDeVigenciaDuplicadaError extends ErroDeDominio {
   }
 }
 
+/** Direitos por `createMany` na propagacao de janelas -- ver `propagarJanelasAosDireitos`. */
+const DIREITOS_POR_LOTE = 500;
+
 /**
  * Reajuste com `validFrom` no passado.
  *
@@ -397,16 +400,25 @@ export class MembershipRepository {
    * que saiu do plano. Substituir as duas na mesma transacao e o unico jeito
    * de o plano nunca existir num estado incoerente.
    *
-   * QUEM JA TEM ASSINATURA NAO E AFETADO: o entitlement guarda um SNAPSHOT
-   * da politica (`montarSnapshotDePolitica`), copiado quando nasce. A edicao
-   * vale para assinaturas NOVAS -- e isso protege quem esta dentro de perder
-   * acesso por uma correcao de cadastro.
+   * QUEM JA TEM O PLANO RECEBE A EDICAO (decisao do PI, 06/10/2026). Ate
+   * entao valia so para assinaturas novas, e o horario do plano mudava sem a
+   * catraca saber: 541 dos 543 direitos ativos ficaram com a copia antiga e
+   * a recepcao via "Fora do horario do plano" para quem estava dentro dele.
+   * As janelas de cada direito VIVO (agendado, ativo ou suspenso, ainda nao
+   * vencido) sao trocadas pelas do plano na mesma transacao. O que ja
+   * encerrou (revogado, expirado) e historico e nao se toca. O
+   * `policySnapshot` segue como registro do que valia na concessao: quem
+   * decide acesso e a janela, nao o snapshot.
+   *
+   * ENCURTAR o plano tira o horario de quem esta dentro, na hora -- e o
+   * mesmo efeito de qualquer outra regra de plano, e fica na auditoria.
    */
   async editarPlano(
     contexto: TenantContext,
     id: string,
     dados: DadosDeEdicaoDePlano,
     correlationId: string,
+    agora: Date,
   ): Promise<Plan> {
     const janelas = validarJanelas(dados.janelas);
 
@@ -468,6 +480,14 @@ export class MembershipRepository {
         },
       });
 
+      const direitosAtualizados = await this.propagarJanelasAosDireitos(
+        tx,
+        contexto.tenantId,
+        id,
+        janelas,
+        agora,
+      );
+
       await tx.auditLog.create({
         data: {
           tenantId: contexto.tenantId,
@@ -481,12 +501,58 @@ export class MembershipRepository {
             name: plano.name,
             unidades: dados.gymUnitIds.length,
             janelas: janelas.length,
+            direitosAtualizados,
           },
         },
       });
 
       return plano;
     });
+  }
+
+  /**
+   * Troca as janelas de cada direito vivo do plano pelas do plano. Devolve
+   * quantos direitos atualizou, para a auditoria.
+   *
+   * VIVO = agendado, ativo ou suspenso (pausa volta com o horario novo) e
+   * ainda nao vencido. Revogado e expirado sao historico.
+   *
+   * SUBSTITUI, nao faz merge, pelo mesmo motivo da edicao do plano: nao ha
+   * identificador estavel de janela para casar linha a linha.
+   */
+  private async propagarJanelasAosDireitos(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    planId: string,
+    janelas: readonly JanelaDeAcesso[],
+    agora: Date,
+  ): Promise<number> {
+    const direitos = await tx.entitlement.findMany({
+      where: {
+        tenantId,
+        status: { in: ['SCHEDULED', 'ACTIVE', 'SUSPENDED'] },
+        endsAt: { gt: agora },
+        subscription: { planId },
+      },
+      select: { id: true },
+    });
+
+    if (direitos.length === 0) return 0;
+
+    const ids = direitos.map((d) => d.id);
+
+    await tx.entitlementUnitWindow.deleteMany({ where: { tenantId, entitlementId: { in: ids } } });
+    // Em lotes: cada linha leva 7 binds (6 colunas + o `id`), e o Postgres
+    // aceita 65.535 por comando. 500 direitos x 12 janelas ainda cabe folgado.
+    for (let i = 0; i < ids.length; i += DIREITOS_POR_LOTE) {
+      await tx.entitlementUnitWindow.createMany({
+        data: ids
+          .slice(i, i + DIREITOS_POR_LOTE)
+          .flatMap((entitlementId) => janelas.map((j) => ({ ...j, entitlementId, tenantId }))),
+      });
+    }
+
+    return ids.length;
   }
 
   async alterarAtivacaoDePlano(

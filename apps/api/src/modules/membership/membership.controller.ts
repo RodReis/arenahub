@@ -335,6 +335,7 @@ export class MembershipController {
         janelas: dados.janelas,
       },
       requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
     );
 
     // Rele o plano COMPLETO: o `update` volta so a linha de `Plan`, sem
