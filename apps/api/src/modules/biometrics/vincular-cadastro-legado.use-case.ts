@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { DeviceUserState } from '@arenahub/database';
 
@@ -49,8 +49,18 @@ export interface ResultadoDoVinculoLegado {
   refusedOrRevoked: string[];
 }
 
+/**
+ * Formato do `enrollid` (#601): so digitos, ate 18 (o leitor esta no modo "18
+ * digitos"). Em producao, em 06/10/2026, os 433 numeros do leitor batiam --
+ * o maior com 5 digitos. O que nao bate e DESCARTADO em silencio, nunca
+ * recusa o lote: um numero estranho derrubaria o vinculo de todos os outros.
+ */
+const FORMATO_DO_NUMERO = /^\d{1,18}$/;
+
 @Injectable()
 export class VincularCadastroLegadoUseCase {
+  private readonly logger = new Logger(VincularCadastroLegadoUseCase.name);
+
   constructor(
     private readonly dispositivos: DeviceRepository,
     private readonly numerosDoLeitor: DeviceReaderNumberRepository,
@@ -73,17 +83,33 @@ export class VincularCadastroLegadoUseCase {
     // do vinculo: mesmo o numero que fica `withoutStudent` abaixo precisa
     // ficar visivel para "proximo numero livre" nao sugerir um que o
     // equipamento ja usa.
-    await this.numerosDoLeitor.registrarLote(
+    const numeros = entrada.externalUserIds.filter((n) => FORMATO_DO_NUMERO.test(n));
+    const foraDoFormato = entrada.externalUserIds.length - numeros.length;
+
+    // So a contagem vai para o log: o numero e identificador de pessoa no leitor.
+    if (foraDoFormato > 0) {
+      this.logger.warn(
+        `Leitor ${leitor.id}: ${foraDoFormato} numero(s) fora do formato descartado(s).`,
+      );
+    }
+
+    const { ignorados } = await this.numerosDoLeitor.registrarLote(
       edge.tenantId,
       leitor.id,
-      [...new Set(entrada.externalUserIds)],
+      [...new Set(numeros)],
       agora,
     );
+
+    if (ignorados > 0) {
+      this.logger.warn(
+        `Leitor ${leitor.id} no teto de numeros registrados: ${ignorados} numero(s) novo(s) nao registrado(s).`,
+      );
+    }
 
     return this.vincularNoLeitor(
       edge.tenantId,
       { id: leitor.id, serial: entrada.deviceSerial },
-      entrada.externalUserIds,
+      numeros,
       correlationId,
       agora,
     );
