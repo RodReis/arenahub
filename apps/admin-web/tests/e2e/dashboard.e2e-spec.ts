@@ -88,7 +88,7 @@ test.describe('dashboard operacional', () => {
     await page.goto('/dashboard');
 
     // Os três assuntos do dia são ABAS desde 05/10/2026 (pedido do PI).
-    for (const aba of ['Acessos em tempo real', 'Bloqueados e suspensos', 'Aniversariantes do mês']) {
+    for (const aba of ['Acessos em tempo real', 'Restrições e recusas', 'Aniversariantes do mês']) {
       await expect(page.getByRole('tab', { name: new RegExp(aba) })).toBeVisible();
     }
 

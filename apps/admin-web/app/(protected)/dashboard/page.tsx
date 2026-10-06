@@ -48,7 +48,7 @@ interface Dashboard {
     status: string;
     motivo: string | null;
     quantidade: number;
-    alunos: string[];
+    alunos: { id: string; nome: string; temFoto: boolean; nota: string | null }[];
   }[];
   placar: {
     mes: string;
@@ -398,7 +398,10 @@ export default async function PaginaDoDashboard({
               <Icon name="key-round" />
               {dados.acessosDeHoje?.override} liberação manual
             </p>
-          ) : null}
+          ) : (
+            // Sem liberação manual a célula ficava sem apoio, ao contrário das vizinhas.
+            <p className={estilos['kpiApoio']}>barrados na catraca</p>
+          )}
         </div>
 
         {/*
@@ -445,7 +448,8 @@ export default async function PaginaDoDashboard({
                   abas={[
                     {
                       id: 'bloqueados',
-                      label: 'Bloqueados e suspensos',
+                      // Sem unidade não há feed nem recusa: só o cadastro travado.
+                      label: 'Restrições',
                       icon: 'user-x',
                       contador: totalDeBloqueados(dados.situacoes),
                       ...(totalDeBloqueados(dados.situacoes) > 0 ? { tomDoContador: 'danger' as const } : {}),

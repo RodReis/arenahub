@@ -259,21 +259,31 @@ describe('F57 -- dashboard operacional', () => {
 
     const situacoes = (
       resposta.body as {
-        situacoes: { status: string; motivo: string | null; quantidade: number; alunos: string[] }[];
+        situacoes: {
+          status: string;
+          motivo: string | null;
+          quantidade: number;
+          alunos: { id: string; nome: string; temFoto: boolean; nota: string | null }[];
+        }[];
       }
     ).situacoes;
 
+    // Cada pessoa leva id (link da ficha), foto e nota -- nao so o nome.
     expect(situacoes).toContainEqual({
       status: 'SUSPENDED',
       motivo: 'MEDICAL',
       quantidade: 1,
-      alunos: ['Suspenso da Matriz'],
+      alunos: [
+        { id: expect.any(String), nome: 'Suspenso da Matriz', temFoto: false, nota: null },
+      ],
     });
     expect(situacoes).toContainEqual({
       status: 'BLOCKED',
       motivo: 'DELINQUENCY',
       quantidade: 1,
-      alunos: ['Bloqueado da Matriz'],
+      alunos: [
+        { id: expect.any(String), nome: 'Bloqueado da Matriz', temFoto: false, nota: null },
+      ],
     });
 
     // O bloqueado da FILIAL nao entra na contagem da matriz.

@@ -675,7 +675,7 @@ Lista viva. Tela nova ou refeita começa por aqui; o PI não precisa repetir nad
 | Estado pinta pelo próprio tom (`PainelDeEstado`, `SummaryStrip`), nunca por enfeite | §4.6b, §4.6c |
 | Diálogo de ação sensível com motivo obrigatório, que não perde o texto em erro | §5.1, §5.3b |
 | Toast para info/warn/erro; nunca `Alert` | §4.16 |
-| Lista de problemas agrupados por estado → **blocos tingidos** (aresta 3 px, degradê, selo e contagem grande no tom, pessoas em chips com iniciais) | §4.6b, dashboard "Bloqueados e suspensos" |
+| Pessoa com estado a comunicar → **cartão de pessoa** (§4.5d): faixa no tom do estado, foto sobreposta, nome e a **razão escrita no rodapé**; sem razão gravada, diz "Sem motivo registrado" e aponta a ficha. Em "Cadastro travado" ganha aresta de 3 px no tom cheio. Substituiu os blocos tingidos com chips de iniciais (06/10/2026) | §4.5d, §4.6b, dashboard "Restrições e recusas" |
 | Contador de aba no tom do estado quando o número é problema | §4.14 |
 | Pedido visual novo do PI → implementa e registra aqui como emenda | topo deste arquivo |
 

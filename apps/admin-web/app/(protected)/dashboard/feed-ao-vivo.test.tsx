@@ -199,7 +199,17 @@ describe('FeedAoVivo — F57 bloco 3', () => {
       <FeedAoVivo
         gymUnitId="u-1"
         timeZone="America/Sao_Paulo"
-        situacoes={[{ status: 'BLOCKED', motivo: null, quantidade: 2, alunos: ['Ana', 'Bia'] }]}
+        situacoes={[
+          {
+            status: 'BLOCKED',
+            motivo: null,
+            quantidade: 2,
+            alunos: [
+              { id: 'a-1', nome: 'Ana', temFoto: false, nota: null },
+              { id: 'a-2', nome: 'Bia', temFoto: false, nota: null },
+            ],
+          },
+        ]}
         aniversariantes={{ id: 'aniversariantes', label: 'Aniversariantes do mês', contador: 3, content: 'bolo' }}
         inicial={[
           evento('e-1', 'Nanci Santana'),
@@ -211,7 +221,7 @@ describe('FeedAoVivo — F57 bloco 3', () => {
     const abas = screen.getAllByRole('tab');
     expect(abas.map((aba) => aba.textContent)).toEqual([
       'Acessos em tempo real2',
-      'Bloqueados e suspensos3', // 2 travados + 1 recusado hoje
+      'Restrições e recusas3', // 2 travados + 1 recusado hoje
       'Aniversariantes do mês3',
     ]);
     expect(abas[0]).toHaveAttribute('aria-selected', 'true');
@@ -372,6 +382,6 @@ describe('FeedAoVivo — F57 bloco 3', () => {
   it('sem situacoes, o feed nao desenha o cartão de bloqueados', () => {
     render(<FeedAoVivo gymUnitId="u-1" timeZone="America/Sao_Paulo" inicial={[]} />);
 
-    expect(screen.queryByText('Bloqueados e suspensos')).toBeNull();
+    expect(screen.queryByText('Restrições e recusas')).toBeNull();
   });
 });

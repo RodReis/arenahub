@@ -12010,7 +12010,29 @@
                           "alunos": {
                             "type": "array",
                             "items": {
-                              "type": "string"
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "nome",
+                                "temFoto",
+                                "nota"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "nome": {
+                                  "type": "string"
+                                },
+                                "temFoto": {
+                                  "type": "boolean"
+                                },
+                                "nota": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              }
                             }
                           }
                         }
