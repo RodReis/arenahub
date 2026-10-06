@@ -14,6 +14,20 @@ import { guardarCorpoCru } from './raw-body.middleware.js';
  * Fica numa funcao, e nao inline no `main.ts`, exatamente para que o teste
  * possa montar a aplicacao do mesmo jeito que producao.
  */
+/**
+ * Diz ao Express quantos proxies confiar -- issue #605. `0` e o padrao do
+ * Express e nao muda nada. Com `N > 0`, `req.ip` passa a ser o IP do cliente
+ * lido do `X-Forwarded-For`, e e ele que o throttle por IP e a auditoria usam.
+ */
+export function aplicarTrustProxy(app: INestApplication, saltos: number): void {
+  if (saltos <= 0) return;
+
+  (app.getHttpAdapter().getInstance() as { set: (chave: string, valor: number) => void }).set(
+    'trust proxy',
+    saltos,
+  );
+}
+
 export function aplicarParserComCorpoCru(app: INestApplication): void {
   app.use(json({ limit: '1mb', verify: guardarCorpoCru }));
   app.use(urlencoded({ extended: true, limit: '1mb' }));
