@@ -133,3 +133,10 @@ Claude outputs/
 
 # Worktrees do Claude Code — arvore de trabalho isolada, nunca conteudo do repo.
 .claude/worktrees/
+
+# Skills instaladas via skills-lock.json (ex.: security-audit) -- ferramenta
+# local de agente, nao material do produto. Duplicadas em .agents/ e .claude/
+# pelos dois loaders de skill; o lock file e que descreve a instalacao.
+.agents/skills/
+.claude/skills/
+skills-lock.json
