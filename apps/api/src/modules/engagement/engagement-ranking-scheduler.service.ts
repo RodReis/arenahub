@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import type { RankingCategory } from '@arenahub/database';
+import { comContexto, type RankingCategory } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { mesAnterior, mesLocal } from './domain/movimento-de-xp.js';
@@ -90,7 +90,11 @@ export class EngagementRankingSchedulerService {
 
     for (const unidade of unidades) {
       try {
-        const fechou = await this.fecharUnidade(unidade, agora);
+        // `students` tem RLS e o job nao passa pelo interceptor das rotas: sem
+        // o escopo do tenant, todo fechamento falhava com SemContextoDeTenantError.
+        const fechou = await comContexto({ kind: 'system', tenantId: unidade.tenantId }, () =>
+          this.fecharUnidade(unidade, agora),
+        );
         if (fechou) fechadas += 1;
       } catch (erro: unknown) {
         falhas += 1;

@@ -1,14 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
 
+import { contextoRls } from '@arenahub/database';
+
 import { FakePortaDeDispatch } from './outbox-dispatcher.repository.fake.js';
 import { OutboxDispatcherService, type ConsumidorDeEvento } from './outbox-dispatcher.service.js';
 
 const AGORA = new Date('2026-09-16T12:00:00Z');
+const TENANT = '1f7e8ed1-6aba-4eb3-87e2-3275663d8921';
 
 function evento(id: string, eventType = 'InvoicePaid') {
   return {
     id,
-    tenantId: 't1',
+    tenantId: TENANT,
     eventType,
     aggregateType: 'Invoice',
     aggregateId: `agg-${id}`,
@@ -105,5 +108,24 @@ describe('OutboxDispatcherService', () => {
     const resultado = await dispatcher.executarCiclo(AGORA);
 
     expect(resultado).toEqual({ eventos: 1, entregas: 0, falhas: 0 });
+  });
+
+  it('entrega cada evento dentro do escopo do tenant dele (RLS de students)', async () => {
+    const porta = new FakePortaDeDispatch();
+    porta.comEvento(evento('e1'));
+
+    let visto: unknown;
+    const consumidor: ConsumidorDeEvento = {
+      nome: 'xp',
+      trata: () => true,
+      processar: () => {
+        visto = contextoRls.getStore();
+        return Promise.resolve();
+      },
+    };
+
+    await new OutboxDispatcherService(porta, [consumidor]).executarCiclo(AGORA);
+
+    expect(visto).toEqual({ kind: 'system', tenantId: TENANT });
   });
 });

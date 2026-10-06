@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { contextoRls } from '@arenahub/database';
+
 import { EngagementRankingSchedulerService } from './engagement-ranking-scheduler.service.js';
 import { EngagementRankingService } from './engagement-ranking.service.js';
 import { FakePortaDeRanking } from './engagement-ranking.repository.fake.js';
+
+/** UUID de verdade: `comContexto` recusa tenant que nao seja uuid. */
+const TENANT = '1f7e8ed1-6aba-4eb3-87e2-3275663d8921';
+const TENANT_2 = '2a8f9fe2-7bcb-4fc4-98f3-4386774e9d32';
 
 /** `AAAA-MM-01T00:00:00Z` -- o job roda diariamente, mas so faz algo de
  * verdade quando o mes anterior ainda nao tem snapshot publicado. */
@@ -30,7 +36,7 @@ describe('EngagementRankingSchedulerService', () => {
   });
 
   it('no dia 1, publica o mes anterior', async () => {
-    fake.comUnidadeAtiva('t1', 'u1', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
     fake.comSaldos('u1', '2026-08', saldosDeAlunos(5));
 
     const resultado = await job.executarCiclo(PRIMEIRO_DE_SETEMBRO);
@@ -38,7 +44,7 @@ describe('EngagementRankingSchedulerService', () => {
     expect(resultado).toEqual({ unidades: 1, fechadas: 1, falhas: 0 });
 
     const publicado = await fake.snapshotPublicado(
-      { tenantId: 't1', actorId: 'a', sessionId: 's', permissions: new Set(), allowedUnitIds: 'ALL' },
+      { tenantId: TENANT, actorId: 'a', sessionId: 's', permissions: new Set(), allowedUnitIds: 'ALL' },
       'u1',
       '2026-08',
     );
@@ -46,7 +52,7 @@ describe('EngagementRankingSchedulerService', () => {
   });
 
   it('rodar duas vezes nao cria dois snapshots', async () => {
-    fake.comUnidadeAtiva('t1', 'u1', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
     fake.comSaldos('u1', '2026-08', saldosDeAlunos(5));
 
     await job.executarCiclo(PRIMEIRO_DE_SETEMBRO);
@@ -57,11 +63,11 @@ describe('EngagementRankingSchedulerService', () => {
   });
 
   it('mes anterior ja publicado nao tenta republicar (sem levantar 409)', async () => {
-    fake.comUnidadeAtiva('t1', 'u1', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
     fake.comSaldos('u1', '2026-08', saldosDeAlunos(5));
 
     const contexto = {
-      tenantId: 't1',
+      tenantId: TENANT,
       actorId: 'a',
       sessionId: 's',
       permissions: new Set<string>(),
@@ -78,8 +84,8 @@ describe('EngagementRankingSchedulerService', () => {
   });
 
   it('falha em um tenant nao impede os outros', async () => {
-    fake.comUnidadeAtiva('t1', 'u1', 'America/Sao_Paulo');
-    fake.comUnidadeAtiva('t2', 'u2', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT_2, 'u2', 'America/Sao_Paulo');
     fake.comSaldos('u1', '2026-08', saldosDeAlunos(5, 'a1'));
     fake.comSaldos('u2', '2026-08', saldosDeAlunos(5, 'a2'));
 
@@ -102,11 +108,27 @@ describe('EngagementRankingSchedulerService', () => {
   });
 
   it('coorte pequena vira WITHHELD sem contar como falha', async () => {
-    fake.comUnidadeAtiva('t1', 'u1', 'America/Sao_Paulo');
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
     fake.comSaldos('u1', '2026-08', saldosDeAlunos(2));
 
     const resultado = await job.executarCiclo(PRIMEIRO_DE_SETEMBRO);
 
     expect(resultado).toEqual({ unidades: 1, fechadas: 0, falhas: 0 });
+  });
+
+  it('fecha cada unidade dentro do escopo do tenant dela (RLS de students)', async () => {
+    fake.comUnidadeAtiva(TENANT, 'u1', 'America/Sao_Paulo');
+    fake.comSaldos('u1', '2026-08', saldosDeAlunos(5));
+
+    let visto: unknown;
+    const coorteMinimaOriginal = fake.coorteMinima.bind(fake);
+    fake.coorteMinima = (contexto) => {
+      visto = contextoRls.getStore();
+      return coorteMinimaOriginal(contexto);
+    };
+
+    await job.executarCiclo(PRIMEIRO_DE_SETEMBRO);
+
+    expect(visto).toEqual({ kind: 'system', tenantId: TENANT });
   });
 });

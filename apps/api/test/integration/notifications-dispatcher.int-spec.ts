@@ -100,7 +100,13 @@ describe('F73 -- despachante de outbox fim a fim', () => {
   });
 
   afterAll(async () => {
-    await db.tenant.deleteMany({ where: { id: tenantId } });
+    try {
+      await db.tenant.deleteMany({ where: { id: tenantId } });
+    } catch (erro: unknown) {
+      // O ledger de XP e append-only por trigger: depois do credito, o tenant
+      // nao se apaga (mesmo caso da suite xp-e-ranking, que nem tenta).
+      if (!String(erro).includes('XP_LEDGER_APPEND_ONLY')) throw erro;
+    }
   });
 
   it('produtor grava OutboxEvent, despachante gera StudentNotification e credita nada de XP (InvoicePaid não credita)', async () => {
@@ -143,5 +149,57 @@ describe('F73 -- despachante de outbox fim a fim', () => {
 
     const depois = await db.studentNotification.count({ where: { tenantId, studentId } });
     expect(depois).toBe(antes);
+  });
+
+  // Fecha o #585: o despachante nao abria escopo de tenant, entao o consumidor
+  // de XP (que le `students`, com RLS) falhava com SemContextoDeTenantError e
+  // o evento era marcado como publicado mesmo assim -- XP nunca creditado.
+  it('AssessmentPublished credita o XP ao aluno (escopo de tenant aberto pelo despachante)', async () => {
+    const avaliador = await db.user.create({
+      data: { email: `f73-xp-${sufixo}@exemplo.test`, passwordHash: 'hash-de-teste' },
+      select: { id: true },
+    });
+    await db.xpRuleVersion.create({
+      data: {
+        tenantId,
+        code: 'avaliacao-publicada',
+        version: 1,
+        trigger: 'AVALIACAO_PUBLICADA',
+        points: 20,
+        status: 'APPROVED',
+        effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+      },
+    });
+    const avaliacao = await db.bodyAssessment.create({
+      data: {
+        tenantId,
+        studentId,
+        status: 'PUBLISHED',
+        assessedAt: AGORA,
+        publishedAt: AGORA,
+        evaluatorUserId: avaliador.id,
+      },
+      select: { id: true },
+    });
+    await db.outboxEvent.create({
+      data: {
+        tenantId,
+        eventType: 'AssessmentPublished',
+        aggregateType: 'BodyAssessment',
+        aggregateId: avaliacao.id,
+        payload: {},
+      },
+    });
+
+    for (let ciclos = 0; ciclos < 20; ciclos += 1) {
+      const resultado = await dispatcher.executarCiclo(AGORA);
+      if (resultado.eventos === 0) break;
+    }
+
+    const creditos = await db.xpLedgerEntry.findMany({
+      where: { tenantId, studentId, sourceKind: 'ASSESSMENT', sourceId: avaliacao.id },
+    });
+    expect(creditos).toHaveLength(1);
+    expect(creditos[0]?.points).toBe(20);
   });
 });
