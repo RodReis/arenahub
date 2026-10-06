@@ -227,6 +227,10 @@ Praticamente nenhum. `@keyframes ah-pulse` (opacidade 1 → .3) marca indicador 
 
 **Emenda de 28/09/2026 (decisão do PI), só nas grades de KPI:** entrada `ah-entrar` (opacidade 0 → 1 e `translateY(6px)` → 0, 360 ms, `cubic-bezier(.16,1,.3,1)`, escalonada em 45 ms por card via `--ordem`) e subida de 2 px no hover (`hover:-translate-y-0.5`). Card de tabela e de formulário não sobe — só a sombra muda. `prefers-reduced-motion: reduce` desliga as duas coisas. Nada mais anima.
 
+**Emenda de 05/10/2026 (decisão do PI), blocos de estado do dashboard:** entrada `ah-surge`
+(opacidade 0 → 1, `translateY(8px) scale(.98)` → 0, 360 ms, `cubic-bezier(.16,1,.3,1)`, escalonada em
+60 ms por bloco via `--ordem`) e subida de 2 px com `elev-2` no hover. `reduced-motion` desliga.
+
 **Emenda de 05/10/2026 (decisão do PI), qualquer tabela:** a linha acende no hover (fundo
 `surface-sunken` a 70%, 120 ms) e o ícone da coluna Ação responde à mão (`scale(1.12) rotate(-8deg)`,
 140 ms, `cubic-bezier(.16,1,.3,1)`). São respostas a interação, não entrada decorativa.
@@ -554,6 +558,11 @@ Validação: data inválida ou fora do intervalo → borda `err` + mensagem 11 p
 
 ### 4.14 Abas
 
+**Emenda de 05/10/2026 (decisão do PI): contador no tom do estado.** `Aba.tomDoContador`
+(`'danger' | 'warning'`) pinta o contador quando o número é um **problema a resolver** — "Bloqueados e
+suspensos" com gente travada fica vermelho com a aba aberta ou fechada. Sem tom, neutro. O número
+continua escrito.
+
 Faixa de 42 px com `border-bottom: 1px solid border/subtle` e `overflow-x: auto`. Aba: padding lateral 14 px, 13 px, `border-bottom: 2px`. Ativa: borda `brand/600`, texto `text/strong`, peso 600. Inativa: borda transparente, texto `text/muted`, peso 500. Aba com pendência recebe ponto de 6 px em `warn` após o rótulo.
 
 ### 4.15 Modal de confirmação
@@ -666,6 +675,8 @@ Lista viva. Tela nova ou refeita começa por aqui; o PI não precisa repetir nad
 | Estado pinta pelo próprio tom (`PainelDeEstado`, `SummaryStrip`), nunca por enfeite | §4.6b, §4.6c |
 | Diálogo de ação sensível com motivo obrigatório, que não perde o texto em erro | §5.1, §5.3b |
 | Toast para info/warn/erro; nunca `Alert` | §4.16 |
+| Lista de problemas agrupados por estado → **blocos tingidos** (aresta 3 px, degradê, selo e contagem grande no tom, pessoas em chips com iniciais) | §4.6b, dashboard "Bloqueados e suspensos" |
+| Contador de aba no tom do estado quando o número é problema | §4.14 |
 | Pedido visual novo do PI → implementa e registra aqui como emenda | topo deste arquivo |
 
 ---

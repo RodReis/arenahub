@@ -193,6 +193,9 @@ export function FeedAoVivo({ gymUnitId, timeZone, inicial, desde, situacoes, ani
       label: 'Bloqueados e suspensos',
       icon: 'user-x',
       contador: totalDeBloqueados(situacoes) + recusados.length,
+      // Com alguem travado ou barrado, o contador fica vermelho mesmo com a
+      // aba fechada (pedido do PI, 05/10/2026).
+      ...(totalDeBloqueados(situacoes) + recusados.length > 0 ? { tomDoContador: 'danger' as const } : {}),
       content: (
         <ConteudoDeBloqueados
           situacoes={situacoes}

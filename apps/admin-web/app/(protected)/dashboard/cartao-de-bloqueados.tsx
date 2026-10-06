@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 import { Icon } from '@arenahub/ui';
 
 import { CartaoDePresenca } from './cartao-de-presenca';
@@ -35,6 +37,20 @@ function traduzir(mapa: Record<string, string>, chave: string | null): string {
   if (chave === null) return 'Motivo não informado';
 
   return mapa[chave] ?? chave;
+}
+
+/** Tom do estado: bloqueado e o problema mais duro (`danger`), suspenso e pausa (`warning`). */
+function tomDaSituacao(status: string): 'danger' | 'warning' {
+  return status === 'BLOCKED' ? 'danger' : 'warning';
+}
+
+/** "Maria Clara" -> "MC". So decoracao: o nome vai escrito ao lado. */
+function iniciais(nome: string): string {
+  return nome
+    .split(' ')
+    .map((parte) => parte.charAt(0))
+    .join('')
+    .toUpperCase();
 }
 
 /** Pessoas com o cadastro travado -- o contador da aba "Bloqueados e suspensos". */
@@ -86,31 +102,67 @@ export function ConteudoDeBloqueados({
           </span>
         </div>
       ) : (
-        <ul className={estilos['lista']} data-testid="lista-de-situacoes">
-          {situacoes.map((situacao) => (
+        /*
+         * UM BLOCO POR SITUACAO, tingido pelo tom do estado (emenda de
+         * 05/10/2026, pedido do PI: "mais destaque, cores, efeitos"). Mesmo
+         * tratamento do `PainelDeEstado`: aresta superior de 3 px, degrade que
+         * some antes do meio, selo no tom -- o que o DS ja liberou para
+         * qualquer tela com estado a comunicar (DS-PAINEL §4.6b).
+         *
+         * A cor e do ESTADO, nunca enfeite: bloqueado e `danger`, suspenso e
+         * `warning`. Rotulo, motivo e numero continuam escritos.
+         */
+        <ul className={estilos['blocosDeSituacao']} data-testid="lista-de-situacoes">
+          {situacoes.map((situacao, ordem) => (
             <li
-              className={estilos['linhaDeSituacao']}
+              className={estilos['blocoDeSituacao']}
               key={`${situacao.status}-${situacao.motivo}`}
+              data-tom={tomDaSituacao(situacao.status)}
+              data-testid="bloco-de-situacao"
+              style={{ '--ordem': ordem } as CSSProperties}
             >
-              <span className={estilos['linha']}>
-                <span className={estilos['linhaTexto']}>
+              <div className={estilos['cabecalhoDaSituacao']}>
+                <span className={estilos['seloDaSituacao']} aria-hidden="true">
                   <Icon name={situacao.status === 'BLOCKED' ? 'ban' : 'user-minus'} />
-                  {traduzir(ROTULO_DE_SITUACAO, situacao.status)} ·{' '}
-                  {traduzir(ROTULO_DE_MOTIVO, situacao.motivo)}
                 </span>
-                <span className={estilos['linhaValor']}>{situacao.quantidade}</span>
-              </span>
+                <span className={estilos['tituloDaSituacao']}>
+                  <strong>{traduzir(ROTULO_DE_SITUACAO, situacao.status)}</strong>
+                  <span
+                    className={estilos['motivoDaSituacao']}
+                    data-sem-motivo={situacao.motivo === null ? '' : undefined}
+                  >
+                    {traduzir(ROTULO_DE_MOTIVO, situacao.motivo)}
+                  </span>
+                </span>
+                <span className={estilos['contagemDaSituacao']} data-testid="contagem-da-situacao">
+                  {situacao.quantidade}
+                </span>
+              </div>
               {/*
-                QUEM são, não só quantos. Cinco nomes cabem; acima disso a
-                contagem ao lado volta a ser a informação útil.
+                QUEM sao, nao so quantos: chips com iniciais. As iniciais sao
+                `aria-hidden` -- quem usa leitor ouve o nome, nao "M C". Acima
+                de cinco nomes, "+N" diz quantos faltam.
               */}
               {situacao.alunos.length > 0 ? (
-                <span className={estilos['nomesDaSituacao']}>
-                  {situacao.alunos.map(doisNomes).join(' · ')}
-                  {situacao.quantidade > situacao.alunos.length
-                    ? ` e mais ${situacao.quantidade - situacao.alunos.length}`
-                    : ''}
-                </span>
+                <ul className={estilos['pessoasDaSituacao']}>
+                  {situacao.alunos.map((aluno) => {
+                    const nome = doisNomes(aluno);
+
+                    return (
+                      <li key={aluno} className={estilos['pessoa']}>
+                        <span className={estilos['iniciais']} aria-hidden="true">
+                          {iniciais(nome)}
+                        </span>
+                        {nome}
+                      </li>
+                    );
+                  })}
+                  {situacao.quantidade > situacao.alunos.length ? (
+                    <li className={estilos['maisPessoas']}>
+                      +{situacao.quantidade - situacao.alunos.length}
+                    </li>
+                  ) : null}
+                </ul>
               ) : null}
             </li>
           ))}

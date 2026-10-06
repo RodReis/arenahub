@@ -114,6 +114,25 @@
   color: var(--ah-action-text);
 }
 
+/*
+ * Contador no tom do estado (emenda de 05/10/2026): vence o tom de "aba
+ * ativa" -- um problema a resolver continua vermelho com a aba aberta ou
+ * fechada. Tint de 12% com texto no tom cheio, o mesmo par do `StateBadge`.
+ */
+.contador[data-tom='danger'],
+.aba[aria-selected='true'] .contador[data-tom='danger'] {
+  background: color-mix(in srgb, var(--ah-state-danger) 12%, var(--ah-surface-raised));
+  color: var(--ah-state-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ah-state-danger) 28%, transparent);
+}
+
+.contador[data-tom='warning'],
+.aba[aria-selected='true'] .contador[data-tom='warning'] {
+  background: color-mix(in srgb, var(--ah-state-warning) 12%, var(--ah-surface-raised));
+  color: var(--ah-state-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ah-state-warning) 28%, transparent);
+}
+
 /**
  * A entrada do painel -- 140ms de opacidade e 4px de deslocamento.
  *
