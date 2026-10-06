@@ -37,14 +37,17 @@ describe('#503 -- foto do aluno vinda do leitor facial', () => {
 
   const gravados = new Map<string, { body: Buffer; contentType: string }>();
 
+  /** Roda DEPOIS de gravar no bucket -- simula a recepcao no meio do caminho. */
+  let aposGravar: ((key: string) => Promise<void>) | null = null;
+
   const storageFalso = {
-    putPrivateObject: (entrada: { key: string; body: Buffer; contentType: string }) => {
+    putPrivateObject: async (entrada: { key: string; body: Buffer; contentType: string }) => {
       gravados.set(entrada.key, {
         body: entrada.body,
         contentType: entrada.contentType,
       });
 
-      return Promise.resolve();
+      await aposGravar?.(entrada.key);
     },
     getPrivateObject: (key: string) => {
       const objeto = gravados.get(key);
@@ -234,7 +237,9 @@ describe('#503 -- foto do aluno vinda do leitor facial', () => {
     const aluno = await db.student.findUniqueOrThrow({
       where: { id: semFoto },
     });
-    expect(aluno.photoObjectKey).toBe(`tenants/${ctx.tenantId}/students/${semFoto}/photo.jpg`);
+    expect(aluno.photoObjectKey).toBe(
+      `tenants/${ctx.tenantId}/students/${semFoto}/photo-leitor.jpg`,
+    );
     expect(gravados.get(aluno.photoObjectKey!)?.contentType).toBe('image/jpeg');
     expect(gravados.get(aluno.photoObjectKey!)?.body.equals(JPEG)).toBe(true);
 
@@ -267,7 +272,7 @@ describe('#503 -- foto do aluno vinda do leitor facial', () => {
 
     expect(resposta.body).toEqual({ result: 'IMPORTED' });
     expect((await db.student.findUniqueOrThrow({ where: { id: alunoId } })).photoObjectKey).toMatch(
-      /photo\.png$/,
+      /photo-leitor\.png$/,
     );
   });
 
@@ -283,6 +288,30 @@ describe('#503 -- foto do aluno vinda do leitor facial', () => {
     expect(
       (await db.student.findUniqueOrThrow({ where: { id: alunoId } })).photoObjectKey,
     ).toBeNull();
+  });
+
+  it('recepcao enviando no meio da importacao: a foto dela fica, intacta (#601)', async () => {
+    const alunoId = await alunoVinculado('F', '1006');
+    const chaveDaRecepcao = `tenants/${ctx.tenantId}/students/${alunoId}/photo.jpg`;
+
+    // Entre a conferencia "sem foto" e a gravacao do leitor, a recepcao grava
+    // a dela -- o mesmo formato (JPEG) que antes dividia o nome do arquivo.
+    aposGravar = async (key) => {
+      if (!key.includes(alunoId)) return;
+      aposGravar = null;
+      gravados.set(chaveDaRecepcao, { body: PNG, contentType: 'image/jpeg' });
+      await db.student.update({ where: { id: alunoId }, data: { photoObjectKey: chaveDaRecepcao } });
+    };
+
+    const resposta = await enviarFoto('1006', JPEG.toString('base64'));
+
+    expect(resposta.body).toEqual({ result: 'ALREADY_HAS_PHOTO' });
+    expect((await db.student.findUniqueOrThrow({ where: { id: alunoId } })).photoObjectKey).toBe(
+      chaveDaRecepcao,
+    );
+    expect(gravados.get(chaveDaRecepcao)?.body.equals(PNG)).toBe(true);
+    // O arquivo do leitor nao fica orfao no bucket.
+    expect([...gravados.keys()].some((k) => k.includes(`${alunoId}/photo-leitor`))).toBe(false);
   });
 
   it('numero sem vinculo nao vira foto de ninguem -- 404', async () => {

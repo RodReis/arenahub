@@ -77,6 +77,37 @@ export class StudentPhotoService {
 
     if (!anterior) throw new AlunoNaoEncontradoParaFotoError();
 
+    const objectKey = await this.guardar(contexto.tenantId, studentId, arquivo, 'photo');
+
+    await this.db.comTenant((tx) =>
+      tx.student.update({
+        where: { id: studentId },
+        data: { photoObjectKey: objectKey },
+      }),
+    );
+
+    const chaveAntiga = anterior.photoObjectKey;
+
+    // Apaga o orfao SO depois de a coluna ja apontar para o arquivo novo, e
+    // so quando a chave mudou de verdade (mesmo aluno reenviando o mesmo
+    // formato produz a mesma chave).
+    if (chaveAntiga !== null && chaveAntiga !== objectKey) {
+      await this.storage.deletePrivateObject(chaveAntiga);
+    }
+
+    return { objectKey };
+  }
+
+  /**
+   * Formato -> antivirus -> storage. Devolve a chave gravada no bucket; quem
+   * chama decide se e quando a coluna do aluno passa a apontar para ela.
+   */
+  private async guardar(
+    tenantId: string,
+    studentId: string,
+    arquivo: ArquivoDeFoto,
+    nome: 'photo' | 'photo-leitor',
+  ): Promise<string> {
     // --- 1. FORMATO ------------------------------------------------------
     const aceitacao = aceitarFotoDoAluno(arquivo);
 
@@ -105,7 +136,7 @@ export class StudentPhotoService {
 
     // --- 3. STORAGE, so depois de limpo -----------------------------------
     const contentType = arquivo.contentType.toLowerCase() as ContentTypeDeFoto;
-    const objectKey = montarChaveDeFoto(contexto.tenantId, studentId, contentType);
+    const objectKey = montarChaveDeFoto(tenantId, studentId, contentType, nome);
 
     await this.storage.putPrivateObject({
       key: objectKey,
@@ -113,23 +144,7 @@ export class StudentPhotoService {
       contentType,
     });
 
-    await this.db.comTenant((tx) =>
-      tx.student.update({
-        where: { id: studentId },
-        data: { photoObjectKey: objectKey },
-      }),
-    );
-
-    const chaveAntiga = anterior.photoObjectKey;
-
-    // Apaga o orfao SO depois de a coluna ja apontar para o arquivo novo, e
-    // so quando a chave mudou de verdade (mesmo aluno reenviando o mesmo
-    // formato produz a mesma chave).
-    if (chaveAntiga !== null && chaveAntiga !== objectKey) {
-      await this.storage.deletePrivateObject(chaveAntiga);
-    }
-
-    return { objectKey };
+    return objectKey;
   }
 
   /**
@@ -172,7 +187,24 @@ export class StudentPhotoService {
       );
     }
 
-    await this.substituir({ tenantId }, studentId, { contentType, conteudo });
+    const objectKey = await this.guardar(tenantId, studentId, { contentType, conteudo }, 'photo-leitor');
+
+    /*
+     * CONDICIONAL NA ESCRITA (#601): a leitura acima e so atalho. Se a
+     * recepcao enviou a foto entre ela e aqui, nada e gravado e o arquivo do
+     * leitor (nome proprio, `photo-leitor`) sai do bucket -- a foto dela fica.
+     */
+    const gravados = await this.db.comTenant((tx) =>
+      tx.student.updateMany({
+        where: { id: studentId, tenantId, photoObjectKey: null },
+        data: { photoObjectKey: objectKey },
+      }),
+    );
+
+    if (gravados.count === 0) {
+      await this.storage.deletePrivateObject(objectKey);
+      return 'ALREADY_HAS_PHOTO';
+    }
 
     return 'IMPORTED';
   }

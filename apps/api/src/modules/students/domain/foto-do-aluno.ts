@@ -95,15 +95,20 @@ export function aceitarFotoDoAluno(entrada: {
  * SERVIDOR GERA, cliente nunca escolhe prefixo -- mesma disciplina de
  * `montarChaveDeIdentidade`. Nome FIXO por aluno, e nao UUID aleatorio: so
  * existe uma foto por aluno e o upload novo substitui a anterior.
+ *
+ * A foto que vem do LEITOR usa `photo-leitor` (#601): com o mesmo nome, uma
+ * importacao concorrente com o envio da recepcao sobrescrevia os BYTES da foto
+ * dela no storage, antes de qualquer conferencia no banco.
  */
 export function montarChaveDeFoto(
   tenantId: string,
   studentId: string,
   contentType: ContentTypeDeFoto,
+  nome: 'photo' | 'photo-leitor' = 'photo',
 ): string {
   const extensao = contentType === 'image/png' ? 'png' : 'jpg';
 
-  return `tenants/${tenantId}/students/${studentId}/photo.${extensao}`;
+  return `tenants/${tenantId}/students/${studentId}/${nome}.${extensao}`;
 }
 
 /**
