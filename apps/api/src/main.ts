@@ -18,7 +18,10 @@ import { config as carregarEnv } from 'dotenv';
 carregarEnv({ path: join(process.cwd(), '../../.env') });
 
 const { AppModule } = await import('./app.module.js');
-const { aplicarParserComCorpoCru } = await import('./common/http/bootstrap-http.js');
+const { aplicarParserComCorpoCru, aplicarTrustProxy } = await import(
+  './common/http/bootstrap-http.js'
+);
+const { carregarConfig } = await import('./config/env.js');
 
 /**
  * Porta 3344 e fixa por decisao registrada (`CLAUDE.md`, Regras de trabalho):
@@ -34,6 +37,7 @@ async function bootstrap(): Promise<void> {
   // Antes do `listen`: a assinatura do Edge e verificada sobre o corpo cru,
   // e o parser padrao do Nest o descarta depois de parsear.
   aplicarParserComCorpoCru(app);
+  aplicarTrustProxy(app, carregarConfig().rede.saltosDeProxy);
 
   await app.listen(PORTA);
   console.log(`api ouvindo em http://localhost:${PORTA}`);

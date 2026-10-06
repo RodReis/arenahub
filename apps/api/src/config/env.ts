@@ -29,6 +29,16 @@ const esquema = z.object({
    */
   THROTTLE_LIMITE_POR_MINUTO: z.coerce.number().int().positive().default(30),
 
+  /**
+   * Quantos proxies confiaveis ha entre o cliente e a API (issue #605). `0`
+   * (padrao) NAO confia em nenhum: `req.ip` e o endereco do socket, que atras
+   * da Railway e o do proxy -- um balde so no throttle por IP. Com `N`, o
+   * Express le o IP do cliente no `X-Forwarded-For` contando N saltos a partir
+   * do socket. Numero ERRADO e pior que `0`: de menos nao muda nada, de MAIS
+   * deixa o cliente escolher o proprio IP. Defina so depois de medir os saltos.
+   */
+  TRUST_PROXY_SALTOS: z.coerce.number().int().min(0).max(5).default(0),
+
   STORAGE_ENDPOINT: z.string().default('http://127.0.0.1:9000'),
   STORAGE_REGION: z.string().default('us-east-1'),
   STORAGE_BUCKET: z.string().default('arenahub-biometrics'),
@@ -200,6 +210,7 @@ export interface ConfigDaApi {
   redis: { url: string };
   /** Throttle global por IP (issue #364). */
   throttle: { limitePorMinuto: number };
+  rede: { saltosDeProxy: number };
   storage: ConfigDeStorage;
   /** `null` quando a variavel nao esta definida -- nunca string vazia (INV-104). */
   anthropicApiKey: string | null;
@@ -262,6 +273,7 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): ConfigDaAp
     mfa: { chave: resolverChaveDeMfa(bruto) },
     redis: { url: resolverRedisUrl(bruto) },
     throttle: { limitePorMinuto: bruto.THROTTLE_LIMITE_POR_MINUTO },
+    rede: { saltosDeProxy: bruto.TRUST_PROXY_SALTOS },
     storage: resolverStorage(bruto),
     anthropicApiKey: bruto.ANTHROPIC_API_KEY ?? null,
     email: {

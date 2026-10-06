@@ -100,7 +100,8 @@ mostra.
 `CONTRATADA_RAZAO_SOCIAL`, `CONTRATADA_REPRESENTANTE`, `DATABASE_URL`, `JWT_PRIVATE_KEY`,
 `JWT_PUBLIC_KEY`, `MFA_ENCRYPTION_KEY`, `NODE_ENV`, `PORT`, `RAILPACK_DEPLOY_APT_PACKAGES`,
 `REDIS_URL`, `RUNTIME_DATABASE_URL` (ver abaixo), `STORAGE_ACCESS_KEY_ID`, `STORAGE_BUCKET`,
-`STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_SECRET_ACCESS_KEY` — mais as `RAILWAY_*` injetadas
+`STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_SECRET_ACCESS_KEY`, `THROTTLE_LIMITE_POR_MINUTO` e
+`TRUST_PROXY_SALTOS` (ver abaixo; as duas opcionais) — mais as `RAILWAY_*` injetadas
 automaticamente pela plataforma.
 
 **`RUNTIME_DATABASE_URL` e o RLS.** A segunda camada de isolamento por tenant (RLS) só protege se a
@@ -110,6 +111,20 @@ em silêncio para `DATABASE_URL` (o role dono). Desde a issue #584, a API **avis
 produção, na subida** (`RLS DESLIGADO NA PRATICA`) se o role da conexão é superusuário ou tem
 `BYPASSRLS`. Hoje só avisa; transformar em falha de boot depende de conferir antes o estado real da
 produção, senão o deploy derruba o serviço.
+
+**`TRUST_PROXY_SALTOS` e o IP do cliente (issue #605).** Sem ela (padrão `0`), `req.ip` é o endereço
+do socket, e atrás do proxy da Railway é o do proxy: o throttle global por IP (`THROTTLE_LIMITE_POR_MINUTO`,
+padrão 30/min) vira um balde só para todos os clientes de uma rota, e o `actorIp` da auditoria
+(biometria, consentimento) grava o IP do proxy. Com `N`, o Express lê o IP no `X-Forwarded-For`
+contando `N` saltos a partir do socket. **Valor errado é pior que `0`:** a menos não muda nada, a mais
+deixa o cliente escolher o próprio IP. Por isso o padrão é `0` e o valor só se define depois de medir
+quantos proxies a Railway põe na frente da API. A documentação da Railway (Specs & Limits, consultada em
+06/10/2026) garante o cabeçalho `X-Real-IP` com o IP do cliente e **não documenta** o número de saltos
+do `X-Forwarded-For`; usar `X-Real-IP` no lugar exigiria código próprio e só vale para tráfego que
+passa pelo edge da Railway, por isso não foi feito. **O `admin-web` não repassa o IP do usuário** à API
+(chama pela rede privada), então esta variável não separa os usuários do painel — só quem chega direto
+à API (app mobile, Edge). Ligar também faz o NAT Wi-Fi da academia virar um balde só no throttle por IP;
+o login do aluno já não depende de IP (teto por conta, #599).
 
 ### 3.2 `@arenahub/admin-web`
 
