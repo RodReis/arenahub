@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
-import type { StudentSession } from '@arenahub/database';
+import type { Prisma, StudentSession } from '@arenahub/database';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { SessaoRevogadaError } from './erros.js';
 
 /**
  * Guarda a cadeia de refresh tokens do APP DO ALUNO.
@@ -60,6 +61,17 @@ export class StudentSessionRepository {
    * Em transacao porque o estado intermediario e perigoso -- se o antigo
    * fosse marcado e o novo falhasse, a sessao sumiria; se o novo fosse criado
    * e a marcacao falhasse, dois tokens valeriam ao mesmo tempo.
+   *
+   * NUNCA RESSUSCITA UM ELO REVOGADO. `renovar()` le a sessao e so depois chega
+   * aqui, sem lock: se a troca de senha ou o logout revogou a familia nesse
+   * intervalo, um `update` incondicional sobrescreveria `REVOKED` por `ROTATED`
+   * e criaria um elo `ACTIVE` -- o refresh devolvido continuaria valendo depois
+   * da troca de senha. A marcacao e condicionada ao status (mesma correcao do
+   * painel, issue #558).
+   *
+   * ACEITA `ACTIVE` E `ROTATED`, de proposito, como o painel: dois refresh
+   * simultaneos do MESMO token legitimo nao podem virar loteria de logout. So o
+   * REVOGADO e recusado.
    */
   async rotacionar(dados: {
     sessaoAtualId: string;
@@ -72,12 +84,15 @@ export class StudentSessionRepository {
     validoAte: Date;
     agora: Date;
   }): Promise<string> {
-    const [, nova] = await this.db.$transaction([
-      this.db.studentSession.update({
-        where: { id: dados.sessaoAtualId },
+    return this.db.$transaction(async (tx) => {
+      const marcado = await tx.studentSession.updateMany({
+        where: { id: dados.sessaoAtualId, status: { in: ['ACTIVE', 'ROTATED'] } },
         data: { status: 'ROTATED', rotatedAt: dados.agora },
-      }),
-      this.db.studentSession.create({
+      });
+
+      if (marcado.count === 0) throw new SessaoRevogadaError();
+
+      const nova = await tx.studentSession.create({
         data: {
           tenantId: dados.tenantId,
           accountId: dados.accountId,
@@ -91,10 +106,10 @@ export class StudentSessionRepository {
           reauthenticatedAt: dados.reauthenticatedAt,
           expiresAt: dados.validoAte,
         },
-      }),
-    ]);
+      });
 
-    return nova.id;
+      return nova.id;
+    });
   }
 
   /**
@@ -106,18 +121,34 @@ export class StudentSessionRepository {
    * aposta em qual dos dois e qual.
    */
   async revogarFamilia(familyId: string, motivo: string, agora: Date): Promise<void> {
-    await this.db.studentSession.updateMany({
-      where: { familyId, status: { in: ['ACTIVE', 'ROTATED'] } },
-      data: { status: 'REVOKED', revokedAt: agora, revokedReason: motivo },
-    });
+    await this.varrer({ familyId }, motivo, agora);
   }
 
   /** Todas as sessoes da conta -- usado quando a senha muda. */
   async revogarTodasDaConta(accountId: string, motivo: string, agora: Date): Promise<void> {
-    await this.db.studentSession.updateMany({
-      where: { accountId, status: { in: ['ACTIVE', 'ROTATED'] } },
-      data: { status: 'REVOKED', revokedAt: agora, revokedReason: motivo },
-    });
+    await this.varrer({ accountId }, motivo, agora);
+  }
+
+  /**
+   * DUAS PASSADAS, e a segunda nao e redundancia (issue #558, #580).
+   *
+   * Um refresh em voo ja segura o lock da linha do elo antigo e inseriu o elo
+   * novo, ainda nao comitado. O `updateMany` espera o lock, revoga o antigo
+   * depois do commit -- mas o elo novo nao esta no SNAPSHOT dele e ficaria
+   * `ACTIVE`. Cada comando de uma transacao READ COMMITTED tira um snapshot
+   * novo: a segunda passada ja enxerga o que o refresh comitou.
+   */
+  private async varrer(
+    escopo: Prisma.StudentSessionWhereInput,
+    motivo: string,
+    agora: Date,
+  ): Promise<void> {
+    for (let passada = 0; passada < 2; passada += 1) {
+      await this.db.studentSession.updateMany({
+        where: { ...escopo, status: { in: ['ACTIVE', 'ROTATED'] } },
+        data: { status: 'REVOKED', revokedAt: agora, revokedReason: motivo },
+      });
+    }
   }
 
   /**
