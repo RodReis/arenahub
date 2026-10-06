@@ -8,6 +8,7 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { PasswordService } from '../auth/password.service.js';
+import { EscopoDeUnidadeInsuficienteError, unidadeCabeNoEscopo } from './escopo-de-unidade.js';
 import { ehDono, SoDonoMexeEmDonoError } from './protecao-do-dono.js';
 
 const VALIDO_POR_HORAS = 24;
@@ -82,6 +83,23 @@ export class InvitationService {
     // #523: o gerente convida a equipe, mas so o dono convida outro dono.
     if (papel.name === 'OWNER' && !(await ehDono(this.db, contexto.tenantId, contexto.actorId))) {
       throw new SoDonoMexeEmDonoError();
+    }
+
+    // #597: quem so atua em certas unidades convida so dentro delas (e nunca
+    // sem unidade, que valeria no tenant inteiro). Antes da consulta de banco.
+    if (!unidadeCabeNoEscopo(contexto, dados.gymUnitId)) {
+      throw new EscopoDeUnidadeInsuficienteError();
+    }
+
+    // A FK de `Invitation`/`UserRole` so prova que a unidade existe, nao de
+    // quem ela e. 404, como o resto, para nao confirmar o UUID.
+    if (dados.gymUnitId) {
+      const unidade = await this.db.gymUnit.findFirst({
+        where: { id: dados.gymUnitId, tenantId: contexto.tenantId },
+        select: { id: true },
+      });
+
+      if (!unidade) throw new NotFoundException({ code: 'GYM_UNIT_NOT_FOUND' });
     }
 
     const token = randomBytes(BYTES_DE_TOKEN).toString('base64url');

@@ -20,6 +20,7 @@ import {
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 import { InvitationService } from '../../src/modules/iam/invitation.service.js';
 import { SoDonoMexeEmDonoError } from '../../src/modules/iam/protecao-do-dono.js';
+import { EscopoDeUnidadeInsuficienteError } from '../../src/modules/iam/escopo-de-unidade.js';
 
 /**
  * Perfis prontos e revogacao de acesso -- F80.
@@ -539,6 +540,123 @@ describe('perfis de sistema e revogacao de acesso', () => {
       );
 
       expect(await db.userRole.count({ where: { tenantId, userId: recepcao } })).toBe(0);
+    });
+  });
+
+  /*
+   * #597: quem so atua em uma unidade nao entrega acesso maior do que o
+   * proprio. `gymUnitId` nulo vale no tenant inteiro (`AuthGuard`).
+   */
+  describe('gerente restrito a uma unidade (#597)', () => {
+    const preparar = async () => {
+      const tenantId = await criarTenantDeTeste(await criarSuperAdmin());
+      const gerente = await criarMembro(tenantId, 'MANAGER');
+      const unidadeA = await db.gymUnit.findFirstOrThrow({ where: { tenantId } });
+      const unidadeB = await db.gymUnit.create({
+        data: {
+          tenantId,
+          code: 'FILIAL',
+          name: 'Filial',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+      const recepcao = await db.role.findFirstOrThrow({ where: { tenantId, name: 'RECEPTION' } });
+      const contexto: TenantContext = {
+        ...contextoDe(tenantId, gerente),
+        allowedUnitIds: new Set([unidadeA.id]),
+      };
+
+      return { tenantId, gerente, unidadeA, unidadeB, recepcao, contexto };
+    };
+
+    const convidar = (
+      contexto: TenantContext,
+      roleId: string,
+      gymUnitId?: string,
+    ) =>
+      app.get(InvitationService).convidar(
+        contexto,
+        { email: `u-${randomUUID()}@exemplo.test`, roleId, ...(gymUnitId ? { gymUnitId } : {}) },
+        `corr-${randomUUID()}`,
+      );
+
+    it('convida dentro da propria unidade', async () => {
+      const { unidadeA, recepcao, contexto } = await preparar();
+
+      const { convite } = await convidar(contexto, recepcao.id, unidadeA.id);
+
+      expect(convite.gymUnitId).toBe(unidadeA.id);
+    });
+
+    it('NAO convida sem unidade (valeria no tenant inteiro)', async () => {
+      const { tenantId, recepcao, contexto } = await preparar();
+      const antes = await db.invitation.count({ where: { tenantId, roleId: recepcao.id } });
+
+      await expect(convidar(contexto, recepcao.id)).rejects.toBeInstanceOf(
+        EscopoDeUnidadeInsuficienteError,
+      );
+
+      expect(await db.invitation.count({ where: { tenantId, roleId: recepcao.id } })).toBe(antes);
+    });
+
+    it('NAO convida para outra unidade do mesmo tenant', async () => {
+      const { unidadeB, recepcao, contexto } = await preparar();
+
+      await expect(convidar(contexto, recepcao.id, unidadeB.id)).rejects.toBeInstanceOf(
+        EscopoDeUnidadeInsuficienteError,
+      );
+    });
+
+    it('dono (escopo ALL) convida sem unidade, como sempre', async () => {
+      const { tenantId, gerente, recepcao } = await preparar();
+
+      const { convite } = await convidar(contextoDe(tenantId, gerente), recepcao.id);
+
+      expect(convite.gymUnitId).toBeNull();
+    });
+
+    it('unidade de OUTRO tenant e tratada como inexistente', async () => {
+      const { recepcao, tenantId, gerente } = await preparar();
+      const outro = await criarTenantDeTeste(await criarSuperAdmin());
+      const unidadeDeFora = await db.gymUnit.findFirstOrThrow({ where: { tenantId: outro } });
+
+      await expect(
+        convidar(contextoDe(tenantId, gerente), recepcao.id, unidadeDeFora.id),
+      ).rejects.toMatchObject({ response: { code: 'GYM_UNIT_NOT_FOUND' } });
+    });
+
+    it('revoga quem esta inteiro dentro da propria unidade', async () => {
+      const { tenantId, unidadeA, contexto } = await preparar();
+      await criarMembro(tenantId, 'OWNER');
+      const alvo = await criarMembro(tenantId, 'RECEPTION');
+      await db.userRole.updateMany({
+        where: { tenantId, userId: alvo },
+        data: { gymUnitId: unidadeA.id },
+      });
+
+      await revogar.executar(contexto, alvo, MOTIVO, `corr-${randomUUID()}`);
+
+      expect(await db.userRole.count({ where: { tenantId, userId: alvo } })).toBe(0);
+    });
+
+    it('NAO revoga quem tem papel sem unidade nem em outra unidade', async () => {
+      const { tenantId, unidadeB, contexto } = await preparar();
+      await criarMembro(tenantId, 'OWNER');
+      const semUnidade = await criarMembro(tenantId, 'RECEPTION');
+      const emOutra = await criarMembro(tenantId, 'RECEPTION');
+      await db.userRole.updateMany({
+        where: { tenantId, userId: emOutra },
+        data: { gymUnitId: unidadeB.id },
+      });
+
+      for (const alvo of [semUnidade, emOutra]) {
+        await expect(
+          revogar.executar(contexto, alvo, MOTIVO, `corr-${randomUUID()}`),
+        ).rejects.toBeInstanceOf(EscopoDeUnidadeInsuficienteError);
+
+        expect(await db.userRole.count({ where: { tenantId, userId: alvo } })).toBe(1);
+      }
     });
   });
 });

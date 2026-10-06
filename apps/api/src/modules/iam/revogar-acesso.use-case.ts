@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { EscopoDeUnidadeInsuficienteError, unidadeCabeNoEscopo } from './escopo-de-unidade.js';
 import { ehDono, SoDonoMexeEmDonoError } from './protecao-do-dono.js';
 
 /** Mesmo minimo da elevacao de suporte e da F79: nao aceita "ok" nem ".". */
@@ -80,8 +81,14 @@ export class RevogarAcessoUseCase {
 
     const papeisDoAlvo = await this.db.userRole.findMany({
       where: { tenantId, userId },
-      select: { role: { select: { name: true } } },
+      select: { gymUnitId: true, role: { select: { name: true } } },
     });
+
+    // #597: quem so atua em certas unidades revoga so quem esta inteiro dentro
+    // delas. Papel sem unidade (tenant inteiro) fica fora do alcance dele.
+    if (!papeisDoAlvo.every((p) => unidadeCabeNoEscopo(contexto, p.gymUnitId))) {
+      throw new EscopoDeUnidadeInsuficienteError();
+    }
 
     const alvoEhDono = papeisDoAlvo.some((p) => p.role.name === 'OWNER');
 
