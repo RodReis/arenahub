@@ -29,3 +29,24 @@ export async function criarPlano(
 
   await expect(page.getByTestId('plano-criado')).toBeVisible();
 }
+
+/**
+ * Escolhe o plano pelo NOME no seletor da ficha.
+ *
+ * O texto da opção leva o preço ("Plano A — R$ 150,00"), então
+ * `selectOption({ label: nome })`, que casa o texto inteiro, deixou de achar.
+ * Casa pelo prefixo e seleciona pelo `value`.
+ */
+export async function escolherPlano(page: Page, nome: string): Promise<void> {
+  const seletor = page.getByTestId('campo-plano');
+  const valor = await seletor.evaluate((el, prefixo) => {
+    const opcao = Array.from((el as HTMLSelectElement).options).find((o) =>
+      o.text.startsWith(prefixo),
+    );
+
+    return opcao?.value ?? null;
+  }, `${nome} — `);
+
+  expect(valor, `plano "${nome}" na combo`).toBeTruthy();
+  await seletor.selectOption(valor);
+}

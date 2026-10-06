@@ -1083,9 +1083,25 @@ export class MembershipRepository {
     entrada: { planId: string; versaoEsperada: number; reason: string },
     correlationId: string,
     agora: Date,
-  ): Promise<{ subscription: Subscription; entitlement: Entitlement } | null> {
+    /**
+     * Reabre a parcela de UMA competencia cancelada, na assinatura nova. Roda
+     * DENTRO da transacao da troca: se nao der para refazer a parcela, a troca
+     * inteira volta atras -- melhor que um plano novo sem cobranca.
+     */
+    reabrirParcela?: (
+      tx: Prisma.TransactionClient,
+      subscriptionId: string,
+      competencia: Date,
+    ) => Promise<unknown>,
+  ): Promise<{
+    subscription: Subscription;
+    entitlement: Entitlement;
+    parcelasReabertas: number;
+  } | null> {
     const origem = await this.encontrarAssinatura(contexto, subscriptionId);
     if (!origem) return null;
+
+    if (origem.planId === entrada.planId) throw new TrocaParaOMesmoPlanoError();
 
     // INV-033, mesma ordem de `ativarAssinatura` (linha 676): falha ANTES da
     // transacao -- senao a assinatura antiga seria cancelada sem o aluno
@@ -1200,16 +1216,39 @@ export class MembershipRepository {
           tenantId: contexto.tenantId,
           subscriptionId,
           status: { in: ['OPEN', 'OVERDUE'] },
-          billingPeriod: competenciaCorrente,
+          // Corrente E futuras: parcela aberta adiante tambem e do plano
+          // antigo. Mes anterior segue de fora (divida nao e perdoada).
+          billingPeriod: { gte: competenciaCorrente },
         },
-        select: { id: true },
+        select: { id: true, billingPeriod: true },
       });
 
       if (invoicesCanceladas.length > 0) {
+        // Guarda de status NO UPDATE: um pagamento que comitou entre o `findMany`
+        // e aqui deixou a invoice PAID, e PAID nao vai para CANCELLED.
         await tx.invoice.updateMany({
-          where: { id: { in: invoicesCanceladas.map((i) => i.id) } },
+          where: {
+            id: { in: invoicesCanceladas.map((i) => i.id) },
+            status: { in: ['OPEN', 'OVERDUE'] },
+          },
           data: { status: 'CANCELLED', version: { increment: 1 } },
         });
+      }
+
+      // So o que de fato foi cancelado volta como parcela nova -- reabrir uma
+      // competencia que ficou PAID cobraria o aluno em dobro.
+      const canceladasDeFato =
+        invoicesCanceladas.length === 0
+          ? []
+          : await tx.invoice.findMany({
+              where: { id: { in: invoicesCanceladas.map((i) => i.id) }, status: 'CANCELLED' },
+              select: { id: true, billingPeriod: true },
+            });
+
+      if (reabrirParcela) {
+        for (const invoice of canceladasDeFato) {
+          await reabrirParcela(tx, nova.id, invoice.billingPeriod);
+        }
       }
 
       await tx.studentTimelineEvent.create({
@@ -1242,7 +1281,7 @@ export class MembershipRepository {
             fromSubscriptionId: subscriptionId,
             toSubscriptionId: nova.id,
             reason: entrada.reason,
-            cancelledInvoiceIds: invoicesCanceladas.map((i) => i.id),
+            cancelledInvoiceIds: canceladasDeFato.map((i) => i.id),
           },
         },
       });
@@ -1273,7 +1312,11 @@ export class MembershipRepository {
         correlationId,
       });
 
-      return { subscription: nova, entitlement: entitlementNovo };
+      return {
+        subscription: nova,
+        entitlement: entitlementNovo,
+        parcelasReabertas: reabrirParcela ? canceladasDeFato.length : 0,
+      };
     });
   }
 

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
+import { escolherPlano } from './cadastro-de-plano';
 
 /**
  * F85 -- a recepcao lanca um pagamento errado e o cancela pela tela.
@@ -55,7 +56,7 @@ test('recepcao cancela pagamento lancado errado e lanca o certo', async ({ page 
   const agora = new Date();
   await page.getByTestId('aba-plano').click();
   await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
-  await page.getByTestId('campo-plano').selectOption({ label: NOME_DO_PLANO_DO_SEED });
+  await escolherPlano(page, NOME_DO_PLANO_DO_SEED);
   await page
     .getByTestId('campo-inicio')
     .fill(paraCampoDeData(new Date(Date.UTC(agora.getUTCFullYear() - 1, agora.getUTCMonth(), 1, 6, 0))));

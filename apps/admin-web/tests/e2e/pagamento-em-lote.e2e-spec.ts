@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cadastrarAluno } from './cadastro-de-aluno';
+import { escolherPlano } from './cadastro-de-plano';
 
 /**
  * F83 Task 8 -- o golden path do pagamento em lote pela interface.
@@ -138,7 +139,7 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
 
   await page.getByTestId('aba-plano').click();
   await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
-  await page.getByTestId('campo-plano').selectOption({ label: NOME_DO_PLANO_DO_SEED });
+  await escolherPlano(page, NOME_DO_PLANO_DO_SEED);
   await page.getByTestId('campo-inicio').fill(inicioDaVigencia);
   await page.getByTestId('campo-fim').fill(fimDaVigencia);
   await page.getByTestId('campo-motivo-atribuicao').fill('matricula para teste de pagamento em lote');
@@ -269,7 +270,7 @@ test('aluno suspenso por inadimplencia ve e usa a faixa de pagamento em lote', a
 
   await page.getByTestId('aba-plano').click();
   await page.getByRole('button', { name: /Atribuir plano|Alterar plano/ }).first().click();
-  await page.getByTestId('campo-plano').selectOption({ label: NOME_DO_PLANO_DO_SEED });
+  await escolherPlano(page, NOME_DO_PLANO_DO_SEED);
   await page.getByTestId('campo-inicio').fill(inicioDaVigencia);
   await page.getByTestId('campo-fim').fill(fimDaVigencia);
   await page.getByTestId('campo-motivo-atribuicao').fill('matricula para teste de aluno suspenso');
