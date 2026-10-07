@@ -4,12 +4,14 @@ import { comContexto, type Prisma } from '@arenahub/database';
 import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { BillingRepository } from './billing.repository.js';
+import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
 import {
   decidirSobreEvento,
   type MotivoDeDescarte,
   type StatusDoPagamento,
 } from './domain/evento-do-provedor.js';
 import { aplicarPagamento, podeTransicionar } from './domain/invoice.js';
+import { vencimentoAposPagamento } from './domain/meses-pagaveis.js';
 import {
   ErroDoProvedor,
   PAYMENT_PROVIDER,
@@ -444,7 +446,12 @@ export class ProcessarWebhookDePagamentoUseCase {
 
     await tx.invoice.update({
       where: { id: invoice.id },
-      data: { status: 'PAID', paidAt: dados.occurredAt, version: { increment: 1 } },
+      data: {
+        status: 'PAID',
+        paidAt: dados.occurredAt,
+        coverageEndsAt: vencimentoAposPagamento(diaDoPagamento(dados.occurredAt), 1),
+        version: { increment: 1 },
+      },
     });
 
     await this.billing.ativarDireitoDeAcessoSePendente(tx, {

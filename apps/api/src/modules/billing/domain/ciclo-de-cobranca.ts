@@ -1,5 +1,7 @@
 import { ErroDeDominio } from '../../../common/http/erro-de-dominio.js';
 
+import { meiaNoiteLocalEmUtc } from './bloqueio-por-inadimplencia.js';
+
 /**
  * Ciclo de cobranca: competencia, vencimento e instante de bloqueio.
  *
@@ -50,19 +52,26 @@ export function proximoVencimento(competencia: Date, dueDay: number): Date {
   return new Date(Date.UTC(competencia.getUTCFullYear(), competencia.getUTCMonth(), dueDay));
 }
 
-const MS_POR_DIA = 24 * 60 * 60 * 1000;
-
 /**
- * Primeiro instante em que a inadimplencia bloqueia (ADR-019, INV-144).
+ * Primeiro instante em que a inadimplencia bloqueia (ADR-019, INV-144): a
+ * meia-noite LOCAL do dia `vencimento + carencia`, no fuso da unidade.
  *
- * `vencimento + carencia`, exato. Sem arredondar para o fim do dia e sem
- * adiar por feriado: a ancora e configuravel no `BillingSettings`, e o
- * padrao e este.
+ * `vencimento` e DATA guardada como meia-noite UTC (convencao do `dueAt`), entao
+ * o dia civil vem dos campos UTC -- ler o dia local de `2026-10-10T00:00Z` em
+ * Sao Paulo daria 09/10 e bloquearia um dia antes. Ate a F88 esta conta era
+ * `vencimento + N x 24h` em UTC, que bloqueava as 21h da vespera.
  */
-export function instanteDeBloqueio(vencimento: Date, graceDays: number): Date {
+export function instanteDeBloqueio(vencimento: Date, graceDays: number, fusoDaUnidade: string): Date {
   if (!Number.isInteger(graceDays) || graceDays < 0) {
     throw new CicloInvalidoError('carencia deve ser inteiro de dias nao negativo');
   }
 
-  return new Date(vencimento.getTime() + graceDays * MS_POR_DIA);
+  return meiaNoiteLocalEmUtc(
+    {
+      ano: vencimento.getUTCFullYear(),
+      mes: vencimento.getUTCMonth() + 1,
+      dia: vencimento.getUTCDate() + graceDays,
+    },
+    fusoDaUnidade,
+  );
 }

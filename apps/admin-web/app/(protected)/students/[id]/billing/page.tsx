@@ -11,7 +11,7 @@ import {
 } from '@arenahub/ui';
 
 import { formatarMesAno } from '../../../../../src/billing/meses-pagaveis';
-import { estadoExibido, faturaEmDestaque } from '../../../../../src/billing/vencimento';
+import { estadoExibido, faturaEmDestaque, venceEmDaLinha } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
 import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { CancelarPagamento } from './cancelar-pagamento';
@@ -51,6 +51,8 @@ interface Invoice {
   discountMinor: number;
   totalMinor: number;
   dueAt: string;
+  /** Ate quando a fatura paga cobre (F88); nulo em paga antiga e nas nao pagas. */
+  coverageEndsAt: string | null;
   blockAt: string | null;
   paidAt: string | null;
   items: { description: string; quantity: number; unitAmountMinor: number; totalMinor: number }[];
@@ -258,9 +260,9 @@ export default async function PaginaFinanceiroDoAluno({
             header: 'Vence em',
             group: 'Cobrança',
             role: 'moment',
-            /* `dueAt` e DATA guardada como meia-noite UTC: so a parte do dia. */
+            /* F88: paga mostra ate quando cobre; as demais, o vencimento (DATA em meia-noite UTC). */
             render: (invoice) => (
-              <TenantDateTime iso={invoice.dueAt.slice(0, 10)} timeZone={timezoneDaUnidade} format="date" />
+              <TenantDateTime iso={venceEmDaLinha(invoice)} timeZone={timezoneDaUnidade} format="date" />
             ),
           },
           {

@@ -6,7 +6,6 @@ import {
   PagamentoNaoCancelavelError,
   creditoAConsumir,
   decidirCancelamento,
-  deveRestaurarVencimento,
   diaDoPagamento,
   podeCancelarPagamento,
   validarCancelamento,
@@ -57,65 +56,6 @@ describe('diaDoPagamento', () => {
   it('devolve a meia-noite UTC do dia UTC do instante', () => {
     expect(diaDoPagamento(new Date('2026-10-05T19:13:00Z')).toISOString()).toBe('2026-10-05T00:00:00.000Z');
     expect(diaDoPagamento(new Date('2026-10-05T12:00:00Z')).toISOString()).toBe('2026-10-05T00:00:00.000Z');
-  });
-});
-
-describe('deveRestaurarVencimento', () => {
-  const paidAt = new Date('2026-10-05T19:13:00Z');
-
-  it('restaura quando o vencimento e exatamente o gravado pelo lote de 1 mes (05/10 + 30 dias)', () => {
-    expect(
-      deveRestaurarVencimento({
-        dueAtAtual: new Date('2026-11-04T00:00:00Z'),
-        paidAt,
-        tamanhoDoLote: 1,
-        confirmadosRestantesNoLote: 0,
-      }),
-    ).toBe(true);
-  });
-
-  it('restaura com lote de 2 meses quando o vencimento e 05/10 + 60 dias', () => {
-    expect(
-      deveRestaurarVencimento({
-        dueAtAtual: new Date('2026-12-04T00:00:00Z'),
-        paidAt,
-        tamanhoDoLote: 2,
-        confirmadosRestantesNoLote: 0,
-      }),
-    ).toBe(true);
-  });
-
-  it('nao restaura quando o vencimento e outro (alguem ja mexeu nele)', () => {
-    expect(
-      deveRestaurarVencimento({
-        dueAtAtual: new Date('2026-11-20T00:00:00Z'),
-        paidAt,
-        tamanhoDoLote: 1,
-        confirmadosRestantesNoLote: 0,
-      }),
-    ).toBe(false);
-  });
-
-  it('nao restaura enquanto sobrar pagamento confirmado no lote', () => {
-    expect(
-      deveRestaurarVencimento({
-        dueAtAtual: new Date('2026-12-04T00:00:00Z'),
-        paidAt,
-        tamanhoDoLote: 2,
-        confirmadosRestantesNoLote: 1,
-      }),
-    ).toBe(false);
-  });
-
-  it('nao confunde o tamanho do lote: vencimento de 2 meses num lote de 1 nao casa', () => {
-    expect(
-      deveRestaurarVencimento({
-        dueAtAtual: new Date('2026-12-04T00:00:00Z'),
-        paidAt,
-        tamanhoDoLote: 1,
-        confirmadosRestantesNoLote: 0,
-      }),
-    ).toBe(false);
   });
 });
 

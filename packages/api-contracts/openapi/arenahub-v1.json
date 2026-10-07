@@ -2588,8 +2588,7 @@
                   "required": [
                     "paymentId",
                     "invoiceId",
-                    "faturaReaberta",
-                    "vencimentoRestaurado"
+                    "faturaReaberta"
                   ],
                   "properties": {
                     "paymentId": {
@@ -2599,9 +2598,6 @@
                       "type": "string"
                     },
                     "faturaReaberta": {
-                      "type": "boolean"
-                    },
-                    "vencimentoRestaurado": {
                       "type": "boolean"
                     }
                   }
@@ -2769,6 +2765,7 @@
                     "dueAt",
                     "blockAt",
                     "paidAt",
+                    "coverageEndsAt",
                     "items",
                     "payments"
                   ],
@@ -2806,6 +2803,10 @@
                       "nullable": true
                     },
                     "paidAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "coverageEndsAt": {
                       "type": "string",
                       "nullable": true
                     },
@@ -3015,6 +3016,47 @@
                           }
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/monthly-invoices/run": {
+      "post": {
+        "operationId": "BillingController_gerarFaturasDoMes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "elegiveis",
+                    "criadas",
+                    "jaExistiam",
+                    "falhas"
+                  ],
+                  "properties": {
+                    "elegiveis": {
+                      "type": "integer"
+                    },
+                    "criadas": {
+                      "type": "integer"
+                    },
+                    "jaExistiam": {
+                      "type": "integer"
+                    },
+                    "falhas": {
+                      "type": "integer"
                     }
                   }
                 }

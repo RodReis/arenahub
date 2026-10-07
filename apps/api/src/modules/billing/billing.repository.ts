@@ -9,6 +9,7 @@ import {
   instanteDeBloqueio,
   proximoVencimento,
 } from './domain/ciclo-de-cobranca.js';
+import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   abrirInvoice,
@@ -18,6 +19,7 @@ import {
   TransicaoDeInvoiceConcorrenteError,
   validarStatusParaCorrecao,
 } from './domain/invoice.js';
+import { vencimentoAposPagamento } from './domain/meses-pagaveis.js';
 
 export class AssinaturaNaoEncontradaError extends ErroDeDominio {
   constructor() {
@@ -152,8 +154,6 @@ export class BillingRepository {
 
     const vencimento =
       entrada.vencimento?.dueAt ?? proximoVencimento(competencia, configuracao.dueDay);
-    const bloqueioEm =
-      entrada.vencimento?.blockAt ?? instanteDeBloqueio(vencimento, configuracao.graceDays);
     const totais = abrirInvoice({
       itens: [{ quantity: 1, unitAmountMinor: preco.amountMinor }],
       discountMinor: 0,
@@ -177,6 +177,21 @@ export class BillingRepository {
       if (jaExiste) {
         return jaExiste;
       }
+
+      // Fuso pela TRANSACAO: `students` tem RLS, e so dentro dela o
+      // `set_config` vale (issue #306). A diaria traz o proprio `blockAt`.
+      const bloqueioEm =
+        entrada.vencimento?.blockAt ??
+        instanteDeBloqueio(
+          vencimento,
+          configuracao.graceDays,
+          (
+            await tx.student.findFirstOrThrow({
+              where: { id: assinatura.studentId, tenantId: contexto.tenantId },
+              select: { gymUnit: { select: { timezone: true } } },
+            })
+          ).gymUnit.timezone,
+        );
 
       const numero = await this.proximoNumero(tx, contexto.tenantId);
 
@@ -243,6 +258,8 @@ export class BillingRepository {
       paidAt: Date;
       receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
       batchId?: string;
+      /** Fim da cobertura deste mes (F88). Ausente = avulso: dia do pagamento + 30. */
+      coverageEndsAt?: Date;
     },
     correlationId: string,
     tx?: Prisma.TransactionClient,
@@ -281,7 +298,12 @@ export class BillingRepository {
        */
       const transicao = await tx.invoice.updateMany({
         where: { id: invoice.id, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
-        data: { status: 'PAID', paidAt: entrada.paidAt, version: { increment: 1 } },
+        data: {
+          status: 'PAID',
+          paidAt: entrada.paidAt,
+          coverageEndsAt: entrada.coverageEndsAt ?? vencimentoAposPagamento(diaDoPagamento(entrada.paidAt), 1),
+          version: { increment: 1 },
+        },
       });
 
       if (transicao.count !== 1) {

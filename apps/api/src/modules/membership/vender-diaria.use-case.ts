@@ -6,7 +6,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import { BillingRepository, PlanoSemPrecoVigenteError } from '../billing/billing.repository.js';
 import { precoVigenteEm } from '../billing/domain/dinheiro.js';
 import { StudentRepository } from '../students/student.repository.js';
-import { fimDaDiaria, haJanelaAteOFimDoDia } from './domain/diaria.js';
+import { diaDeAcessoDaDiaria, fimDaDiaria, haJanelaAteOFimDoDia } from './domain/diaria.js';
 import { MembershipRepository, PlanoNaoEncontradoError } from './membership.repository.js';
 
 export class PlanoDeDiariaInvalidoError extends ErroDeDominio {
@@ -131,6 +131,10 @@ export class VenderDiariaUseCase {
           reason: 'Diaria vendida no balcao',
           paidAt: agora,
           receivedVia: entrada.channel,
+          // F88: a diaria cobre o DIA de acesso (data em meia-noite UTC, como o `dueAt`),
+          // nao o pagamento + 30 dias. `endsAt` (meia-noite local seguinte) mostraria o
+          // dia seguinte na tela, que corta a data com `slice(0, 10)`.
+          coverageEndsAt: diaDeAcessoDaDiaria(agora, unidade.timezone),
         },
         correlationId,
         tx,

@@ -50,28 +50,23 @@ describe('proximoVencimento', () => {
   });
 });
 
-/**
- * ADR-019 / INV-144: o bloqueio e no PRIMEIRO INSTANTE depois de
- * `vencimento + carencia`. Nao no fim do dia, nao arredondado, e sem
- * adiamento por feriado.
- */
-describe('instanteDeBloqueio', () => {
-  it('soma a carencia em dias ao vencimento', () => {
-    expect(instanteDeBloqueio(new Date('2026-08-10T00:00:00Z'), 5)).toEqual(
-      new Date('2026-08-15T00:00:00Z'),
-    );
+describe('instanteDeBloqueio (F88: meia-noite LOCAL de vencimento + carencia)', () => {
+  const SP = 'America/Sao_Paulo';
+
+  it('vence 10/10 (data em meia-noite UTC), carencia 5, Sao Paulo: bloqueia 15/10 00:00 BRT', () => {
+    expect(instanteDeBloqueio(new Date('2026-10-10T00:00:00Z'), 5, SP)).toEqual(new Date('2026-10-15T03:00:00Z'));
   });
 
-  it('carencia zero bloqueia no proprio vencimento', () => {
-    expect(instanteDeBloqueio(new Date('2026-08-10T00:00:00Z'), 0)).toEqual(
-      new Date('2026-08-10T00:00:00Z'),
-    );
+  it('carencia zero bloqueia no primeiro instante LOCAL do dia do vencimento', () => {
+    expect(instanteDeBloqueio(new Date('2026-10-10T00:00:00Z'), 0, SP)).toEqual(new Date('2026-10-10T03:00:00Z'));
   });
 
-  it('rejeita carencia negativa', () => {
-    expect(() => instanteDeBloqueio(new Date('2026-08-10T00:00:00Z'), -1)).toThrow(
-      CicloInvalidoError,
-    );
+  it('atravessa o fim do mes', () => {
+    expect(instanteDeBloqueio(new Date('2026-10-30T00:00:00Z'), 5, SP)).toEqual(new Date('2026-11-04T03:00:00Z'));
+  });
+
+  it('recusa carencia negativa', () => {
+    expect(() => instanteDeBloqueio(new Date('2026-10-10T00:00:00Z'), -1, SP)).toThrow(CicloInvalidoError);
   });
 });
 

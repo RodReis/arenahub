@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@arenahub/database';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
-import {
-  deveBloquear,
-  instanteDeBloqueio,
-  type PoliticaDeBloqueio,
-} from './domain/bloqueio-por-inadimplencia.js';
+import { instanteDeBloqueio } from './domain/ciclo-de-cobranca.js';
 
 /**
  * Job de vencimento e bloqueio por inadimplencia. `MVP-02` 7, Slice 2.4:
@@ -68,7 +64,7 @@ export class AplicarInadimplenciaUseCase {
   async executar(tenantId: string, agora: Date): Promise<ResultadoDaInadimplencia> {
     const configuracao = await this.db.billingSettings.findUnique({
       where: { tenantId },
-      select: { graceDays: true, blockAnchor: true },
+      select: { graceDays: true },
     });
 
     /**
@@ -83,7 +79,7 @@ export class AplicarInadimplenciaUseCase {
     const candidatas = await this.candidatas(tenantId, agora);
 
     const aBloquear = candidatas.filter((invoice) =>
-      this.jaBloqueia(invoice, configuracao.graceDays, configuracao.blockAnchor, agora),
+      this.jaBloqueia(invoice, configuracao.graceDays, agora),
     );
 
     if (aBloquear.length === 0) {
@@ -111,15 +107,20 @@ export class AplicarInadimplenciaUseCase {
     // entao nem o TypeScript nem o teste avisam (issue #306). Aqui o dano
     // seria o fuso da unidade sumir e o corte de vencimento errar o dia.
     //
-    // O unico chamador e rota HTTP (`billing.controller.ts`), entao o
-    // contexto ja esta aberto pelo interceptor. Worker que venha a chamar
-    // isto precisa abrir o seu com `comContexto`.
+    // Chamadores: a rota HTTP (`billing.controller.ts`), em que o interceptor
+    // ja abriu o contexto, e o agendador diario
+    // (`aplicar-inadimplencia-scheduler.service.ts`), que abre o seu com
+    // `comContexto`. Novo chamador fora desses dois precisa fazer o mesmo.
     const invoices = await this.db.comTenant((tx) =>
       tx.invoice.findMany({
         where: {
           tenantId,
           status: { in: ['OPEN', 'OVERDUE'] },
           dueAt: { lte: agora },
+          // F88: so quem depende de plano bloqueia. ADMIN/STAFF/TRAINER/PERMUTA
+          // tem acesso por vinculo; diaria nao e contrato (F86).
+          student: { profile: 'STUDENT' },
+          subscription: { plan: { billingMode: { not: 'DIARIA' } } },
         },
         select: {
           id: true,
@@ -165,18 +166,13 @@ export class AplicarInadimplenciaUseCase {
   private jaBloqueia(
     invoice: Candidata,
     diasDeCarencia: number,
-    ancora: PoliticaDeBloqueio['ancora'],
     agora: Date,
   ): boolean {
     if (invoice.blockAt !== null) {
       return agora.getTime() >= invoice.blockAt.getTime();
     }
 
-    return deveBloquear(
-      invoice.dueAt,
-      { ancora, diasDeCarencia, fusoDaUnidade: invoice.fusoDaUnidade },
-      agora,
-    );
+    return agora.getTime() >= instanteDeBloqueio(invoice.dueAt, diasDeCarencia, invoice.fusoDaUnidade).getTime();
   }
 
   private async aplicar(
@@ -199,11 +195,7 @@ export class AplicarInadimplenciaUseCase {
       await tx.invoice.update({
         where: { id: invoice.id },
         data: {
-          blockAt: instanteDeBloqueio(invoice.dueAt, {
-            ancora: 'DUE_PLUS_GRACE',
-            diasDeCarencia,
-            fusoDaUnidade: invoice.fusoDaUnidade,
-          }),
+          blockAt: instanteDeBloqueio(invoice.dueAt, diasDeCarencia, invoice.fusoDaUnidade),
         },
       });
     }

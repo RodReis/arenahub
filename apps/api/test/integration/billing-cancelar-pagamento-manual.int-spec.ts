@@ -26,11 +26,11 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
 /**
  * Cancelamento de pagamento manual lancado por engano (F85, decisao do PI em
  * 05/10/2026). Contra banco de verdade: a atomicidade, a corrida de dois
- * cancelamentos e a restauracao do vencimento sao comportamento do Postgres.
+ * cancelamentos e a reabertura da fatura sao comportamento do Postgres.
  *
- * O pagamento e criado pelo CAMINHO REAL (lote da recepcao), nao por `INSERT`:
- * e ele que ancora o vencimento da fatura seguinte, e e esse efeito que o
- * cancelamento precisa desfazer.
+ * O pagamento e criado pelo CAMINHO REAL (lote da recepcao), nao por `INSERT`.
+ * O lote nao ancora mais o vencimento da fatura seguinte (F88): cancelar nao
+ * tem vencimento a restaurar, e o teste afirma que a seguinte nem e tocada.
  *
  * REGRA DE QUANDO (decisao do PI, 05/10/2026, depois da F85): so cancela mes
  * ADIANTADO ou competencia com 2+ pagamentos; mes que ja passou nunca. Com
@@ -234,13 +234,12 @@ describe('CancelarPagamentoManualUseCase', () => {
   const cancelarPagamento = (paymentId: string, reason = 'lancado no aluno errado', agora = AGORA) =>
     cancelar.executar(contexto, { paymentId, reason, agora }, 'corr-cancelamento');
 
-  it('mes adiantado: cancela, reabre a fatura e devolve o vencimento da seguinte', async () => {
+  it('mes adiantado: cancela, reabre a fatura e nao toca na seguinte (F88)', async () => {
     const { subscriptionId } = await novaAssinatura();
     await pagarLote(subscriptionId, ['2026-11']);
     const pagamento = await pagamentoDe(subscriptionId, '2026-11');
-
-    // Pre-condicao: o lote ancorou dez em 05/10 + 30 dias.
-    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-11-04T00:00:00.000Z');
+    // Sem isto o `toBeNull` depois passaria por ausencia, nao por zeragem.
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: pagamento.invoiceId } })).coverageEndsAt).not.toBeNull();
 
     const resultado = await cancelarPagamento(pagamento.id);
 
@@ -248,7 +247,6 @@ describe('CancelarPagamentoManualUseCase', () => {
       paymentId: pagamento.id,
       invoiceId: pagamento.invoiceId,
       faturaReaberta: true,
-      vencimentoRestaurado: true,
     });
 
     const depois = await db.payment.findUniqueOrThrow({ where: { id: pagamento.id } });
@@ -260,14 +258,16 @@ describe('CancelarPagamentoManualUseCase', () => {
     expect(depois.recognizedByUserId).toBe(contexto.actorId);
     expect(depois.paidAt).not.toBeNull();
 
+    // Pago, a fatura cobria ate uma data (F88); reaberta, deixa de cobrir.
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: pagamento.invoiceId } })).coverageEndsAt).toBeNull();
     const reaberta = await invoiceDe(subscriptionId, '2026-11');
     expect(reaberta.status).toBe('OPEN');
     expect(reaberta.paidAt).toBeNull();
 
-    // Dez volta ao padrao do ciclo: dia 9, bloqueio +3 dias de carencia.
-    const seguinte = await invoiceDe(subscriptionId, '2026-12');
-    expect(seguinte.dueAt.toISOString()).toBe('2026-12-09T00:00:00.000Z');
-    expect(seguinte.blockAt?.toISOString()).toBe('2026-12-12T00:00:00.000Z');
+    // O lote nao abre dez (F88): cancelar tambem nao.
+    expect(
+      await db.invoice.findFirst({ where: { subscriptionId, billingPeriod: new Date('2026-12-01T00:00:00Z') } }),
+    ).toBeNull();
 
     const auditoria = await db.auditLog.findFirst({
       where: { tenantId: contexto.tenantId, action: 'billing.payment.cancelled', targetId: pagamento.id },
@@ -326,7 +326,6 @@ describe('CancelarPagamentoManualUseCase', () => {
     const resultado = await cancelarPagamento(dinheiro.id);
 
     expect(resultado.faturaReaberta).toBe(false);
-    expect(resultado.vencimentoRestaurado).toBe(false);
     expect((await db.payment.findUniqueOrThrow({ where: { id: dinheiro.id } })).status).toBe('CANCELLED');
     expect((await db.payment.findUniqueOrThrow({ where: { id: pix.id } })).status).toBe('CONFIRMED');
     expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
@@ -352,42 +351,30 @@ describe('CancelarPagamentoManualUseCase', () => {
     expect((await invoiceDe(subscriptionId, '2026-10')).status).toBe('PAID');
   });
 
-  it('nao sobrescreve o vencimento da seguinte quando ele foi alterado por outra via', async () => {
-    const { subscriptionId } = await novaAssinatura();
-    await pagarLote(subscriptionId, ['2026-11']);
-    const pagamento = await pagamentoDe(subscriptionId, '2026-11');
-    const seguinte = await invoiceDe(subscriptionId, '2026-12');
-    await db.invoice.update({
-      where: { id: seguinte.id },
-      data: { dueAt: new Date('2026-12-20T00:00:00Z') },
-    });
-
-    const resultado = await cancelarPagamento(pagamento.id);
-
-    expect(resultado.vencimentoRestaurado).toBe(false);
-    expect((await invoiceDe(subscriptionId, '2026-12')).dueAt.toISOString()).toBe('2026-12-20T00:00:00.000Z');
-  });
-
-  it('lote de dois meses: cancelar um nao toca nos irmaos e so devolve o vencimento quando o lote inteiro foi desfeito', async () => {
+  it('lote de dois meses: cancelar um nao toca nos irmaos', async () => {
     const { subscriptionId } = await novaAssinatura();
     await pagarLote(subscriptionId, ['2026-11', '2026-12']);
     const pagamentoNov = await pagamentoDe(subscriptionId, '2026-11');
     const pagamentoDez = await pagamentoDe(subscriptionId, '2026-12');
+    const novAntes = await invoiceDe(subscriptionId, '2026-11');
+    const dezAntes = await invoiceDe(subscriptionId, '2026-12');
+    expect(novAntes.coverageEndsAt).not.toBeNull();
 
-    // Pre-condicao: jan ancorado em 05/10 + 60 dias.
-    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
+    await cancelarPagamento(pagamentoDez.id);
 
-    const primeiro = await cancelarPagamento(pagamentoDez.id);
+    const novDepois = await invoiceDe(subscriptionId, '2026-11');
+    expect(novDepois.status).toBe('PAID');
+    // F88: a cobertura do irmao nao e tocada (nem zerada, nem recalculada) e nenhum vencimento do lote muda.
+    expect(novDepois.coverageEndsAt).toEqual(novAntes.coverageEndsAt);
+    expect(novDepois.dueAt).toEqual(novAntes.dueAt);
+    const dezDepois = await invoiceDe(subscriptionId, '2026-12');
+    expect(dezDepois.status).toBe('OPEN');
+    expect(dezDepois.coverageEndsAt).toBeNull();
+    expect(dezDepois.dueAt).toEqual(dezAntes.dueAt);
 
-    expect(primeiro.vencimentoRestaurado).toBe(false);
-    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
-    expect((await invoiceDe(subscriptionId, '2026-12')).status).toBe('OPEN');
-    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2026-12-04T00:00:00.000Z');
+    await cancelarPagamento(pagamentoNov.id);
 
-    const segundo = await cancelarPagamento(pagamentoNov.id);
-
-    expect(segundo.vencimentoRestaurado).toBe(true);
-    expect((await invoiceDe(subscriptionId, '2027-01')).dueAt.toISOString()).toBe('2027-01-09T00:00:00.000Z');
+    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('OPEN');
   });
 
   it('expira o credito de sobrepagamento ainda disponivel', async () => {

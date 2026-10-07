@@ -8,7 +8,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, BillingRepository, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
-import { instanteDeBloqueio } from './domain/ciclo-de-cobranca.js';
+import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
 import {
   instanteDoPagamento,
   mesesPagaveis,
@@ -18,8 +18,6 @@ import {
 } from './domain/meses-pagaveis.js';
 import { InvoiceInvalidaError } from './domain/invoice.js';
 import { invoicesDaFaixa } from './invoices-da-faixa.js';
-
-const MESES_A_FRENTE_PARA_ANCORAR = 7;
 
 export class TotalDoLoteDivergenteError extends ErroDeDominio {
   constructor() {
@@ -44,11 +42,12 @@ export interface ResultadoDoLote {
  * os meses que a recepcao escolher da faixa -- vencidos, corrente e ate 6
  * adiantados, em qualquer combinacao ("pagou usou", decisao do PI 01/10/2026).
  *
- * A recepcao informa a DATA do pagamento. A vigencia conta dela: a proxima
- * fatura em aberto depois do ultimo mes pago passa a vencer em
- * `data + 30 dias por mes pago`, e o bloqueio continua sendo vencimento +
- * carencia. Mes anterior nao usado pode ser DISPENSADO na hora (CANCELLED);
- * o que a recepcao nao dispensa nem paga segue em aberto.
+ * A recepcao informa a DATA do pagamento. Cada mes pago ganha a sua cobertura
+ * (`coverageEndsAt` = data + 30 dias x posicao no lote), que e INFORMATIVA: o
+ * vencimento de toda fatura e sempre o dia do ciclo (F88, decisao do PI em
+ * 07/10/2026, que revogou a ancora `data + 30 x N` da INV-163). Mes anterior
+ * nao usado pode ser DISPENSADO na hora (CANCELLED); o que a recepcao nao
+ * dispensa nem paga segue em aberto.
  *
  * Reaproveita `abrirInvoiceDoPeriodo` e `registrarPagamentoManual` do
  * `BillingRepository`, passando o MESMO `tx` para as duas -- e o que faz o
@@ -169,6 +168,15 @@ export class RegistrarPagamentoEmLoteUseCase {
       let ultimoPagamentoId: string | null = null;
       let ultimaMoeda: string | null = null;
 
+      // Posicao k pela COMPETENCIA, nao pela ordem do pedido: o mes mais cedo
+      // cobre 30 dias, o seguinte 60... (F88).
+      const posicao = new Map(
+        [...lote]
+          .sort((a, b) => a.competencia.getTime() - b.competencia.getTime())
+          .map((mes, i) => [mes.competencia.getTime(), i + 1]),
+      );
+      const diaDoRecebimento = diaDoPagamento(entrada.paidAt);
+
       for (const mes of lote) {
         const invoice = mes.invoiceId
           ? await tx.invoice.findUniqueOrThrow({ where: { id: mes.invoiceId, tenantId: contexto.tenantId } })
@@ -183,6 +191,7 @@ export class RegistrarPagamentoEmLoteUseCase {
             paidAt: instanteDoRecebimento,
             receivedVia: entrada.channel,
             batchId: entrada.idempotencyKey,
+            coverageEndsAt: vencimentoAposPagamento(diaDoRecebimento, posicao.get(mes.competencia.getTime())!),
           },
           correlationId,
           tx,
@@ -210,15 +219,6 @@ export class RegistrarPagamentoEmLoteUseCase {
       for (const mes of dispensadas) {
         await this.dispensarInvoice(tx, contexto, mes.invoiceId!, correlationId);
       }
-
-      await this.ancorarProximoVencimento(tx, contexto, {
-        subscriptionId: entrada.subscriptionId,
-        ultimoMesPago: lote[lote.length - 1]!.competencia,
-        vencimento: vencimentoAposPagamento(entrada.paidAt, lote.length),
-        graceDays: configuracao.graceDays,
-        endsAt: assinatura.endsAt,
-        agora: entrada.agora,
-      });
 
       const excedente = (entrada.receivedAmountMinor ?? totalCalculado) - totalCalculado;
 
@@ -264,65 +264,6 @@ export class RegistrarPagamentoEmLoteUseCase {
         metadata: { reason: 'mes nao usado (pagou e usou)' },
       },
     });
-  }
-
-  /**
-   * A primeira fatura ainda devida DEPOIS do ultimo mes pago passa a vencer no
-   * fim da vigencia paga. Abre a fatura se ainda nao existir. Fatura ja
-   * paga/cancelada e pulada: a vigencia vale para a proxima que ainda deve.
-   */
-  private async ancorarProximoVencimento(
-    tx: Prisma.TransactionClient,
-    contexto: TenantContext,
-    entrada: {
-      subscriptionId: string;
-      ultimoMesPago: Date;
-      vencimento: Date;
-      graceDays: number;
-      endsAt: Date | null;
-      agora: Date;
-    },
-  ): Promise<void> {
-    for (let i = 1; i <= MESES_A_FRENTE_PARA_ANCORAR; i += 1) {
-      const periodo = new Date(
-        Date.UTC(entrada.ultimoMesPago.getUTCFullYear(), entrada.ultimoMesPago.getUTCMonth() + i, 1),
-      );
-
-      if (entrada.endsAt && periodo.getTime() >= entrada.endsAt.getTime()) return;
-
-      const existente = await tx.invoice.findUnique({
-        where: {
-          tenantId_subscriptionId_billingPeriod: {
-            tenantId: contexto.tenantId,
-            subscriptionId: entrada.subscriptionId,
-            billingPeriod: periodo,
-          },
-        },
-      });
-
-      if (existente && existente.status !== 'OPEN' && existente.status !== 'OVERDUE') continue;
-
-      const alvo =
-        existente ??
-        (await this.billing.abrirInvoiceDoPeriodo(
-          contexto,
-          { subscriptionId: entrada.subscriptionId, emQue: periodo },
-          tx,
-        ));
-
-      await tx.invoice.update({
-        where: { id: alvo.id },
-        data: {
-          dueAt: entrada.vencimento,
-          blockAt: instanteDeBloqueio(entrada.vencimento, entrada.graceDays),
-          // Vigencia nova reabre o prazo: OVERDUE com vencimento futuro volta a OPEN.
-          status: entrada.vencimento.getTime() > entrada.agora.getTime() ? 'OPEN' : alvo.status,
-          version: { increment: 1 },
-        },
-      });
-
-      return;
-    }
   }
 }
 

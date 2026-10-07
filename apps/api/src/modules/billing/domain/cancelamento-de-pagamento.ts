@@ -1,7 +1,6 @@
 import { ErroDeDominio } from '../../../common/http/erro-de-dominio.js';
 
 import { competenciaDe } from './ciclo-de-cobranca.js';
-import { vencimentoAposPagamento } from './meses-pagaveis.js';
 
 /**
  * Cancelamento de pagamento MANUAL lancado por engano. F85, decisao do PI em
@@ -77,42 +76,12 @@ export function validarCancelamento(pagamento: PagamentoParaCancelar, reason: st
 }
 
 /**
- * O DIA em que o lote ancorou o vencimento: meia-noite UTC do dia UTC de
- * `paidAt`. O lote grava o instante real (hoje) ou meio-dia UTC (dia passado)
- * em `Payment.paidAt`, mas ancora o vencimento no DIA informado
- * (`ancorarProximoVencimento`).
- *
- * ponytail: recepcao que paga depois das 21h (Brasil) manda o dia local e o
- * `paidAt` cai no dia UTC seguinte; os dois dias divergem, o vencimento nao
- * casa e NAO e restaurado. Falha para o lado seguro (nao toca). Se aparecer
- * na pratica, guardar o dia ancorado no lote.
+ * O dia que conta a cobertura do mes pago (`coverageEndsAt`, F88): meia-noite
+ * UTC do dia UTC de `paidAt`. O lote grava o instante real (hoje) ou meio-dia
+ * UTC (dia passado) em `Payment.paidAt`.
  */
 export function diaDoPagamento(paidAt: Date): Date {
   return new Date(Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth(), paidAt.getUTCDate()));
-}
-
-/**
- * O vencimento da fatura seguinte ainda e o que ESTE lote gravou?
- *
- * Conservador de proposito -- so devolve ao padrao do ciclo quando (a) o lote
- * inteiro foi desfeito e (b) o `dueAt` atual e exatamente o ancorado
- * (`dia + N * 30 dias`, N = tamanho do lote). Qualquer outra coisa significa
- * que outro pagamento ou a recepcao ja mexeu naquela data, e sobrescreve-la
- * apagaria uma decisao.
- */
-export function deveRestaurarVencimento(entrada: {
-  readonly dueAtAtual: Date;
-  readonly paidAt: Date;
-  readonly tamanhoDoLote: number;
-  readonly confirmadosRestantesNoLote: number;
-}): boolean {
-  if (entrada.confirmadosRestantesNoLote > 0) {
-    return false;
-  }
-
-  const ancora = vencimentoAposPagamento(diaDoPagamento(entrada.paidAt), entrada.tamanhoDoLote);
-
-  return entrada.dueAtAtual.getTime() === ancora.getTime();
 }
 
 /** O que o cancelamento faz com a fatura. */

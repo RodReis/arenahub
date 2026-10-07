@@ -166,6 +166,25 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(invoice.blockAt?.toISOString()).toContain('2026-08-15');
   });
 
+  it('F88: blockAt da fatura aberta e a meia-noite LOCAL de vencimento + carencia', async () => {
+    // Tenant proprio: abrir outubro no `a` mudaria a contagem de invoices dos demais testes.
+    const f = await semearTenant('f88');
+
+    try {
+      const invoice = await billing.abrirInvoiceDoPeriodo(contexto(f.tenantId, f.actorId), {
+        subscriptionId: f.subscriptionId,
+        emQue: new Date('2026-10-15T12:00:00Z'),
+      });
+
+      // dueDay 10 + graceDays 5, unidade em America/Sao_Paulo (UTC-3).
+      expect(invoice.dueAt.toISOString()).toBe('2026-10-10T00:00:00.000Z');
+      expect(invoice.blockAt?.toISOString()).toBe('2026-10-15T03:00:00.000Z');
+    } finally {
+      await db.tenant.deleteMany({ where: { id: f.tenantId } });
+      await db.user.deleteMany({ where: { id: f.actorId } });
+    }
+  });
+
   it('abrir de novo o MESMO periodo devolve a mesma invoice, sem gastar numero', async () => {
     const primeira = await billing.abrirInvoiceDoPeriodo(contexto(a.tenantId, a.actorId), {
       subscriptionId: a.subscriptionId,
@@ -353,7 +372,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(entitlementAtualizado.suspendedAt).toBeNull();
   });
 
-  it('tenant que nao define vencimento nasce com dia 10 e carencia 10 (decisao do PI, 23/09/2026)', async () => {
+  it('tenant que nao define vencimento nasce com dia 10 e carencia 5 (vencimento 23/09/2026; carencia 5 na F88)', async () => {
     // Antes o default era `dueDay` OBRIGATORIO e `graceDays: 0` -- academia
     // nova ficava sem configuracao financeira (emissao recusava com
     // BILLING_SETTINGS_MISSING), e quem criasse a linha sem informar carencia
@@ -361,7 +380,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     //
     // AFIRMA O DEFAULT NO CATALOGO DO POSTGRES, nao o valor que volta do
     // `create`. O Prisma Client aplica o default do schema no lado da
-    // aplicacao, entao um `create` sem os campos devolve 10/10 mesmo com a
+    // aplicacao, entao um `create` sem os campos devolve o default mesmo com a
     // migration NAO aplicada -- verificado: revertendo o default no banco,
     // a versao anterior deste teste continuava verde. Quem grava por SQL
     // direto (psql, script de manutencao, outro servico) depende do default
@@ -376,7 +395,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     const porColuna = new Map(colunas.map((c) => [c.column_name, c.column_default]));
 
     expect(porColuna.get('due_day')).toBe('10');
-    expect(porColuna.get('grace_days')).toBe('10');
+    expect(porColuna.get('grace_days')).toBe('5');
 
     // E o caminho do Prisma tambem entrega o mesmo, para os dois nao
     // divergirem em silencio.
@@ -392,7 +411,7 @@ describe('F12 -- invoice e pagamento manual', () => {
       const config = await db.billingSettings.create({ data: { tenantId: tenant.id } });
 
       expect(config.dueDay).toBe(10);
-      expect(config.graceDays).toBe(10);
+      expect(config.graceDays).toBe(5);
     } finally {
       await db.tenant.delete({ where: { id: tenant.id } }).catch(() => undefined);
     }

@@ -121,7 +121,8 @@ describe('F86 -- diaria avulsa no balcao', () => {
       });
 
       expect(invoice.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
-      expect(invoice.blockAt?.toISOString()).toBe('2026-10-12T00:00:00.000Z');
+      // F88: bloqueio na meia-noite LOCAL (Sao Paulo, UTC-3) de vencimento + carencia, nao mais 00:00Z.
+      expect(invoice.blockAt?.toISOString()).toBe('2026-10-12T03:00:00.000Z');
     });
   });
 
@@ -184,12 +185,33 @@ describe('F86 -- diaria avulsa no balcao', () => {
       expect(invoice.status).toBe('PAID');
       expect(invoice.totalMinor).toBe(3000);
       expect(invoice.dueAt.toISOString()).toBe(AGORA.toISOString());
+      // F88: a cobertura da diaria e o DIA de acesso (data em meia-noite UTC, como o
+      // `dueAt`), nao o pagamento + 30 dias nem o fim exclusivo do passe.
+      expect(invoice.coverageEndsAt?.toISOString()).toBe('2026-10-07T00:00:00.000Z');
 
       const pagamento = await db.payment.findUniqueOrThrow({ where: { id: vendida.paymentId } });
       expect(pagamento.status).toBe('CONFIRMED');
       expect(pagamento.method).toBe('MANUAL');
       expect(pagamento.receivedVia).toBe('DINHEIRO');
       expect(pagamento.amountMinor).toBe(3000);
+    });
+
+    it('vendida as 23:30 locais (ja e o dia seguinte em UTC): a cobertura grava o dia LOCAL', async () => {
+      const planId = await criarPlano(db, c, { nome: `Diaria noite ${c.sufixo}` });
+      const studentId = await criarAluno(db, c);
+      // quarta 23:30 em Sao Paulo = quinta 02:30Z
+      const quartaNoite = new Date('2026-10-08T02:30:00.000Z');
+
+      const vendida = await venderDiaria.executar(
+        contextoDe(c),
+        venda(studentId, planId),
+        'corr-noite',
+        quartaNoite,
+      );
+
+      const invoice = await db.invoice.findUniqueOrThrow({ where: { id: vendida.invoiceId } });
+      expect(invoice.coverageEndsAt?.toISOString()).toBe('2026-10-07T00:00:00.000Z');
+      expect(vendida.endsAt.toISOString()).toBe(FIM_DO_DIA.toISOString());
     });
 
     it('o repositorio cria a diaria ESPERANDO o pagamento: PENDING e SCHEDULED', async () => {

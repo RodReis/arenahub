@@ -1,4 +1,4 @@
-import { inicioDoDiaLocal } from '../../health/domain/periodo.js';
+import { dataLocalIso, inicioDoDiaLocal } from '../../health/domain/periodo.js';
 import { momentoLocal, type JanelaDeAcesso } from './plan.js';
 
 /**
@@ -7,6 +7,16 @@ import { momentoLocal, type JanelaDeAcesso } from './plan.js';
  */
 
 const UMA_HORA_EM_MS = 3_600_000;
+
+/**
+ * O DIA de acesso da diaria, como DATA em meia-noite UTC -- a convencao do
+ * `dueAt` que admin-web, kiosk e avisos leem com `slice(0, 10)`. E o dia LOCAL
+ * da compra na timezone da unidade (a mesma de `fimDaDiaria`), nao o do UTC:
+ * 23:30 em Sao Paulo ja e o dia seguinte em UTC, mas o passe vale hoje.
+ */
+export function diaDeAcessoDaDiaria(agora: Date, fuso: string): Date {
+  return new Date(`${dataLocalIso(agora, fuso)}T00:00:00.000Z`);
+}
 
 /**
  * O FIM da diaria: 00:00 local do dia seguinte, EXCLUSIVO (igual a

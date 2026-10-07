@@ -435,13 +435,27 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   seu próprio `Payment`, todos com o mesmo `batchId`; não existe invoice consolidada nem desconto
   por antecipação — cada mês cobra o preço vigente da própria competência (INV-068 continua
   valendo mês a mês).
-- **INV-163** **A recepção informa a data do pagamento (dia, nunca futura) e a vigência conta dela:**
-  a primeira invoice ainda devida depois do último mês pago (aberta pelo lote se não existir) passa
-  a vencer em `data do pagamento + 30 dias × meses pagos`, e o bloqueio por inadimplência segue
-  `vencimento + carência` (INV-144). Mês anterior não pago e não usado pode ser **dispensado** na
-  hora pela recepção (invoice `CANCELLED`, com auditoria `billing.invoice.dispensed`); o que a
-  recepção não paga nem dispensa segue em aberto. Data de hoje grava o instante real; dia passado
-  grava meio-dia UTC (nunca meia-noite, que o fuso mostra como o dia anterior).
+- **INV-163** **A recepção informa a data do pagamento (dia, nunca futura) e ela define até quando
+  o mês pago cobre — não o vencimento.** *(Emenda de 07/10/2026, F88, decisão do PI: a âncora
+  `data + 30 × N` na fatura seguinte foi **revogada**.)* Todo vencimento é o dia do ciclo
+  (`dueDay`) da própria competência; a data do pagamento só grava `Invoice.coverageEndsAt`
+  (`dia do pagamento + 30 dias × posição do mês no lote`), campo **informativo** que o painel mostra
+  na fatura `PAID`. O lote **não abre mais a fatura seguinte**. O bloqueio por inadimplência segue
+  `vencimento + carência` (INV-144), a partir da meia-noite local do dia do vencimento. Mês anterior
+  não pago e não usado pode ser **dispensado** na hora pela recepção (invoice `CANCELLED`, com
+  auditoria `billing.invoice.dispensed`); o que a recepção não paga nem dispensa segue em aberto.
+  Data de hoje grava o instante real; dia passado grava meio-dia UTC (nunca meia-noite, que o fuso
+  mostra como o dia anterior). A restauração de vencimento ao cancelar pagamento (INV-069, F85)
+  deixou de existir; cancelar zera `coverageEndsAt`.
+- **INV-164** **Fatura mensal automática e inadimplência só para aluno (F88).** (a) A fatura da
+  competência nasce **todo dia 01 às 00:05** (America/Sao_Paulo) para aluno `STUDENT` + `ACTIVE`
+  com assinatura vigente e plano `billingMode != DIARIA`; é idempotente por INV-066 (rodar de novo,
+  ou pelo `POST /billing/monthly-invoices/run`, não duplica nem consome número). (b) A inadimplência
+  roda **todo dia às 00:10** só sobre aluno `STUDENT` e plano `!= DIARIA` (staff, professor e passe
+  de diária nunca são bloqueados por ela), e **só está ligada** quando
+  `BILLING_DELINQUENCY_JOB_ENABLED=true` — ausente ou qualquer outro valor deixa o job desligado.
+  (c) `coverageEndsAt` é só informação: nenhuma decisão de acesso ou cobrança lê esse campo
+  (regra de arquitetura nº 1). A diária grava `coverageEndsAt` = fim do dia de uso.
 
 ### 4.11 Webhooks e idempotência (INV-076 a INV-087)
 

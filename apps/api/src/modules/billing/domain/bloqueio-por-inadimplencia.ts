@@ -87,7 +87,7 @@ export function deveBloquear(
   return agora.getTime() >= instanteDeBloqueio(vencimento, politica).getTime();
 }
 
-interface DataLocal {
+export interface DataLocal {
   readonly ano: number;
   readonly mes: number;
   readonly dia: number;
@@ -133,7 +133,7 @@ function dataLocalDe(instante: Date, timeZone: string): DataLocal {
  * `dia` pode passar do fim do mes (`31 + 3`): `Date.UTC` normaliza sozinho, e
  * e por isso que a soma de carencia pode ser feita antes de chegar aqui.
  */
-function meiaNoiteLocalEmUtc(data: DataLocal, timeZone: string): Date {
+export function meiaNoiteLocalEmUtc(data: DataLocal, timeZone: string): Date {
   const alvo = Date.UTC(data.ano, data.mes - 1, data.dia, 0, 0, 0, 0);
   let palpite = alvo;
 

@@ -5,6 +5,9 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
+import { AplicarInadimplenciaSchedulerService } from './aplicar-inadimplencia-scheduler.service.js';
+import { GerarFaturasDoMesUseCase } from './gerar-faturas-do-mes.use-case.js';
+import { GerarFaturasDoMesSchedulerService } from './gerar-faturas-do-mes-scheduler.service.js';
 import { ExpirarAssinaturasVencidasUseCase } from './expirar-assinaturas-vencidas.use-case.js';
 import { ExpirarAssinaturasSchedulerService } from './expirar-assinaturas-scheduler.service.js';
 import { ConsultarResumoFinanceiroUseCase } from './consultar-resumo-financeiro.use-case.js';
@@ -88,6 +91,9 @@ import { WebhookController } from './webhook.controller.js';
     AplicarInadimplenciaUseCase,
     ExpirarAssinaturasVencidasUseCase,
     ExpirarAssinaturasSchedulerService,
+    AplicarInadimplenciaSchedulerService,
+    GerarFaturasDoMesUseCase,
+    GerarFaturasDoMesSchedulerService,
     ConsultarInadimplenciaUseCase,
     ConsultarPagosUseCase,
     ConsultarResumoFinanceiroUseCase,

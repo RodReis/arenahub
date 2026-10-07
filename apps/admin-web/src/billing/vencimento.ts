@@ -62,6 +62,15 @@ export function faturaEmDestaque<T extends InvoiceCandidata>(
   });
 }
 
+/** "Vence em" da grade (F88): paga mostra ate quando cobre; as demais, o vencimento. */
+export function venceEmDaLinha(invoice: {
+  readonly status: string;
+  readonly dueAt: string;
+  readonly coverageEndsAt: string | null;
+}): string {
+  return (invoice.status === 'PAID' && invoice.coverageEndsAt ? invoice.coverageEndsAt : invoice.dueAt).slice(0, 10);
+}
+
 /**
  * Dias de atraso, em dia CIVIL no fuso da unidade -- zero quando ainda nao
  * venceu.

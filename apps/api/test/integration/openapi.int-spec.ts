@@ -198,6 +198,8 @@ describe('contrato OpenAPI', () => {
         '/api/v1/billing/delinquency/apply',
         '/api/v1/billing/financial-overrides',
         '/api/v1/billing/financial-overrides/{id}/revoke',
+        // F88 -- fatura do mes sob demanda (o cron do dia 01 faz o mesmo).
+        '/api/v1/billing/monthly-invoices/run',
         // F16 -- estorno, conciliacao e recibo.
         '/api/v1/payments/{id}/refunds',
         // F85 -- cancelamento de pagamento manual lancado errado (ADR-065).
