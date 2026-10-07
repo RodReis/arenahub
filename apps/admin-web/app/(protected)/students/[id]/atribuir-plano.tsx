@@ -6,6 +6,7 @@ import { useFormStatus } from 'react-dom';
 import {
   Button,
   Field,
+  Icon,
   SelectField,
   TenantDateTime,
   TextareaField,
@@ -195,10 +196,10 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
     return (
       <Button
         type="button"
-        variant="outline"
         onClick={() => setAberto(true)}
         data-testid={`abrir-plano-${studentId}`}
       >
+        <Icon name={troca ? 'refresh-cw' : 'dumbbell'} />
         {troca ? 'Alterar plano' : 'Atribuir plano'}
       </Button>
     );

@@ -147,28 +147,6 @@
 }
 
 /**
- * SEÇÃO — a unidade de leitura da ficha.
- *
- * Separador em vez de card: cinco cards empilhados numa tela de consulta
- * viram moldura sobre moldura, e o `PRODUCT.md` é explícito -- card tem
- * borda, não sombra, e superfície plana lê melhor em densidade alta. Aqui
- * nem borda: uma linha de topo basta para dizer "outra coisa começa".
- */
-.secao {
-  padding-top: 20px;
-  margin-top: 20px;
-  border-top: 1px solid var(--ah-border-subtle);
-}
-
-.secao > h2 {
-  margin: 0 0 12px;
-  font-size: var(--ah-type-body-strong-size);
-  line-height: var(--ah-type-body-strong-lh);
-  font-weight: var(--ah-type-body-strong-weight);
-  color: var(--ah-text-strong);
-}
-
-/**
  * NAVEGAÇÃO para as outras telas do aluno.
  *
  * Eram quatro links de texto num `<ul>` no rodapé -- as quatro portas do

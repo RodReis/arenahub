@@ -157,6 +157,17 @@ describe('ficha do aluno', () => {
     expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
   });
 
+  /* O card de direitos pinta o ESTADO: sem direito vigente e atencao, nunca neutro nem verde. */
+  it('card de direitos fica em atencao quando nao ha direito vigente', async () => {
+    responder([]);
+
+    await renderizar();
+
+    expect(
+      screen.getByRole('region', { name: 'Direitos de acesso', hidden: true }),
+    ).toHaveAttribute('data-tom', 'atencao');
+  });
+
   /*
    * F86 -- diaria avulsa. O plano de diaria tem fluxo proprio (com pagamento): vende-se
    * so a quem esta sem plano, e NUNCA aparece na lista de atribuicao por datas, que

@@ -2,11 +2,15 @@
 
 import { useState, type ReactNode } from 'react';
 
+import { Icon, type IconName } from '@arenahub/ui';
+
 import estilos from './abas.module.css';
 
 export interface Aba {
   readonly id: string;
   readonly rotulo: string;
+  /** Glifo ao lado do rótulo -- reforço, nunca substituto do texto. */
+  readonly icone?: IconName;
   readonly conteudo: ReactNode;
 }
 
@@ -49,6 +53,7 @@ export function Abas({ abas, rotulo }: Props) {
             onClick={() => setAtiva(aba.id)}
             data-testid={`aba-${aba.id}`}
           >
+            {aba.icone !== undefined ? <Icon name={aba.icone} /> : null}
             {aba.rotulo}
           </button>
         ))}
@@ -60,6 +65,7 @@ export function Abas({ abas, rotulo }: Props) {
           role="tabpanel"
           id={`painel-${aba.id}`}
           aria-labelledby={`aba-${aba.id}`}
+          className={estilos['painel']}
           hidden={ativa !== aba.id}
         >
           {aba.conteudo}

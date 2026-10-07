@@ -496,6 +496,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
           {
             id: 'informacao',
             rotulo: 'Informação',
+            icone: 'file-text',
             conteudo: (
               <>
             <div className={estilos['resumo']}>
@@ -656,6 +657,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
           {
             id: 'plano',
             rotulo: 'Plano',
+            icone: 'key-round',
             conteudo: (
               <>
             {/*
@@ -670,9 +672,19 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               O que ficou aqui é o DETALHE -- quais janelas, de qual unidade, com
               qual vigência --, que é o que só faz sentido consultar na ficha.
             */}
-            <section aria-labelledby="titulo-direitos" className={estilos['secao']}>
-              <h2 id="titulo-direitos">Direitos de acesso</h2>
-
+            <div className={estilos['grade']}>
+            {/*
+              TOM DO ESTADO, não da tela: verde quando há direito vigente e a
+              situação não impede, âmbar quando a catraca não tem o que honrar.
+              É a mesma leitura da célula "Acesso" do resumo, na aba ao lado.
+            */}
+            <div className={estilos['largo']}>
+            <SectionCard
+              title="Direitos de acesso"
+              icon="key-round"
+              tom={vigentes.length > 0 && !bloqueado ? 'positivo' : 'atencao'}
+              summary="Quando e onde o acesso vale, do mais recente para o mais antigo."
+            >
               {/*
                 Sem a lista de unidades, `nomeDaUnidade` cai para o UUID. Dizer isso
                 evita que a recepção leia um identificador técnico achando que é o
@@ -811,7 +823,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   />
                 }
               />
-            </section>
+            </SectionCard>
+            </div>
 
             {/*
               F56 -- cobranca recorrente, ao lado do plano e nao numa aba
@@ -822,8 +835,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             */}
             {/* DIARIA ja nasce paga e vence no mesmo dia: nao ha recorrencia a ativar. */}
             {assinaturaVigente && assinaturaVigente.billingMode !== 'DIARIA' ? (
-              <section aria-labelledby="titulo-recorrencia" className={estilos['secao']}>
-                <h2 id="titulo-recorrencia">Cobrança recorrente</h2>
+              <div className={estilos['largo']}>
+              <SectionCard title="Cobrança recorrente" icon="refresh-cw">
 
                 <CobrancaRecorrente
                   subscriptionId={assinaturaVigente.subscriptionId}
@@ -833,16 +846,26 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   currency={assinaturaVigente.planCurrentPrice?.currency ?? 'BRL'}
                   dueDay={null}
                 />
-              </section>
+              </SectionCard>
+              </div>
             ) : null}
 
-            <section aria-labelledby="titulo-atribuir" className={estilos['secao']}>
+            {/* Sozinho na linha quando não há diária ao lado (aluno com plano). */}
+            <div className={assinaturaVigente ? estilos['largo'] : undefined}>
+            <SectionCard
+              title={assinaturaVigente ? 'Alterar plano' : 'Atribuir plano'}
+              icon="dumbbell"
+              summary={
+                assinaturaVigente
+                  ? 'O plano atual é encerrado e o novo entra no lugar.'
+                  : 'Cria o direito de acesso a partir do início da vigência.'
+              }
+            >
               {/*
                 O TÍTULO diz o que a ação faz de verdade. Aluno com plano vigente
                 não recebe um segundo plano: o atual é encerrado e o novo entra no
                 lugar -- ver `AtribuirPlano`.
               */}
-              <h2 id="titulo-atribuir">{assinaturaVigente ? 'Alterar plano' : 'Atribuir plano'}</h2>
 
               {/*
                 Lista de planos vazia por falha tem a mesma aparência de "nenhum
@@ -871,7 +894,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   timezone={timezoneDaUnidade ?? FUSO_PROVISORIO}
                 />
               )}
-            </section>
+            </SectionCard>
+            </div>
 
             {/*
               F86 -- diaria avulsa. So para quem esta SEM plano vigente: quem tem
@@ -879,15 +903,14 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               qualquer jeito (STUDENT_HAS_ACTIVE_SUBSCRIPTION).
             */}
             {assinaturaVigente ? null : (
-              <section aria-labelledby="titulo-diaria" className={estilos['secao']}>
-                <h2 id="titulo-diaria">Diária</h2>
+              <SectionCard title="Diária" icon="clock" summary="Acesso pago no balcão, válido até 23:59 de hoje.">
                 <VenderDiaria
                   studentId={aluno.id}
                   planos={planosDeDiaria}
                   impedido={bloqueado}
                   emAtraso={temPlanoSuspenso}
                 />
-              </section>
+              </SectionCard>
             )}
 
             {/*
@@ -898,10 +921,12 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               fora. Junto de "Direitos de acesso" porque e a mesma pergunta
               -- "este aluno consegue passar na catraca".
             */}
-            <section aria-labelledby="titulo-credencial" className={estilos['secao']}>
-              <h2 id="titulo-credencial">Número da catraca</h2>
+            <div className={estilos['largo']}>
+            <SectionCard title="Número da catraca" icon="scan-face">
               <CredencialDeAcesso studentId={aluno.id} credenciais={credenciais} />
-            </section>
+            </SectionCard>
+            </div>
+            </div>
 
             {/*
               AS QUATRO PORTAS do aluno, como destino navegável e não como lista de
