@@ -54,10 +54,15 @@ parte para a recepção resolver.
 
 ### 4.1 Regra única de vencimento
 
-- `dueAt` = dia `dueDay` da competência, **00:00 no fuso da unidade do aluno** (não mais UTC).
-- `blockAt` = `dueAt + graceDays`, no fuso da unidade — a mesma conta de `domain/bloqueio-por-inadimplencia.ts`
-  passa a ser usada também na abertura (some a soma em milissegundos de `ciclo-de-cobranca.ts`).
-- A competência de "agora" sai do fuso da unidade.
+- `dueAt` = dia `dueDay` da competência, **gravado como DATA** (meia-noite UTC), como hoje. É a convenção
+  que admin-web, kiosk e avisos já leem (`dueAt.slice(0, 10)`); mudar para instante local quebraria todos.
+- `blockAt` = **meia-noite LOCAL** (fuso da unidade do aluno) do dia `dueAt + graceDays`. Vence 10/10,
+  carência 5 → `2026-10-15T03:00:00Z` (00:00 em São Paulo). Hoje é `dueAt + N × 24h` em UTC, que bloqueia
+  às 21h da véspera; e o fallback do job lia o dia local de um `dueAt` UTC (09/10) e bloqueava um dia antes.
+- **Competência continua em UTC** (`competenciaDe`): ~10 chamadores passam a competência pronta como
+  meia-noite UTC, e convertê-la para o fuso a jogaria no mês anterior. O job do dia 01 roda às 00:05 BRT
+  (03:05Z), já no mês certo. O clique em "Gerar" entre 21h e 0h do último dia segue gerando o mês seguinte
+  — registrado, fora desta fatia.
 - **Apagar** `ancorarProximoVencimento` do lote e a restauração da âncora no cancelamento
   (`cancelar-pagamento-manual.use-case.ts`). O lote continua abrindo as faturas dos meses **pagos**; deixa
   de abrir/reescrever a fatura seguinte.
@@ -110,8 +115,8 @@ dos scripts de setembro: sem flag imprime o plano; `--gravar` aplica. Idempotent
    execução do job** (faturas cujo novo `blockAt` já passou — ex.: set/26 → 15/09).
 
 Ordem de operação: merge → dry-run em produção → PI confere o plano → `--gravar`. O job de bloqueio só
-liga depois do saneamento (variável `BILLING_DELINQUENCY_JOB_ENABLED`, desligada por padrão, no `globalEnv`
-do turbo).
+liga depois do saneamento (variável `BILLING_DELINQUENCY_JOB_ENABLED=true` no serviço da API na Railway;
+ausente = desligado; só o runtime lê, não entra no `globalEnv` do turbo).
 
 ## 5. Efeito em produção (PI ciente)
 
