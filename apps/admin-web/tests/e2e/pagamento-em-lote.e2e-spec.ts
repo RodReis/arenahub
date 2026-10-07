@@ -217,8 +217,8 @@ test('aluno com 1 mes vencido paga ate corrente+1 e fica em dia', async ({ page 
   const linhasPagas = page.getByTestId('tabela-de-cobrancas').getByText('Paga');
   await expect(linhasPagas).toHaveCount(3);
 
-  // Mes pago NUNCA reaparece como pagavel: a faixa recomeca na fatura seguinte
-  // (aberta pelo lote para ancorar a vigencia) e vai ate corrente+6 -- 5 chips.
+  // Mes pago NUNCA reaparece como pagavel: a faixa recomeca no mes seguinte ao
+  // ultimo pago (o lote nao abre mais a fatura dele, F88) e vai ate corrente+6 -- 5 chips.
   await expect(chips).toHaveCount(5);
 });
 

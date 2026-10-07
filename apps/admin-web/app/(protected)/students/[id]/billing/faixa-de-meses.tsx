@@ -52,7 +52,7 @@ const ROTULO_DA_SITUACAO: Record<SituacaoDoMes, string> = {
  * combinacao da faixa, sem obrigar o mes anterior --, informa o DIA em que o
  * aluno pagou e, para cada mes anterior em aberto que ficou de fora, escolhe
  * dispensar (aluno nao usou) ou deixar em aberto. A vigencia conta da data do
- * pagamento: 30 dias por mes pago, mais a carencia.
+ * pagamento: 30 dias por mes pago.
  *
  * O SERVIDOR SEMPRE RECALCULA (`receberPagamentoEmLote` -> `manual-payment-batch`):
  * `expectedTotalMinor` e conferencia optimista, nao autoridade. Se o total
@@ -220,7 +220,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
         />
         {selecao.length > 0 && dataValida ? (
           <p className={styles['vigencia']}>
-            Vigente até {formatarData(vigenteAte(dataPagamento, selecao.length))}, mais a carência.
+            Vigente até {formatarData(vigenteAte(dataPagamento, selecao.length))}.
           </p>
         ) : null}
       </div>

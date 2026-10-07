@@ -131,6 +131,8 @@ export class VenderDiariaUseCase {
           reason: 'Diaria vendida no balcao',
           paidAt: agora,
           receivedVia: entrada.channel,
+          // F88: a diaria cobre ate o fim do dia de acesso, nao o pagamento + 30 dias.
+          coverageEndsAt: endsAt,
         },
         correlationId,
         tx,

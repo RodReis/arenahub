@@ -185,6 +185,8 @@ describe('F86 -- diaria avulsa no balcao', () => {
       expect(invoice.status).toBe('PAID');
       expect(invoice.totalMinor).toBe(3000);
       expect(invoice.dueAt.toISOString()).toBe(AGORA.toISOString());
+      // F88: a cobertura da diaria e o fim do dia de acesso, nao o pagamento + 30 dias.
+      expect(invoice.coverageEndsAt?.toISOString()).toBe(FIM_DO_DIA.toISOString());
 
       const pagamento = await db.payment.findUniqueOrThrow({ where: { id: vendida.paymentId } });
       expect(pagamento.status).toBe('CONFIRMED');

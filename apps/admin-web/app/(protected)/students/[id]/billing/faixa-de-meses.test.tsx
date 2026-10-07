@@ -156,10 +156,11 @@ describe('FaixaDeMeses', () => {
     renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-09-15' } });
-    expect(screen.getByText(/Vigente até 15\/10\/2026, mais a carência/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vigente até 15\/10\/2026\.?$/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
-    expect(screen.getByText(/Vigente até 14\/11\/2026, mais a carência/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vigente até 14\/11\/2026\.?$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/mais a carência/i)).not.toBeInTheDocument();
   });
 
   it('data de pagamento futura e recusada: erro na tela e botao desabilitado', () => {

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { diasDeAtraso, estadoExibido, faturaEmDestaque, fraseDeVencimento, situacaoDeVencimento } from './vencimento';
+import {
+  diasDeAtraso,
+  estadoExibido,
+  faturaEmDestaque,
+  fraseDeVencimento,
+  situacaoDeVencimento,
+  venceEmDaLinha,
+} from './vencimento';
 
 describe('situacaoDeVencimento', () => {
   it('vencida quando o vencimento ja passou e a invoice segue aberta', () => {
@@ -307,5 +314,17 @@ describe('estadoExibido', () => {
 
   it('PAID com vencimento no passado continua PAID', () => {
     expect(estadoExibido({ status: 'PAID', dueAt: '2026-07-09T00:00:00.000Z' }, agora, tz)).toBe('PAID');
+  });
+});
+
+describe('venceEmDaLinha', () => {
+  it('paga mostra a cobertura', () => {
+    expect(venceEmDaLinha({ status: 'PAID', dueAt: '2026-10-10T00:00:00.000Z', coverageEndsAt: '2026-11-06T00:00:00.000Z' })).toBe('2026-11-06');
+  });
+  it('aberta mostra o vencimento', () => {
+    expect(venceEmDaLinha({ status: 'OPEN', dueAt: '2026-10-10T00:00:00.000Z', coverageEndsAt: null })).toBe('2026-10-10');
+  });
+  it('paga antiga sem cobertura cai no vencimento', () => {
+    expect(venceEmDaLinha({ status: 'PAID', dueAt: '2026-09-10T00:00:00.000Z', coverageEndsAt: null })).toBe('2026-09-10');
   });
 });
