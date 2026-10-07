@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import type {
   AssinaturaDatada,
   FalhaDePagamento,
@@ -194,7 +195,7 @@ export class RetentionSnapshotsRepository implements PortaDeRetencao {
          * `orderBy`.
          */
         this.db.subscription.findFirst({
-          where: { ...escopo, createdAt: { lte: corteDeConhecimento } },
+          where: { ...escopo, createdAt: { lte: corteDeConhecimento }, ...ASSINATURA_QUE_NAO_E_DIARIA },
           select: { startsAt: true, endsAt: true },
           orderBy: [{ startsAt: 'desc' }, { id: 'asc' }],
         }),

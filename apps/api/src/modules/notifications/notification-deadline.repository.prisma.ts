@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@arenahub/database';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import type {
   AlunoParaAvaliar,
   InvoiceParaAvaliar,
@@ -50,7 +51,7 @@ export class NotificationDeadlineRepository implements PortaDePrazo {
     const ate = new Date(agora.getTime() + JANELA_DE_VENCIMENTO_EM_DIAS * 24 * 60 * 60 * 1000);
 
     const assinaturas = await this.db.subscription.findMany({
-      where: { status: 'ACTIVE', endsAt: { gte: de, lte: ate } },
+      where: { status: 'ACTIVE', endsAt: { gte: de, lte: ate }, ...ASSINATURA_QUE_NAO_E_DIARIA },
       select: { id: true, tenantId: true, endsAt: true },
     });
 

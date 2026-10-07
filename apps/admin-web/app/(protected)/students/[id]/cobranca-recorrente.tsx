@@ -16,7 +16,7 @@ import {
 interface Props {
   subscriptionId: string;
   /** Modalidade do plano da assinatura vigente. */
-  billingMode: 'AVULSO' | 'ASSINATURA';
+  billingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
   /** Já existe recorrência instalada no provedor? */
   ativa: boolean;
   /** Preço vigente do plano, em centavos. Nulo quando o plano perdeu a vigência. */

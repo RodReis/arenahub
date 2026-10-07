@@ -235,3 +235,16 @@ export function interseccaoDeJanelas(
 
   return ordenarJanelas(resultado);
 }
+
+/**
+ * Fragmento de `where` de `Subscription` que deixa a DIARIA de fora (F86).
+ *
+ * A diaria e venda avulsa de um dia, nao contrato: contada como assinatura ela
+ * infla "alunos ativos", receita esperada e o denominador da inadimplencia, e
+ * dispara "seu plano vence em breve" para quem acabou de pagar. Todo leitor de
+ * assinatura VIGENTE que alimenta indicador ou aviso espalha este fragmento --
+ * uma constante so, para a proxima consulta nova nao esquecer.
+ */
+export const ASSINATURA_QUE_NAO_E_DIARIA = {
+  plan: { billingMode: { not: 'DIARIA' } },
+} as const;

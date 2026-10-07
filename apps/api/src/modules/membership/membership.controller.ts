@@ -24,6 +24,7 @@ import {
   type EntitlementComJanelas,
   type PlanoComRegras,
 } from './membership.repository.js';
+import { VenderDiariaUseCase } from './vender-diaria.use-case.js';
 
 const janela = z
   .object({
@@ -51,7 +52,7 @@ const esquemaDePlano = z
      * default da coluna: chamador que nao conhece o campo continua criando
      * plano avulso, e nenhum plano passa a cobrar sozinho por omissao.
      */
-    billingMode: z.enum(['AVULSO', 'ASSINATURA']).optional(),
+    billingMode: z.enum(['AVULSO', 'ASSINATURA', 'DIARIA']).optional(),
     /**
      * Limite mensal de convidados (F76, ADR-060). Ausente = sem o
      * beneficio, mesmo default da coluna.
@@ -137,6 +138,16 @@ const esquemaDeCortesia = z
   })
   .strict();
 
+const esquemaDeDiaria = z
+  .object({
+    planId: z.uuid(),
+    channel: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
+    // Centavos, INV-065: o Zod recusa fracionario antes do dominio.
+    expectedTotalMinor: z.number().int().positive(),
+    receivedAmountMinor: z.number().int().positive().optional(),
+  })
+  .strict();
+
 interface PrecoDto {
   amountMinor: number;
   currency: string;
@@ -155,7 +166,7 @@ interface PlanoDto {
   /** Todas as vigencias, para a tela mostrar o historico de reajuste. */
   prices: PrecoDto[];
   /** Como o plano cobra (ADR-043, Decisao 2). */
-  billingMode: 'AVULSO' | 'ASSINATURA';
+  billingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
   /** Limite mensal de convidados (F76, ADR-060). Nulo = sem o beneficio. */
   guestPassesPerMonth: number | null;
 }
@@ -193,7 +204,7 @@ interface EntitlementDto {
    * Modalidade do plano da assinatura (ADR-043, Decisao 2). Nulo em cortesia,
    * que nao nasce de assinatura.
    */
-  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | null;
   /**
    * Ja existe cobranca recorrente instalada? A tela escolhe entre "ativar" e
    * "encerrar" por este campo -- e nao pela modalidade, que so diz o que o
@@ -221,6 +232,7 @@ export class MembershipController {
   constructor(
     private readonly membership: MembershipRepository,
     private readonly billing: BillingRepository,
+    private readonly venderDiaria: VenderDiariaUseCase,
     private readonly contexto: TenantContextService,
   ) {}
 
@@ -447,6 +459,61 @@ export class MembershipController {
     const criado = comJanelas.find((e) => e.id === entitlement.id)!;
 
     return { subscriptionId: subscription.id, entitlement: this.entitlementParaDto(criado) };
+  }
+
+  /**
+   * Vende a DIARIA avulsa no balcao (F86, `SPEC-086`): assinatura, invoice,
+   * pagamento e direito de acesso numa transacao so. O acesso so existe porque o
+   * pagamento foi registrado.
+   *
+   * Exige as DUAS permissoes -- vender plano e reconhecer dinheiro sao atos
+   * distintos (`billing.payment.manual` e propria, separada de `billing.manage`).
+   */
+  @Post('students/:id/day-pass')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['subscriptionId', 'invoiceId', 'paymentId', 'startsAt', 'endsAt'],
+      properties: {
+        subscriptionId: { type: 'string' },
+        invoiceId: { type: 'string' },
+        paymentId: { type: 'string' },
+        startsAt: { type: 'string' },
+        endsAt: { type: 'string' },
+      },
+    },
+  })
+  @RequirePermissions('subscription.manage', 'billing.payment.manual')
+  async venderDiariaAoAluno(
+    @Param('id') id: string,
+    @Body() corpo: unknown,
+    @Req() requisicao: Request,
+  ): Promise<{
+    subscriptionId: string;
+    invoiceId: string;
+    paymentId: string;
+    startsAt: string;
+    endsAt: string;
+  }> {
+    // UUID validado AQUI: o id vai para um `::uuid` em SQL cru (trava do aluno), e
+    // texto qualquer viraria 500 em vez de 400.
+    const studentId = z.uuid().parse(id);
+    const dados = esquemaDeDiaria.parse(corpo);
+
+    const vendida = await this.venderDiaria.executar(
+      this.contexto.require(),
+      { studentId, ...dados },
+      requisicao.correlationId ?? 'sem-correlacao',
+      new Date(),
+    );
+
+    return {
+      subscriptionId: vendida.subscriptionId,
+      invoiceId: vendida.invoiceId,
+      paymentId: vendida.paymentId,
+      startsAt: vendida.startsAt.toISOString(),
+      endsAt: vendida.endsAt.toISOString(),
+    };
   }
 
   @Post('subscriptions/:id/actions')

@@ -467,6 +467,30 @@ export class StudentRepository {
   }
 
   /**
+   * Unidade de ORIGEM do aluno e o fuso dela (INV-144, ADR-019: sem fallback para
+   * o tenant). E de onde a diaria tira "ate quando vale": o dia civil da unidade.
+   *
+   * Devolve `null` quando o aluno nao existe NESTE tenant. `comTenant` pelo mesmo
+   * motivo de `encontrar`: fora de transacao interceptada a politica RLS devolve
+   * zero linhas em silencio sob o role restrito.
+   */
+  async unidadeDeOrigem(
+    contexto: TenantContext,
+    id: string,
+  ): Promise<{ gymUnitId: string; timezone: string } | null> {
+    const aluno = await this.db.comTenant((tx) =>
+      tx.student.findFirst({
+        where: { id, tenantId: contexto.tenantId },
+        select: { gymUnitId: true, gymUnit: { select: { timezone: true } } },
+      }),
+    );
+
+    if (!aluno) return null;
+
+    return { gymUnitId: aluno.gymUnitId, timezone: aluno.gymUnit.timezone };
+  }
+
+  /**
    * Aluno com endereco e contatos (`GET /students/:id`).
    *
    * Separado do `encontrar`: a decisao de acesso e a checagem de

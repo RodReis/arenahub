@@ -42,6 +42,7 @@ import { IconeBioimpedancia, IconePagamento } from '../acoes-do-aluno';
 import { Abas } from '../../../../src/components/abas';
 import { AlterarSituacao } from './alterar-situacao';
 import { AtribuirPlano } from './atribuir-plano';
+import { VenderDiaria } from './vender-diaria';
 import { CredencialDeAcesso } from './credencial-de-acesso';
 import { CobrancaRecorrente } from './cobranca-recorrente';
 import { EditarCadastro } from './editar-cadastro';
@@ -120,7 +121,7 @@ interface Entitlement {
   /** #337: troca de plano já agendada para o próximo ciclo, ou nula/ausente. */
   scheduledPlanChange?: { planId: string; effectiveFrom: string } | null;
   /** F56: modalidade do plano da assinatura. Nulo em cortesia. */
-  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | null;
   /** F56: já existe recorrência instalada no provedor? */
   recorrenciaAtiva: boolean;
   /** F56: preço vigente do plano — o valor que o aceite autoriza. */
@@ -132,6 +133,7 @@ interface Plano {
   id: string;
   name: string;
   isActive: boolean;
+  billingMode?: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
   currentPrice?: { amountMinor: number; currency: string } | null;
 }
 
@@ -263,11 +265,38 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
   const credenciais = respostaDasCredenciais.dados ?? [];
   const planosIndisponiveis = !respostaDosPlanos.ok;
 
+  /*
+    DIARIA tem fluxo proprio ("Vender diaria", com pagamento): ficar fora da lista
+    de atribuicao e o que impede a recepcao de dar acesso por datas livres, sem
+    cobrar. A API tambem recusa (DAY_PASS_PLAN_NOT_ASSIGNABLE) -- esta e so a
+    cortesia de nao oferecer o que vai falhar.
+  */
+  const planosAtribuiveis = planos.filter((p) => p.billingMode !== 'DIARIA');
+  const planosDeDiaria = planos.flatMap((p) =>
+    p.billingMode === 'DIARIA' && p.isActive && p.currentPrice
+      ? [
+          {
+            id: p.id,
+            name: p.name,
+            amountMinor: p.currentPrice.amountMinor,
+            currency: p.currentPrice.currency,
+          },
+        ]
+      : [],
+  );
+
   const nomeDaUnidade = (unidadeId: string): string =>
     unidades.find((unidade) => unidade.id === unidadeId)?.name ?? unidadeId;
 
   const agora = new Date();
   const vigentes = direitos.filter((direito) => vigenteAgora(direito, agora));
+  // Plano suspenso por atraso e ainda no prazo: nao e "vigente" para a ficha, mas e para a API.
+  const temPlanoSuspenso = direitos.some(
+    (direito) =>
+      direito.subscriptionId !== null &&
+      direito.status === 'SUSPENDED' &&
+      new Date(direito.endsAt).getTime() > agora.getTime(),
+  );
   const bloqueado = impedeAcesso(aluno.status);
 
   /*
@@ -791,7 +820,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
 
               So aparece com assinatura vigente: sem plano nao ha o que cobrar.
             */}
-            {assinaturaVigente ? (
+            {/* DIARIA ja nasce paga e vence no mesmo dia: nao ha recorrencia a ativar. */}
+            {assinaturaVigente && assinaturaVigente.billingMode !== 'DIARIA' ? (
               <section aria-labelledby="titulo-recorrencia" className={estilos['secao']}>
                 <h2 id="titulo-recorrencia">Cobrança recorrente</h2>
 
@@ -835,13 +865,30 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               ) : (
                 <AtribuirPlano
                   studentId={aluno.id}
-                  planos={planos}
+                  planos={planosAtribuiveis}
                   impedido={bloqueado}
                   vigente={assinaturaVigente}
                   timezone={timezoneDaUnidade ?? FUSO_PROVISORIO}
                 />
               )}
             </section>
+
+            {/*
+              F86 -- diaria avulsa. So para quem esta SEM plano vigente: quem tem
+              plano troca pelo "Alterar plano" acima, e a API recusa a diaria de
+              qualquer jeito (STUDENT_HAS_ACTIVE_SUBSCRIPTION).
+            */}
+            {assinaturaVigente ? null : (
+              <section aria-labelledby="titulo-diaria" className={estilos['secao']}>
+                <h2 id="titulo-diaria">Diária</h2>
+                <VenderDiaria
+                  studentId={aluno.id}
+                  planos={planosDeDiaria}
+                  impedido={bloqueado}
+                  emAtraso={temPlanoSuspenso}
+                />
+              </section>
+            )}
 
             {/*
               ISSUE #396 -- numero que o leitor reconhece (cartao de catraca

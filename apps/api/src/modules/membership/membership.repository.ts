@@ -98,6 +98,35 @@ export class PlanoEmUsoError extends ErroDeDominio {
 }
 
 /**
+ * Diaria so se vende a quem esta SEM plano vigente (F86): a trava do aluno e o
+ * indice parcial "uma assinatura vigente por aluno" garantem a regra no banco.
+ */
+export class AlunoJaTemAssinaturaVigenteError extends ErroDeDominio {
+  constructor() {
+    super(
+      'STUDENT_HAS_ACTIVE_SUBSCRIPTION',
+      409,
+      'Aluno ja tem assinatura vigente; diaria so se vende a quem esta sem plano',
+    );
+  }
+}
+
+/**
+ * Plano de diaria so se VENDE (`POST /students/:id/day-pass`), nunca se atribui
+ * nem se troca para ele (F86): atribuir daria acesso sem pagamento e com datas
+ * livres, e trocar um mensalista para diaria nao tem significado de negocio.
+ */
+export class PlanoDeDiariaSoPorVendaError extends ErroDeDominio {
+  constructor() {
+    super(
+      'DAY_PASS_PLAN_NOT_ASSIGNABLE',
+      422,
+      'Plano de diaria so se vende em "Vender diaria": atribuir ou trocar para ele daria acesso sem pagamento',
+    );
+  }
+}
+
+/**
  * Plano sem janela de acesso nao gera direito nenhum.
  *
  * O snapshot de politica sairia vazio e o entitlement nasceria ATIVO sem
@@ -194,7 +223,7 @@ export interface DadosDeCriacaoDePlano {
    * Modalidade de cobranca (ADR-043, Decisao 2). Ausente = `AVULSO`, que e o
    * default da coluna -- plano criado por chamador antigo continua avulso.
    */
-  billingMode?: 'AVULSO' | 'ASSINATURA' | undefined;
+  billingMode?: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | undefined;
   /**
    * Limite mensal de convidados (F76, ADR-060). Ausente = sem o beneficio,
    * mesmo default da coluna.
@@ -778,6 +807,7 @@ export class MembershipRepository {
 
     // Sem janela o entitlement nasceria ATIVO sem liberar hora nenhuma --
     // ver `PlanoSemJanelaError`. Antes da transacao: nao ha o que desfazer.
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
@@ -835,6 +865,95 @@ export class MembershipRepository {
 
       return { subscription: assinatura, entitlement };
     });
+  }
+
+  /**
+   * Cria, DENTRO da transacao do chamador, a assinatura da DIARIA e o direito de
+   * acesso que ela deriva -- os dois ESPERANDO o pagamento: assinatura `PENDING`,
+   * entitlement `SCHEDULED`. Quem os promove e `registrarPagamentoManual`
+   * (`ativarDireitoDeAcessoSePendente`), na mesma transacao: a cadeia
+   * `Pagamento -> Invoice -> Subscription -> Entitlement` da regra de arquitetura
+   * no 1, sem atalho. Se o pagamento falhar, a transacao volta atras e nem a
+   * assinatura `PENDING` sobra.
+   *
+   * Trava a linha do aluno (`FOR UPDATE`, como `ativarAssinatura`): duas vendas
+   * simultaneas para o mesmo aluno se serializam aqui, e a segunda ve a primeira
+   * ja `ACTIVE` e recebe 409. O indice parcial "uma assinatura vigente por
+   * aluno" fica como segunda barreira, nao como a primeira.
+   *
+   * NAO reaproveita `ativarAssinatura`: ele cria `ACTIVE`, que e justamente o
+   * acesso-antes-do-pagamento que a diaria existe para nao ter.
+   */
+  async criarDiariaPendente(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    entrada: { studentId: string; plano: PlanoComRegras; startsAt: Date; endsAt: Date },
+    correlationId: string,
+  ): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
+    await this.travarAlunoElegivel(tx, contexto, entrada.studentId);
+
+    const vigente = await tx.subscription.findFirst({
+      where: {
+        tenantId: contexto.tenantId,
+        studentId: entrada.studentId,
+        status: { in: ['ACTIVE', 'PAST_DUE'] },
+      },
+      select: { id: true },
+    });
+
+    if (vigente) throw new AlunoJaTemAssinaturaVigenteError();
+
+    const janelas: JanelaDeAcesso[] = entrada.plano.accessWindows.map((j) => ({
+      gymUnitId: j.gymUnitId,
+      dayOfWeek: j.dayOfWeek,
+      startMinute: j.startMinute,
+      endMinute: j.endMinute,
+    }));
+
+    const snapshot = montarSnapshotDePolitica(
+      entrada.plano.id,
+      entrada.plano.name,
+      entrada.plano.units.map((u) => u.gymUnitId),
+      janelas,
+    );
+
+    const assinatura = await tx.subscription.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId: entrada.studentId,
+        planId: entrada.plano.id,
+        status: 'PENDING',
+        startsAt: entrada.startsAt,
+        endsAt: entrada.endsAt,
+        lastActorId: contexto.actorId,
+        lastReason: 'Diaria vendida no balcao',
+      },
+    });
+
+    const entitlement = await tx.entitlement.create({
+      data: {
+        tenantId: contexto.tenantId,
+        studentId: entrada.studentId,
+        source: 'SUBSCRIPTION',
+        subscriptionId: assinatura.id,
+        status: 'SCHEDULED',
+        startsAt: entrada.startsAt,
+        endsAt: entrada.endsAt,
+        policySnapshot: snapshot as unknown as Prisma.InputJsonValue,
+        unitWindows: {
+          create: janelas.map((j) => ({ ...j, tenantId: contexto.tenantId })),
+        },
+      },
+    });
+
+    await this.registrarDerivacao(tx, contexto, {
+      studentId: entrada.studentId,
+      subscriptionId: assinatura.id,
+      entitlementId: entitlement.id,
+      correlationId,
+    });
+
+    return { subscription: assinatura, entitlement };
   }
 
   /** Timeline + auditoria + outbox da derivacao, na mesma transacao. */
@@ -1116,6 +1235,7 @@ export class MembershipRepository {
     // Falha ANTES da transacao: nao ha o que desfazer. Mesma ordem de
     // `ativarAssinatura` (linha 680) -- o entitlement nunca nasce sem
     // janela nenhuma (PlanoSemJanelaError).
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
@@ -1356,6 +1476,7 @@ export class MembershipRepository {
 
     const plano = await this.encontrarPlano(contexto, entrada.planId);
     if (!plano) throw new PlanoNaoEncontradoError();
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     return this.db.$transaction(async (tx) => {
