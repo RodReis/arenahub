@@ -34,7 +34,7 @@ describe('planejarPagamentos', () => {
 
     expect(r!.pendencia).toBeNull();
     expect(r!.acoes).toEqual([
-      { tipo: 'DAR_BAIXA', faturaId: 'fat-1', valorMinor: 15000, pagoEm: new Date('2026-09-05T00:00:00Z') },
+      { tipo: 'DAR_BAIXA', faturaId: 'fat-1', valorMinor: 15000, pagoEm: new Date('2026-09-05T12:00:00Z') },
     ]);
   });
 

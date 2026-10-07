@@ -65,7 +65,7 @@ const esquemaDeCadastro = z.object({
   advisorUserId: z.string().uuid().optional(),
   status: z.enum(['LEAD', 'TRIAL', 'ACTIVE']).optional(),
   /** F82 -- ausente cai no default `STUDENT` da API. */
-  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']).optional(),
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']).optional(),
   telefone: z.string().trim().max(160).optional(),
   whatsapp: z.string().trim().max(160).optional(),
   email: z.string().trim().max(160).optional(),
@@ -804,7 +804,7 @@ export async function liberarFinanceiramente(
  */
 const esquemaDePerfil = z.object({
   studentId: z.string().uuid(),
-  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']),
   version: z.coerce.number().int().min(0),
 });
 

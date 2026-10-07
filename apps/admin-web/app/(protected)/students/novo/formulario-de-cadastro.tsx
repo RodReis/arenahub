@@ -58,6 +58,8 @@ const PERFIL_INICIAL = [
   ['TRAINER', 'Professor'],
   ['STAFF', 'Funcionário'],
   ['ADMIN', 'Administrador'],
+  ['PERMUTA_TACIO', 'Permuta-Tacio'],
+  ['PERMUTA_DOUGLAS', 'Permuta-Douglas'],
 ] as const;
 
 /** As 27 UFs. Lista fechada — "XX" passaria por qualquer campo de texto. */

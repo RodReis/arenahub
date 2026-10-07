@@ -103,7 +103,7 @@ export async function atualizarVinculo(
  */
 const esquemaDePerfil = z.object({
   teamMemberId: z.string().uuid(),
-  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+  profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']),
   version: z.coerce.number().int().min(0),
 });
 

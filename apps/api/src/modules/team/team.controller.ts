@@ -60,7 +60,7 @@ const esquemaDeVinculo = z
 
 const esquemaDePerfil = z
   .object({
-    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']),
     version: z.number().int().min(0),
   })
   .strict();

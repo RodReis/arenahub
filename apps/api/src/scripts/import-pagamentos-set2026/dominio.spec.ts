@@ -10,8 +10,11 @@ import {
 } from './dominio.js';
 
 describe('parsearDataBr', () => {
-  it('converte dd/mm/yyyy em data UTC', () => {
-    expect(parsearDataBr('01/09/2026').toISOString()).toBe('2026-09-01T00:00:00.000Z');
+  it('converte dd/mm/yyyy em meio-dia UTC, que no Brasil continua no mesmo dia', () => {
+    const data = parsearDataBr('01/09/2026');
+
+    expect(data.toISOString()).toBe('2026-09-01T12:00:00.000Z');
+    expect(data.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })).toBe('01/09/2026');
   });
 
   it('rejeita formato fora do padrao', () => {
@@ -90,7 +93,7 @@ describe('decidirVeredito', () => {
       invoiceId: 'inv-1',
       amountMinor: 20_000,
       valorDaInvoiceMinor: 20_000,
-      paidAt: new Date('2026-09-01T00:00:00.000Z'),
+      paidAt: new Date('2026-09-01T12:00:00.000Z'),
     });
   });
 

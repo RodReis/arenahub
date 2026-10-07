@@ -7,6 +7,8 @@ export const ROTULO_DE_PERFIL: Record<string, string> = {
   TRAINER: 'Professor',
   STAFF: 'Funcionário',
   ADMIN: 'Administrador',
+  PERMUTA_TACIO: 'Permuta-Tacio',
+  PERMUTA_DOUGLAS: 'Permuta-Douglas',
 };
 
 /**
