@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
-import { Test } from '@nestjs/testing';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { AppModule } from '../../src/app.module.js';
 import { comContextoDeTenant } from './com-contexto-de-tenant.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { AplicarInadimplenciaUseCase } from '../../src/modules/billing/aplicar-inadimplencia.use-case.js';
+import { AplicarInadimplenciaSchedulerService } from '../../src/modules/billing/aplicar-inadimplencia-scheduler.service.js';
+import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
 import { ConsultarInadimplenciaUseCase } from '../../src/modules/billing/consultar-inadimplencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from '../../src/modules/billing/liberacao-financeira.use-case.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -22,6 +24,8 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
  * filtro por estado de origem no `updateMany`, e o desbloqueio e uma transacao
  * escrita pelo webhook. Dublar o banco provaria o `where` do TypeScript.
  */
+let moduleRef: TestingModule;
+
 describe('F15 -- linha do tempo da inadimplencia', () => {
   let db: PrismaService;
   let aplicar: AplicarInadimplenciaUseCase;
@@ -49,7 +53,7 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
   const JA_BLOQUEIA = new Date('2026-08-13T03:00:00.000Z');
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = moduleRef.get(PrismaService);
     aplicar = comContextoDeTenant(moduleRef.get(AplicarInadimplenciaUseCase));
     consultar = comContextoDeTenant(moduleRef.get(ConsultarInadimplenciaUseCase));
@@ -1047,6 +1051,255 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
       });
     } finally {
       await db.tenant.delete({ where: { id: vizinho.id } });
+    }
+  });
+});
+
+/**
+ * F88 -- bloqueio automatico 5 dias apos o vencimento, so para STUDENT.
+ *
+ * UM TENANT POR CENARIO: o job age no tenant inteiro, e um cenario vizinho com
+ * fatura vencida somaria no `direitosSuspensos` e esconderia o que se prova.
+ */
+describe('F88 -- bloqueio automatico: perfil, diaria e agendador', () => {
+  let db: PrismaService;
+  let aplicar: AplicarInadimplenciaUseCase;
+  let billing: BillingRepository;
+
+  const sufixo = randomUUID().slice(0, 8);
+  const tenantsCriados: string[] = [];
+  /** Operador do recebimento manual: `audit_logs.actor_id` tem FK para `users`. */
+  let operadorId = '';
+
+  /** Vencimento 10/10 (data em meia-noite UTC) + carencia 5, Sao Paulo: bloqueia 15/10 03:00Z. */
+  const VENCIMENTO = new Date('2026-10-10T00:00:00.000Z');
+  const ANTES_DO_BLOQUEIO = new Date('2026-10-15T02:59:59.000Z');
+  const NO_BLOQUEIO = new Date('2026-10-15T03:00:00.000Z');
+  const COMPETENCIA = new Date('2026-10-01T00:00:00.000Z');
+
+  beforeAll(async () => {
+    db = moduleRef.get(PrismaService);
+    aplicar = comContextoDeTenant(moduleRef.get(AplicarInadimplenciaUseCase));
+    billing = comContextoDeTenant(moduleRef.get(BillingRepository));
+
+    operadorId = (
+      await db.user.create({
+        data: { email: `f88-op-${sufixo}@exemplo.test`, passwordHash: 'hash-de-teste-nao-usado' },
+        select: { id: true },
+      })
+    ).id;
+  });
+
+  afterAll(async () => {
+    await db.tenant.deleteMany({ where: { id: { in: tenantsCriados } } });
+    await db.user.deleteMany({ where: { id: operadorId } });
+  });
+
+  async function cenario(opcoes: {
+    nome: string;
+    profile: 'STUDENT' | 'STAFF';
+    billingMode: 'AVULSO' | 'DIARIA';
+    /** Ausente = a fatura nasce por `abrirInvoiceDoPeriodo` (blockAt calculado). */
+    invoiceDireta?: { blockAt: Date | null };
+  }) {
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `f88-${opcoes.nome}-${sufixo}`,
+        legalName: `F88 ${opcoes.nome} ${sufixo} LTDA`,
+        displayName: `F88 ${opcoes.nome}`,
+      },
+      select: { id: true },
+    });
+    tenantsCriados.push(tenant.id);
+
+    await db.billingSettings.create({ data: { tenantId: tenant.id, dueDay: 10, graceDays: 5 } });
+
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'MTZ',
+        name: 'Matriz',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+
+    const aluno = await db.student.create({
+      data: {
+        tenantId: tenant.id,
+        gymUnitId: unidade.id,
+        membershipNumber: `F88-${opcoes.nome}-${sufixo}`,
+        fullName: `Aluno F88 ${opcoes.nome}`,
+        birthDate: new Date('2000-01-01T00:00:00Z'),
+        status: 'ACTIVE',
+        profile: opcoes.profile,
+      },
+    });
+
+    const plano = await db.plan.create({
+      data: { tenantId: tenant.id, name: `Plano F88 ${opcoes.nome}`, billingMode: opcoes.billingMode },
+    });
+    await db.planPrice.create({
+      data: {
+        tenantId: tenant.id,
+        planId: plano.id,
+        amountMinor: 12990,
+        validFrom: new Date('2026-01-01T00:00:00Z'),
+      },
+    });
+
+    const assinatura = await db.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        studentId: aluno.id,
+        planId: plano.id,
+        status: 'ACTIVE',
+        startsAt: new Date('2026-10-01T00:00:00Z'),
+      },
+    });
+
+    await db.entitlement.create({
+      data: {
+        tenantId: tenant.id,
+        studentId: aluno.id,
+        subscriptionId: assinatura.id,
+        source: 'SUBSCRIPTION',
+        status: 'ACTIVE',
+        policySnapshot: {},
+        startsAt: new Date('2026-10-01T00:00:00Z'),
+        endsAt: new Date('2026-12-31T23:59:59Z'),
+      },
+    });
+
+    const contexto: TenantContext = {
+      tenantId: tenant.id,
+      actorId: operadorId,
+      sessionId: randomUUID(),
+      permissions: new Set(),
+      allowedUnitIds: 'ALL',
+    };
+
+    const invoice = opcoes.invoiceDireta
+      ? await db.invoice.create({
+          data: {
+            tenantId: tenant.id,
+            subscriptionId: assinatura.id,
+            studentId: aluno.id,
+            billingPeriod: COMPETENCIA,
+            number: 1,
+            status: 'OPEN',
+            currency: 'BRL',
+            subtotalMinor: 12990,
+            totalMinor: 12990,
+            dueAt: VENCIMENTO,
+            blockAt: opcoes.invoiceDireta.blockAt,
+          },
+        })
+      : await billing.abrirInvoiceDoPeriodo(contexto, {
+          subscriptionId: assinatura.id,
+          emQue: COMPETENCIA,
+        });
+
+    return { tenantId: tenant.id, subscriptionId: assinatura.id, invoiceId: invoice.id, contexto, total: 12990 };
+  }
+
+  const statusDoDireito = async (subscriptionId: string) =>
+    (await db.entitlement.findFirstOrThrow({ where: { subscriptionId } })).status;
+
+  it('F88: aluno de perfil STAFF com fatura vencida alem da carencia NAO e suspenso', async () => {
+    const c = await cenario({
+      nome: 'staff',
+      profile: 'STAFF',
+      billingMode: 'AVULSO',
+      invoiceDireta: { blockAt: new Date('2026-10-15T03:00:00.000Z') },
+    });
+
+    const r = await aplicar.executar(c.tenantId, new Date('2026-10-16T12:00:00Z'));
+
+    expect(r.direitosSuspensos).toBe(0);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('ACTIVE');
+  });
+
+  it('F88: assinatura de plano DIARIA nao entra na inadimplencia', async () => {
+    const c = await cenario({
+      nome: 'diaria',
+      profile: 'STUDENT',
+      billingMode: 'DIARIA',
+      invoiceDireta: { blockAt: new Date('2026-10-15T03:00:00.000Z') },
+    });
+
+    const r = await aplicar.executar(c.tenantId, new Date('2026-10-16T12:00:00Z'));
+
+    expect(r.invoicesVencidas).toBe(0);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('ACTIVE');
+  });
+
+  it('F88: STUDENT bloqueia em 15/10 00:00 BRT e nao antes; pagar reativa e o job seguinte nao re-suspende', async () => {
+    const c = await cenario({ nome: 'student', profile: 'STUDENT', billingMode: 'AVULSO' });
+
+    const invoice = await db.invoice.findUniqueOrThrow({ where: { id: c.invoiceId } });
+    expect(invoice.blockAt?.toISOString()).toBe('2026-10-15T03:00:00.000Z');
+
+    expect((await aplicar.executar(c.tenantId, ANTES_DO_BLOQUEIO)).direitosSuspensos).toBe(0);
+    expect((await aplicar.executar(c.tenantId, NO_BLOQUEIO)).direitosSuspensos).toBe(1);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('SUSPENDED');
+
+    await billing.registrarPagamentoManual(
+      c.contexto,
+      {
+        invoiceId: c.invoiceId,
+        amountMinor: c.total,
+        reason: 'balcao',
+        paidAt: new Date('2026-10-20T12:00:00Z'),
+        receivedVia: 'DINHEIRO',
+      },
+      'corr',
+    );
+    expect(await statusDoDireito(c.subscriptionId)).toBe('ACTIVE');
+
+    expect((await aplicar.executar(c.tenantId, new Date('2026-10-21T03:10:00Z'))).direitosSuspensos).toBe(0);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('ACTIVE');
+  });
+
+  it('F88: sem blockAt (legado), o corte cai na meia-noite LOCAL e nao nas 21h da vespera', async () => {
+    /**
+     * Carry da revisao da Task 2: `dueAt` em meia-noite UTC e `blockAt` nulo.
+     * Pela conta antiga (`dueAt + 5 x 24h` em UTC) o corte seria 15/10 00:00Z --
+     * 14/10 21:00 em Sao Paulo --, e a primeira chamada ja suspenderia.
+     */
+    const c = await cenario({
+      nome: 'legado',
+      profile: 'STUDENT',
+      billingMode: 'AVULSO',
+      invoiceDireta: { blockAt: null },
+    });
+
+    expect((await aplicar.executar(c.tenantId, ANTES_DO_BLOQUEIO)).direitosSuspensos).toBe(0);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('ACTIVE');
+
+    expect((await aplicar.executar(c.tenantId, NO_BLOQUEIO)).direitosSuspensos).toBe(1);
+    expect(await statusDoDireito(c.subscriptionId)).toBe('SUSPENDED');
+  });
+
+  it('F88: o ciclo do scheduler abre o proprio contexto de tenant (RLS) e suspende', async () => {
+    const c = await cenario({ nome: 'cron', profile: 'STUDENT', billingMode: 'AVULSO' });
+
+    const scheduler = moduleRef.get(AplicarInadimplenciaSchedulerService);
+    // Restringe ao tenant do cenario: o ciclo real varre todos e suspenderia
+    // dado de outra suite no mesmo banco. O `comContexto` interno -- o que se
+    // prova aqui -- continua sendo o do scheduler.
+    const tenants = jest
+      .spyOn(moduleRef.get(BillingRepository), 'listarTenantsAtivos')
+      .mockResolvedValue([c.tenantId]);
+
+    try {
+      // Sem `comContextoDeTenant`: nenhum contexto de requisicao aberto.
+      const r = await scheduler.executarCiclo(new Date('2026-10-16T12:00:00Z'));
+
+      expect(r).toEqual({ tenants: 1, direitosSuspensos: 1, falhas: 0 });
+      expect(await statusDoDireito(c.subscriptionId)).toBe('SUSPENDED');
+    } finally {
+      tenants.mockRestore();
     }
   });
 });
