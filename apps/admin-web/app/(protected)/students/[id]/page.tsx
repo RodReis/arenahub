@@ -290,6 +290,13 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
 
   const agora = new Date();
   const vigentes = direitos.filter((direito) => vigenteAgora(direito, agora));
+  // Plano suspenso por atraso e ainda no prazo: nao e "vigente" para a ficha, mas e para a API.
+  const temPlanoSuspenso = direitos.some(
+    (direito) =>
+      direito.subscriptionId !== null &&
+      direito.status === 'SUSPENDED' &&
+      new Date(direito.endsAt).getTime() > agora.getTime(),
+  );
   const bloqueado = impedeAcesso(aluno.status);
 
   /*
@@ -874,7 +881,12 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             {assinaturaVigente ? null : (
               <section aria-labelledby="titulo-diaria" className={estilos['secao']}>
                 <h2 id="titulo-diaria">Diária</h2>
-                <VenderDiaria studentId={aluno.id} planos={planosDeDiaria} impedido={bloqueado} />
+                <VenderDiaria
+                  studentId={aluno.id}
+                  planos={planosDeDiaria}
+                  impedido={bloqueado}
+                  emAtraso={temPlanoSuspenso}
+                />
               </section>
             )}
 

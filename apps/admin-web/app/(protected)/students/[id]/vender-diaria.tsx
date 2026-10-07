@@ -21,6 +21,12 @@ interface Props {
   planos: readonly PlanoDeDiaria[];
   /** `true` quando a situacao do aluno impede o acesso (INV-033). */
   impedido: boolean;
+  /**
+   * Plano SUSPENSO por atraso ainda no prazo: a ficha nao o conta como vigente, mas a API
+   * conta (assinatura `PAST_DUE`) e recusaria a venda. Explicar aqui evita a recepcao
+   * receber o dinheiro para depois ler o erro.
+   */
+  emAtraso?: boolean;
 }
 
 /**
@@ -36,7 +42,7 @@ interface Props {
  * O ACESSO NAO NASCE AQUI: a API cria o direito junto do pagamento. Tocar no botao
  * nunca libera nada por si -- so a resposta `ok` do servidor diz que pagou.
  */
-export function VenderDiaria({ studentId, planos, impedido }: Props) {
+export function VenderDiaria({ studentId, planos, impedido, emAtraso = false }: Props) {
   const [aberto, setAberto] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [planoId, setPlanoId] = useState(planos[0]?.id ?? '');
@@ -47,6 +53,15 @@ export function VenderDiaria({ studentId, planos, impedido }: Props) {
     return (
       <p role="note" data-testid="diaria-impedida">
         A situação do aluno impede o acesso. Regularize antes de vender a diária.
+      </p>
+    );
+  }
+
+  if (emAtraso) {
+    return (
+      <p role="note" data-testid="diaria-em-atraso">
+        Este aluno tem plano suspenso por atraso. Regularize em Financeiro: diária é só para quem
+        está sem plano.
       </p>
     );
   }

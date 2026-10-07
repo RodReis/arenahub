@@ -141,6 +141,13 @@ describe('vender diaria na ficha do aluno', () => {
     expect(screen.queryByTestId('abrir-venda-de-diaria')).toBeNull();
   });
 
+  it('aluno com plano suspenso por atraso nao ve o botao e e mandado ao Financeiro', () => {
+    montar({ emAtraso: true });
+
+    expect(screen.getByTestId('diaria-em-atraso')).toHaveTextContent(/Financeiro/);
+    expect(screen.queryByTestId('abrir-venda-de-diaria')).toBeNull();
+  });
+
   it('aluno com acesso impedido nao ve o botao e ve o motivo', () => {
     montar({ impedido: true });
 

@@ -212,6 +212,29 @@ describe('ficha do aluno', () => {
     ).toBeInTheDocument();
   });
 
+  it('plano suspenso por atraso: a Diaria explica em vez de oferecer o que a API vai negar', async () => {
+    // Assinatura PAST_DUE + direito SUSPENDED ainda no prazo: a ficha nao o conta como "vigente",
+    // mas a API conta (STUDENT_HAS_ACTIVE_SUBSCRIPTION).
+    responder([entitlement({ status: 'SUSPENDED' })], [PLANO_DE_DIARIA]);
+
+    await renderizar();
+
+    expect(screen.getByTestId('diaria-em-atraso')).toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-venda-de-diaria')).toBeNull();
+  });
+
+  it('direito suspenso que JA venceu nao trava a Diaria', async () => {
+    responder(
+      [entitlement({ status: 'SUSPENDED', endsAt: '2020-06-01T00:00:00.000Z' })],
+      [PLANO_DE_DIARIA],
+    );
+
+    await renderizar();
+
+    expect(screen.queryByTestId('diaria-em-atraso')).toBeNull();
+    expect(screen.getByTestId('abrir-venda-de-diaria')).toBeInTheDocument();
+  });
+
   it('aluno com plano vigente nao ve a secao Diaria', async () => {
     responder([entitlement()], [PLANO_DE_DIARIA]);
 
