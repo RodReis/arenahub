@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
@@ -25,6 +26,19 @@ export interface ResultadoDaGeracao {
  * do scheduler): `abrirInvoiceDoPeriodo` sem `tx` usa o `$transaction` que
  * aplica o contexto do `AsyncLocalStorage`.
  */
+/**
+ * Quem recebe fatura mensal (SPEC-088 3). Fonte unica: o job e o script de
+ * saneamento (`padronizar-vencimentos`) usam esta mesma consulta.
+ */
+export function assinaturasElegiveisParaFaturaMensal(tenantId: string): Prisma.SubscriptionWhereInput {
+  return {
+    tenantId,
+    status: { in: ['ACTIVE', 'PAST_DUE'] },
+    plan: { billingMode: { not: 'DIARIA' } },
+    student: { profile: 'STUDENT', status: 'ACTIVE' },
+  };
+}
+
 @Injectable()
 export class GerarFaturasDoMesUseCase {
   private readonly log = new Logger(GerarFaturasDoMesUseCase.name);
@@ -48,12 +62,7 @@ export class GerarFaturasDoMesUseCase {
     // `comTenant`: o filtro passa por `students`, que tem RLS (issue #306).
     const assinaturas = await this.db.comTenant((tx) =>
       tx.subscription.findMany({
-        where: {
-          tenantId,
-          status: { in: ['ACTIVE', 'PAST_DUE'] },
-          plan: { billingMode: { not: 'DIARIA' } },
-          student: { profile: 'STUDENT', status: 'ACTIVE' },
-        },
+        where: assinaturasElegiveisParaFaturaMensal(tenantId),
         select: { id: true },
         orderBy: { id: 'asc' },
       }),
