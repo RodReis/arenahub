@@ -139,7 +139,7 @@ export function VenderDiaria({ studentId, planos, impedido }: Props) {
           data-testid="confirmar-diaria"
           onClick={() => void confirmar()}
         >
-          {enviando ? 'Vendendo…' : 'Receber e liberar acesso'}
+          {enviando ? 'Recebendo…' : `Receber ${formatarDinheiro(plano.amountMinor, plano.currency)}`}
         </Button>
         <Button type="button" variant="outline" disabled={enviando} onClick={() => setAberto(false)}>
           Cancelar
