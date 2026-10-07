@@ -2588,8 +2588,7 @@
                   "required": [
                     "paymentId",
                     "invoiceId",
-                    "faturaReaberta",
-                    "vencimentoRestaurado"
+                    "faturaReaberta"
                   ],
                   "properties": {
                     "paymentId": {
@@ -2599,9 +2598,6 @@
                       "type": "string"
                     },
                     "faturaReaberta": {
-                      "type": "boolean"
-                    },
-                    "vencimentoRestaurado": {
                       "type": "boolean"
                     }
                   }

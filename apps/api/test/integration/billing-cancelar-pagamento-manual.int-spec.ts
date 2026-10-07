@@ -26,7 +26,7 @@ import { PrismaService } from '../../src/persistence/prisma.service.js';
 /**
  * Cancelamento de pagamento manual lancado por engano (F85, decisao do PI em
  * 05/10/2026). Contra banco de verdade: a atomicidade, a corrida de dois
- * cancelamentos e a restauracao do vencimento sao comportamento do Postgres.
+ * cancelamentos e a reabertura da fatura sao comportamento do Postgres.
  *
  * O pagamento e criado pelo CAMINHO REAL (lote da recepcao), nao por `INSERT`.
  * O lote nao ancora mais o vencimento da fatura seguinte (F88): cancelar nao
