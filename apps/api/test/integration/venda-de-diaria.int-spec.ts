@@ -121,7 +121,8 @@ describe('F86 -- diaria avulsa no balcao', () => {
       });
 
       expect(invoice.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
-      expect(invoice.blockAt?.toISOString()).toBe('2026-10-12T00:00:00.000Z');
+      // F88: bloqueio na meia-noite LOCAL (Sao Paulo, UTC-3) de vencimento + carencia, nao mais 00:00Z.
+      expect(invoice.blockAt?.toISOString()).toBe('2026-10-12T03:00:00.000Z');
     });
   });
 

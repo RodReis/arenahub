@@ -152,8 +152,6 @@ export class BillingRepository {
 
     const vencimento =
       entrada.vencimento?.dueAt ?? proximoVencimento(competencia, configuracao.dueDay);
-    const bloqueioEm =
-      entrada.vencimento?.blockAt ?? instanteDeBloqueio(vencimento, configuracao.graceDays);
     const totais = abrirInvoice({
       itens: [{ quantity: 1, unitAmountMinor: preco.amountMinor }],
       discountMinor: 0,
@@ -177,6 +175,21 @@ export class BillingRepository {
       if (jaExiste) {
         return jaExiste;
       }
+
+      // Fuso pela TRANSACAO: `students` tem RLS, e so dentro dela o
+      // `set_config` vale (issue #306). A diaria traz o proprio `blockAt`.
+      const bloqueioEm =
+        entrada.vencimento?.blockAt ??
+        instanteDeBloqueio(
+          vencimento,
+          configuracao.graceDays,
+          (
+            await tx.student.findFirstOrThrow({
+              where: { id: assinatura.studentId, tenantId: contexto.tenantId },
+              select: { gymUnit: { select: { timezone: true } } },
+            })
+          ).gymUnit.timezone,
+        );
 
       const numero = await this.proximoNumero(tx, contexto.tenantId);
 

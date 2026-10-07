@@ -166,6 +166,25 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(invoice.blockAt?.toISOString()).toContain('2026-08-15');
   });
 
+  it('F88: blockAt da fatura aberta e a meia-noite LOCAL de vencimento + carencia', async () => {
+    // Tenant proprio: abrir outubro no `a` mudaria a contagem de invoices dos demais testes.
+    const f = await semearTenant('f88');
+
+    try {
+      const invoice = await billing.abrirInvoiceDoPeriodo(contexto(f.tenantId, f.actorId), {
+        subscriptionId: f.subscriptionId,
+        emQue: new Date('2026-10-15T12:00:00Z'),
+      });
+
+      // dueDay 10 + graceDays 5, unidade em America/Sao_Paulo (UTC-3).
+      expect(invoice.dueAt.toISOString()).toBe('2026-10-10T00:00:00.000Z');
+      expect(invoice.blockAt?.toISOString()).toBe('2026-10-15T03:00:00.000Z');
+    } finally {
+      await db.tenant.deleteMany({ where: { id: f.tenantId } });
+      await db.user.deleteMany({ where: { id: f.actorId } });
+    }
+  });
+
   it('abrir de novo o MESMO periodo devolve a mesma invoice, sem gastar numero', async () => {
     const primeira = await billing.abrirInvoiceDoPeriodo(contexto(a.tenantId, a.actorId), {
       subscriptionId: a.subscriptionId,
