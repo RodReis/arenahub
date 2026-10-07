@@ -101,7 +101,16 @@ export class BillingRepository {
    */
   async abrirInvoiceDoPeriodo(
     contexto: TenantContext,
-    entrada: { subscriptionId: string; emQue: Date },
+    entrada: {
+      subscriptionId: string;
+      emQue: Date;
+      /**
+       * Vencimento e bloqueio EXPLICITOS (F86, diaria): a diaria vence na compra
+       * e bloqueia no fim do dia -- `dueDay` e carencia sao do ciclo MENSAL e nao
+       * descrevem um dia. Ausente = ciclo mensal, como sempre foi.
+       */
+      vencimento?: { dueAt: Date; blockAt: Date };
+    },
     tx?: Prisma.TransactionClient,
   ): Promise<Invoice> {
     const competencia = competenciaDe(entrada.emQue);
@@ -134,7 +143,10 @@ export class BillingRepository {
       throw new PlanoSemPrecoVigenteError();
     }
 
-    const vencimento = proximoVencimento(competencia, configuracao.dueDay);
+    const vencimento =
+      entrada.vencimento?.dueAt ?? proximoVencimento(competencia, configuracao.dueDay);
+    const bloqueioEm =
+      entrada.vencimento?.blockAt ?? instanteDeBloqueio(vencimento, configuracao.graceDays);
     const totais = abrirInvoice({
       itens: [{ quantity: 1, unitAmountMinor: preco.amountMinor }],
       discountMinor: 0,
@@ -176,7 +188,7 @@ export class BillingRepository {
           discountMinor: totais.discountMinor,
           totalMinor: totais.totalMinor,
           dueAt: vencimento,
-          blockAt: instanteDeBloqueio(vencimento, configuracao.graceDays),
+          blockAt: bloqueioEm,
           items: {
             create: [
               {
