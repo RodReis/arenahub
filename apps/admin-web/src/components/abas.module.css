@@ -12,33 +12,59 @@
 .abas {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  border-bottom: 1px solid var(--ah-border-subtle);
-  margin-bottom: 16px;
+  gap: 4px;
+  border-bottom: 1px solid var(--ah-border-default);
+  margin-bottom: 20px;
 }
 
+/*
+ * A aba é ALVO, não link de texto: 40px de altura e fundo no hover, para a
+ * mão acertar no balcão. O rótulo vai em peso forte mesmo inativo -- a aba
+ * inativa de peso normal sumia entre os rótulos de campo da página.
+ */
 .aba {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   appearance: none;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--ah-radius-control) var(--ah-radius-control) 0 0;
   background: transparent;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 0 18px;
   font: inherit;
+  font-size: var(--ah-type-body-strong-size);
+  font-weight: var(--ah-type-body-strong-weight);
   color: var(--ah-text-secondary);
   cursor: pointer;
   white-space: nowrap;
   /*
-    120ms -- feedback de controle. Só cor e borda: movimento decorativo faria
-    a interface parecer mais lenta que o motor da catraca, cuja promessa é
-    p95 < 300ms.
+    120ms -- feedback de controle. Cor e fundo só; o movimento mora na barra
+    (transform, compositor), nunca em largura ou posição.
   */
   transition:
     color 120ms cubic-bezier(0.2, 0, 0.2, 1),
-    border-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+    background-color 120ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* A barra da aba ativa cresce do centro: diz "você veio para cá". */
+.aba::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--ah-action-text);
+  transform: scaleX(0);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .aba:hover {
   color: var(--ah-text-strong);
+  background: var(--ah-surface-sunken);
 }
 
 .aba:focus-visible {
@@ -47,18 +73,44 @@
 }
 
 /*
-  A aba ativa carrega DOIS canais: cor E a barra embaixo. Só a cor deixaria
-  de fora quem opera com brilho baixo, que é o caso do balcão sob luz
-  fluorescente forte.
+  A aba ativa carrega TRÊS canais: cor, fundo tingido e a barra embaixo. Só a
+  cor deixaria de fora quem opera com brilho baixo, que é o caso do balcão sob
+  luz fluorescente forte.
 */
-.abaAtiva {
+.abaAtiva,
+.abaAtiva:hover {
   color: var(--ah-action-text);
-  border-bottom-color: var(--ah-action-text);
-  font-weight: var(--ah-type-body-strong-weight);
+  background: color-mix(in srgb, var(--ah-action-text) 7%, transparent);
+}
+
+.abaAtiva::after {
+  transform: scaleX(1);
+}
+
+/*
+ * Painel que aparece entra por opacidade e 4px de subida. `hidden` vira
+ * `display: none`, e sair dele reinicia a animação -- então ela roda a cada
+ * troca de aba sem uma linha de JS. Parte de quase visível: se a animação não
+ * rodar, o conteúdo nunca fica escondido.
+ */
+.painel:not([hidden]) {
+  animation: painel-entra 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes painel-entra {
+  from {
+    opacity: 0.001;
+    transform: translateY(4px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aba {
+  .aba,
+  .aba::after {
     transition: none;
+  }
+
+  .painel:not([hidden]) {
+    animation: none;
   }
 }

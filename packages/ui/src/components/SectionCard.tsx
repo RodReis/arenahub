@@ -11,8 +11,13 @@ interface Props {
   /**
    * `perigo` tinge o cabecalho e o glifo com o tom semantico de risco -- e do
    * bloco que desliga o cliente, nao de qualquer secao importante.
+   *
+   * `positivo` e `atencao` sao o ESTADO que o conteudo do card descreve
+   * (direito vigente / nenhum direito), mesmos nomes do `SummaryStrip`. Card
+   * sem estado a descrever fica `neutro` -- cor nunca e enfeite (PRODUCT.md,
+   * emenda de 30/09/2026).
    */
-  readonly tom?: 'neutro' | 'perigo';
+  readonly tom?: 'neutro' | 'perigo' | 'positivo' | 'atencao';
   /** Controles do canto direito do cabecalho. */
   readonly actions?: ReactNode;
   /** Corpo que ja e uma tabela: dispensa o respiro interno do card. */
@@ -48,7 +53,7 @@ export function SectionCard({
   return (
     <section
       className={estilos['card']}
-      data-tom={tom === 'perigo' ? 'perigo' : undefined}
+      data-tom={tom === 'neutro' ? undefined : tom}
       data-encaixe={encaixe === true ? 'true' : undefined}
       aria-labelledby={id}
       data-testid={testId}

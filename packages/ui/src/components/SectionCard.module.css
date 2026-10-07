@@ -63,6 +63,33 @@
   border-color: color-mix(in srgb, var(--ah-state-danger) 30%, var(--ah-border-subtle));
 }
 
+/*
+ * Card de ESTADO -- o conteudo descreve um estado (acesso vigente, nenhum
+ * direito). Mesma gramatica do `PainelDeEstado`: aresta superior de 3px no
+ * tom cheio, cabecalho tingido a 7% e glifo no tom. O titulo segue em texto
+ * forte: o tom acompanha, o rotulo decide (cor nunca e canal unico).
+ */
+.card[data-tom='positivo'] { --tomCheio: var(--ah-state-success); }
+.card[data-tom='atencao']  { --tomCheio: var(--ah-state-warning); }
+
+.card[data-tom='positivo'],
+.card[data-tom='atencao'] {
+  border-top: 3px solid var(--tomCheio);
+}
+
+.card[data-tom='positivo'] .cabecalho,
+.card[data-tom='atencao'] .cabecalho {
+  background: color-mix(in srgb, var(--tomCheio) 7%, var(--ah-surface-raised));
+  border-bottom-color: color-mix(in srgb, var(--tomCheio) 22%, var(--ah-border-subtle));
+}
+
+.card[data-tom='positivo'] .glifo,
+.card[data-tom='atencao'] .glifo {
+  color: var(--tomCheio);
+  border-color: color-mix(in srgb, var(--tomCheio) 35%, var(--ah-border-subtle));
+  background: color-mix(in srgb, var(--tomCheio) 10%, var(--ah-surface-raised));
+}
+
 .textos {
   display: flex;
   flex-direction: column;

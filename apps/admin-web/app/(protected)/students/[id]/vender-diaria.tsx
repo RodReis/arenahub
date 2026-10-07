@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { Button, SelectField, formatarDinheiro, useToast } from '@arenahub/ui';
+import { Button, Icon, SelectField, formatarDinheiro, useToast } from '@arenahub/ui';
 
 import { venderDiaria } from '../../../actions/membership';
 import { SeletorDeForma, type FormaDePagamento } from './billing/seletor-de-forma';
@@ -76,12 +76,8 @@ export function VenderDiaria({ studentId, planos, impedido, emAtraso = false }: 
 
   if (!aberto) {
     return (
-      <Button
-        type="button"
-        variant="outline"
-        data-testid="abrir-venda-de-diaria"
-        onClick={() => setAberto(true)}
-      >
+      <Button type="button" data-testid="abrir-venda-de-diaria" onClick={() => setAberto(true)}>
+        <Icon name="banknote" />
         Vender diária
       </Button>
     );
