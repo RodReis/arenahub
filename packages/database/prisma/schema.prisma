@@ -3430,10 +3430,10 @@ model BillingSettings {
   dueDay          Int         @default(10) @map("due_day")
   /// Dias de carencia depois do vencimento antes do bloqueio.
   ///
-  /// Padrao 10 (mesma decisao): vence dia 10, bloqueia dia 20. O default
-  /// anterior era `0`, que bloqueia a catraca na meia-noite do proprio dia
-  /// do vencimento -- severo demais para nascer por omissao.
-  graceDays       Int         @default(10) @map("grace_days")
+  /// Padrao 5 (F88): vence dia 10, bloqueia dia 15. O default anterior era
+  /// `0`, que bloqueia a catraca na meia-noite do proprio dia do
+  /// vencimento -- severo demais para nascer por omissao.
+  graceDays       Int         @default(5) @map("grace_days")
   /// Dias apos o vencimento em que cada tentativa de cobranca acontece.
   ///
   /// O TAMANHO DA LISTA E O MAXIMO DE TENTATIVAS -- nao existe um segundo
@@ -3644,6 +3644,10 @@ model Invoice {
   /// Instante a partir do qual a inadimplencia bloqueia (ADR-019/INV-144).
   blockAt        DateTime?     @map("block_at")
   paidAt         DateTime?     @map("paid_at")
+  /// Ate quando o mes PAGO cobre (F88): dia do pagamento + 30 dias x posicao do
+  /// mes no lote. INFORMATIVO -- nao adia vencimento nem bloqueio. Nulo em
+  /// fatura nao paga; zerado quando o pagamento e cancelado.
+  coverageEndsAt DateTime?     @map("coverage_ends_at")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   version        Int           @default(0)

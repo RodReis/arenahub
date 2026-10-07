@@ -162,7 +162,7 @@ export class CancelarPagamentoManualUseCase {
       if (faturaReaberta) {
         const reaberta = await tx.invoice.updateMany({
           where: { id: pagamento.invoiceId, tenantId: contexto.tenantId, status: 'PAID' },
-          data: { status: 'OPEN', paidAt: null, version: { increment: 1 } },
+          data: { status: 'OPEN', paidAt: null, coverageEndsAt: null, version: { increment: 1 } },
         });
 
         if (reaberta.count !== 1) {

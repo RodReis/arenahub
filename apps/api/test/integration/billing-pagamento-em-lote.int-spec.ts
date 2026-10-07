@@ -356,6 +356,34 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     expect(outubro.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
   });
 
+  it('F88: cobertura escalonada -- pago 07/10 out+nov+dez cobre 06/11, 06/12, 05/01', async () => {
+    const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
+
+    await registrarLote.executar(
+      contexto,
+      {
+        subscriptionId,
+        competencias: [new Date('2026-12-01T00:00:00Z'), new Date('2026-10-01T00:00:00Z'), new Date('2026-11-01T00:00:00Z')],
+        dispensar: [],
+        paidAt: diaUtc('2026-10-07'),
+        channel: 'PIX',
+        expectedTotalMinor: 30000,
+        idempotencyKey: randomUUID(),
+        agora: new Date('2026-10-07T15:00:00.000Z'),
+      },
+      'corr-cobertura',
+    );
+
+    const faturas = await db.invoice.findMany({
+      where: { tenantId: contexto.tenantId, subscriptionId },
+      orderBy: { billingPeriod: 'asc' },
+      select: { billingPeriod: true, coverageEndsAt: true, dueAt: true },
+    });
+    expect(faturas.map((f) => f.coverageEndsAt?.toISOString().slice(0, 10))).toEqual(['2026-11-06', '2026-12-06', '2027-01-05']);
+    // Vencimento intocado: dia do ciclo (dueDay do cenario).
+    expect(faturas.map((f) => f.dueAt.toISOString().slice(8, 10))).toEqual(['09', '09', '09']);
+  });
+
   it('o lote NAO abre a fatura do mes seguinte ao ultimo pago (F88)', async () => {
     const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
 

@@ -372,7 +372,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     expect(entitlementAtualizado.suspendedAt).toBeNull();
   });
 
-  it('tenant que nao define vencimento nasce com dia 10 e carencia 10 (decisao do PI, 23/09/2026)', async () => {
+  it('tenant que nao define vencimento nasce com dia 10 e carencia 5 (vencimento 23/09/2026; carencia 5 na F88)', async () => {
     // Antes o default era `dueDay` OBRIGATORIO e `graceDays: 0` -- academia
     // nova ficava sem configuracao financeira (emissao recusava com
     // BILLING_SETTINGS_MISSING), e quem criasse a linha sem informar carencia
@@ -380,7 +380,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     //
     // AFIRMA O DEFAULT NO CATALOGO DO POSTGRES, nao o valor que volta do
     // `create`. O Prisma Client aplica o default do schema no lado da
-    // aplicacao, entao um `create` sem os campos devolve 10/10 mesmo com a
+    // aplicacao, entao um `create` sem os campos devolve o default mesmo com a
     // migration NAO aplicada -- verificado: revertendo o default no banco,
     // a versao anterior deste teste continuava verde. Quem grava por SQL
     // direto (psql, script de manutencao, outro servico) depende do default
@@ -395,7 +395,7 @@ describe('F12 -- invoice e pagamento manual', () => {
     const porColuna = new Map(colunas.map((c) => [c.column_name, c.column_default]));
 
     expect(porColuna.get('due_day')).toBe('10');
-    expect(porColuna.get('grace_days')).toBe('10');
+    expect(porColuna.get('grace_days')).toBe('5');
 
     // E o caminho do Prisma tambem entrega o mesmo, para os dois nao
     // divergirem em silencio.
@@ -411,7 +411,7 @@ describe('F12 -- invoice e pagamento manual', () => {
       const config = await db.billingSettings.create({ data: { tenantId: tenant.id } });
 
       expect(config.dueDay).toBe(10);
-      expect(config.graceDays).toBe(10);
+      expect(config.graceDays).toBe(5);
     } finally {
       await db.tenant.delete({ where: { id: tenant.id } }).catch(() => undefined);
     }

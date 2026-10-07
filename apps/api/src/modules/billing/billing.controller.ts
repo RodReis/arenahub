@@ -284,6 +284,8 @@ interface InvoiceDto {
   dueAt: string;
   blockAt: string | null;
   paidAt: string | null;
+  /** Ate quando o mes pago cobre (F88). Informativo; nulo em fatura nao paga. */
+  coverageEndsAt: string | null;
   items: InvoiceItemDto[];
   payments: PagamentoDto[];
 }
@@ -769,6 +771,7 @@ export class BillingController {
         'dueAt',
         'blockAt',
         'paidAt',
+        'coverageEndsAt',
         'items',
         'payments',
       ],
@@ -784,6 +787,7 @@ export class BillingController {
         dueAt: { type: 'string' },
         blockAt: { type: 'string', nullable: true },
         paidAt: { type: 'string', nullable: true },
+        coverageEndsAt: { type: 'string', nullable: true },
         items: { type: 'array', items: { type: 'object' } },
         payments: { type: 'array', items: { type: 'object' } },
       },
@@ -1410,6 +1414,7 @@ export class BillingController {
       dueAt: invoice.dueAt.toISOString(),
       blockAt: invoice.blockAt?.toISOString() ?? null,
       paidAt: invoice.paidAt?.toISOString() ?? null,
+      coverageEndsAt: invoice.coverageEndsAt?.toISOString() ?? null,
       items: invoice.items.map((item) => ({
         description: item.description,
         quantity: item.quantity,

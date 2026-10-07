@@ -9,6 +9,7 @@ import {
   instanteDeBloqueio,
   proximoVencimento,
 } from './domain/ciclo-de-cobranca.js';
+import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   abrirInvoice,
@@ -18,6 +19,7 @@ import {
   TransicaoDeInvoiceConcorrenteError,
   validarStatusParaCorrecao,
 } from './domain/invoice.js';
+import { vencimentoAposPagamento } from './domain/meses-pagaveis.js';
 
 export class AssinaturaNaoEncontradaError extends ErroDeDominio {
   constructor() {
@@ -256,6 +258,8 @@ export class BillingRepository {
       paidAt: Date;
       receivedVia: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
       batchId?: string;
+      /** Fim da cobertura deste mes (F88). Ausente = avulso: dia do pagamento + 30. */
+      coverageEndsAt?: Date;
     },
     correlationId: string,
     tx?: Prisma.TransactionClient,
@@ -294,7 +298,12 @@ export class BillingRepository {
        */
       const transicao = await tx.invoice.updateMany({
         where: { id: invoice.id, tenantId: contexto.tenantId, status: { in: ['OPEN', 'OVERDUE'] } },
-        data: { status: 'PAID', paidAt: entrada.paidAt, version: { increment: 1 } },
+        data: {
+          status: 'PAID',
+          paidAt: entrada.paidAt,
+          coverageEndsAt: entrada.coverageEndsAt ?? vencimentoAposPagamento(diaDoPagamento(entrada.paidAt), 1),
+          version: { increment: 1 },
+        },
       });
 
       if (transicao.count !== 1) {

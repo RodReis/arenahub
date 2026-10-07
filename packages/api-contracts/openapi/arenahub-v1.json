@@ -2765,6 +2765,7 @@
                     "dueAt",
                     "blockAt",
                     "paidAt",
+                    "coverageEndsAt",
                     "items",
                     "payments"
                   ],
@@ -2802,6 +2803,10 @@
                       "nullable": true
                     },
                     "paidAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "coverageEndsAt": {
                       "type": "string",
                       "nullable": true
                     },

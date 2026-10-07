@@ -8,11 +8,13 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, BillingRepository, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
+import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
 import {
   instanteDoPagamento,
   mesesPagaveis,
   resolverDispensa,
   resolverLote,
+  vencimentoAposPagamento,
 } from './domain/meses-pagaveis.js';
 import { InvoiceInvalidaError } from './domain/invoice.js';
 import { invoicesDaFaixa } from './invoices-da-faixa.js';
@@ -166,6 +168,15 @@ export class RegistrarPagamentoEmLoteUseCase {
       let ultimoPagamentoId: string | null = null;
       let ultimaMoeda: string | null = null;
 
+      // Posicao k pela COMPETENCIA, nao pela ordem do pedido: o mes mais cedo
+      // cobre 30 dias, o seguinte 60... (F88).
+      const posicao = new Map(
+        [...lote]
+          .sort((a, b) => a.competencia.getTime() - b.competencia.getTime())
+          .map((mes, i) => [mes.competencia.getTime(), i + 1]),
+      );
+      const diaDoRecebimento = diaDoPagamento(entrada.paidAt);
+
       for (const mes of lote) {
         const invoice = mes.invoiceId
           ? await tx.invoice.findUniqueOrThrow({ where: { id: mes.invoiceId, tenantId: contexto.tenantId } })
@@ -180,6 +191,7 @@ export class RegistrarPagamentoEmLoteUseCase {
             paidAt: instanteDoRecebimento,
             receivedVia: entrada.channel,
             batchId: entrada.idempotencyKey,
+            coverageEndsAt: vencimentoAposPagamento(diaDoRecebimento, posicao.get(mes.competencia.getTime())!),
           },
           correlationId,
           tx,

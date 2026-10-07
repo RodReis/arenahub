@@ -238,6 +238,8 @@ describe('CancelarPagamentoManualUseCase', () => {
     const { subscriptionId } = await novaAssinatura();
     await pagarLote(subscriptionId, ['2026-11']);
     const pagamento = await pagamentoDe(subscriptionId, '2026-11');
+    // Sem isto o `toBeNull` depois passaria por ausencia, nao por zeragem.
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: pagamento.invoiceId } })).coverageEndsAt).not.toBeNull();
 
     const resultado = await cancelarPagamento(pagamento.id);
 
@@ -256,6 +258,8 @@ describe('CancelarPagamentoManualUseCase', () => {
     expect(depois.recognizedByUserId).toBe(contexto.actorId);
     expect(depois.paidAt).not.toBeNull();
 
+    // Pago, a fatura cobria ate uma data (F88); reaberta, deixa de cobrir.
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: pagamento.invoiceId } })).coverageEndsAt).toBeNull();
     const reaberta = await invoiceDe(subscriptionId, '2026-11');
     expect(reaberta.status).toBe('OPEN');
     expect(reaberta.paidAt).toBeNull();
