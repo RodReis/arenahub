@@ -5,14 +5,11 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 
-import { ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
-import { instanteDeBloqueio, proximoVencimento } from './domain/ciclo-de-cobranca.js';
 import {
   CreditoJaAplicadoError,
   PagamentoNaoCancelavelError,
   creditoAConsumir,
   decidirCancelamento,
-  deveRestaurarVencimento,
   validarCancelamento,
 } from './domain/cancelamento-de-pagamento.js';
 import { TransicaoDeInvoiceConcorrenteError } from './domain/invoice.js';
@@ -31,7 +28,7 @@ import { TransicaoDeInvoiceConcorrenteError } from './domain/invoice.js';
  * inadimplencia e so bloqueia quando passar de `blockAt` -- cancelar nao
  * derruba o acesso de ninguem na hora.
  *
- * Tudo numa transacao so: ou o pagamento, a fatura, o credito, o vencimento, a
+ * Tudo numa transacao so: ou o pagamento, a fatura, o credito, a
  * auditoria e o evento mudam juntos, ou nada muda.
  */
 
@@ -49,8 +46,6 @@ export interface PagamentoCancelado {
    * na mesma competencia: ele passa a quita-la e a fatura continua paga.
    */
   readonly faturaReaberta: boolean;
-  /** A fatura seguinte voltou ao vencimento padrao do ciclo? */
-  readonly vencimentoRestaurado: boolean;
 }
 
 interface PagamentoLido {
@@ -163,7 +158,6 @@ export class CancelarPagamentoManualUseCase {
       });
 
       const faturaReaberta = efeito === 'REABRE_FATURA';
-      let vencimentoRestaurado = false;
 
       if (faturaReaberta) {
         const reaberta = await tx.invoice.updateMany({
@@ -174,8 +168,6 @@ export class CancelarPagamentoManualUseCase {
         if (reaberta.count !== 1) {
           throw new TransicaoDeInvoiceConcorrenteError(pagamento.invoiceId);
         }
-
-        vencimentoRestaurado = await this.restaurarVencimentoDaSeguinte(tx, contexto, pagamento);
       } else {
         await this.passarQuitacaoAoOutroPagamento(
           tx,
@@ -196,7 +188,6 @@ export class CancelarPagamentoManualUseCase {
             invoiceId: pagamento.invoiceId,
             amountMinor: pagamento.amountMinor,
             faturaReaberta,
-            vencimentoRestaurado,
           },
         },
       });
@@ -216,12 +207,11 @@ export class CancelarPagamentoManualUseCase {
             reason: motivo,
             receivedVia: pagamento.receivedVia,
             faturaReaberta,
-            invoiceVencimentoRestaurado: vencimentoRestaurado,
           },
         },
       });
 
-      return { paymentId: pagamento.id, invoiceId: pagamento.invoiceId, faturaReaberta, vencimentoRestaurado };
+      return { paymentId: pagamento.id, invoiceId: pagamento.invoiceId, faturaReaberta };
     });
   }
 
@@ -277,83 +267,5 @@ export class CancelarPagamentoManualUseCase {
           ? { status: 'EXPIRED' }
           : { amountMinor: consumo.restanteMinor },
     });
-  }
-
-  /**
-   * Devolve a fatura seguinte ao vencimento do ciclo SE o lote que a
-   * empurrou foi desfeito por inteiro e a data ainda e a que ele gravou
-   * (`deveRestaurarVencimento`). So pagamento em lote ancora vencimento --
-   * o avulso (`batchId` nulo) nunca mexeu em fatura nenhuma.
-   *
-   * A "seguinte" e a primeira `OPEN`/`OVERDUE` com competencia POSTERIOR a
-   * maior do lote: as do proprio lote acabaram de reabrir e nao contam.
-   */
-  private async restaurarVencimentoDaSeguinte(
-    tx: Prisma.TransactionClient,
-    contexto: TenantContext,
-    pagamento: PagamentoLido,
-  ): Promise<boolean> {
-    if (pagamento.batchId === null || pagamento.paidAt === null) {
-      return false;
-    }
-
-    // Le DENTRO da transacao: este pagamento ja aparece como `CANCELLED`.
-    const lote = await tx.payment.findMany({
-      where: { tenantId: contexto.tenantId, batchId: pagamento.batchId },
-      select: { status: true, invoice: { select: { billingPeriod: true } } },
-    });
-
-    const ultimaCompetencia = lote.reduce(
-      (maior, p) => (p.invoice.billingPeriod.getTime() > maior.getTime() ? p.invoice.billingPeriod : maior),
-      pagamento.invoice.billingPeriod,
-    );
-
-    const seguinte = await tx.invoice.findFirst({
-      where: {
-        tenantId: contexto.tenantId,
-        subscriptionId: pagamento.invoice.subscriptionId,
-        billingPeriod: { gt: ultimaCompetencia },
-        status: { in: ['OPEN', 'OVERDUE'] },
-      },
-      orderBy: { billingPeriod: 'asc' },
-      select: { id: true, dueAt: true, billingPeriod: true },
-    });
-
-    if (!seguinte) {
-      return false;
-    }
-
-    const restaurar = deveRestaurarVencimento({
-      dueAtAtual: seguinte.dueAt,
-      paidAt: pagamento.paidAt,
-      tamanhoDoLote: lote.length,
-      confirmadosRestantesNoLote: lote.filter((p) => p.status === 'CONFIRMED').length,
-    });
-
-    if (!restaurar) {
-      return false;
-    }
-
-    const configuracao = await tx.billingSettings.findUnique({
-      where: { tenantId: contexto.tenantId },
-      select: { dueDay: true, graceDays: true },
-    });
-
-    if (!configuracao) {
-      throw new ConfiguracaoFinanceiraAusenteError();
-    }
-
-    const dueAt = proximoVencimento(seguinte.billingPeriod, configuracao.dueDay);
-
-    await tx.invoice.update({
-      where: { id: seguinte.id },
-      data: {
-        dueAt,
-        blockAt: instanteDeBloqueio(dueAt, configuracao.graceDays),
-        version: { increment: 1 },
-      },
-    });
-
-    return true;
   }
 }

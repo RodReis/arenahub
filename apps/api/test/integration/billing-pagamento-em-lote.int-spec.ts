@@ -251,10 +251,10 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     expect(resultado.totalMinor).toBe(50000);
 
     const invoices = await db.invoice.findMany({ where: { subscriptionId, tenantId: contexto.tenantId } });
-    // 5 pagas + a fatura SEGUINTE (dez), aberta para ancorar a vigencia paga.
-    expect(invoices).toHaveLength(6);
+    // 5 pagas; o lote nao abre a fatura seguinte (F88).
+    expect(invoices).toHaveLength(5);
     expect(invoices.filter((i) => i.status === 'PAID')).toHaveLength(5);
-    expect(invoices.filter((i) => i.status === 'OPEN')).toHaveLength(1);
+    expect(invoices.filter((i) => i.status === 'OPEN')).toHaveLength(0);
 
     const payments = await db.payment.findMany({ where: { tenantId: contexto.tenantId, batchId: resultado.batchId } });
     expect(payments).toHaveLength(5);
@@ -267,7 +267,6 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     expect(entitlement.status).toBe('ACTIVE');
   });
 
-  const MS_DIA = 24 * 60 * 60 * 1000;
   const diaUtc = (iso: string): Date => new Date(`${iso}T00:00:00Z`);
 
   async function aluno2MesesAtrasados(): Promise<{ studentId: string; subscriptionId: string; jul: string; ago: string }> {
@@ -328,9 +327,10 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     expect(auditoria).toBe(1);
   });
 
-  it('DATA DO PAGAMENTO: a proxima fatura vence em data + 30 dias e bloqueia depois da carencia', async () => {
+  it('DATA DO PAGAMENTO nao mexe na fatura seguinte: ela segue no dia do ciclo (F88)', async () => {
     const { studentId, subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
     await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-09-01T00:00:00Z', dueAt: '2026-09-09T00:00:00Z', status: 'OPEN' });
+    await invoiceEmAberto({ subscriptionId, studentId, competencia: '2026-10-01T00:00:00Z', dueAt: '2026-10-09T00:00:00Z', status: 'OPEN' });
 
     await registrarLote.executar(
       contexto,
@@ -344,28 +344,19 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         idempotencyKey: randomUUID(),
         agora: new Date('2026-09-15T12:00:00.000Z'),
       },
-      'corr-ancora',
+      'corr-sem-ancora',
     );
 
     const pagamento = await db.payment.findFirstOrThrow({ where: { tenantId: contexto.tenantId, invoice: { subscriptionId } } });
     expect(pagamento.paidAt!.toISOString()).toBe('2026-09-10T12:00:00.000Z');
 
     const outubro = await db.invoice.findUniqueOrThrow({
-      where: {
-        tenantId_subscriptionId_billingPeriod: {
-          tenantId: contexto.tenantId,
-          subscriptionId,
-          billingPeriod: new Date('2026-10-01T00:00:00Z'),
-        },
-      },
+      where: { tenantId_subscriptionId_billingPeriod: { tenantId: contexto.tenantId, subscriptionId, billingPeriod: new Date('2026-10-01T00:00:00Z') } },
     });
-    expect(outubro.status).toBe('OPEN');
-    expect(outubro.dueAt.toISOString()).toBe('2026-10-10T00:00:00.000Z');
-    // graceDays = 3 no cenario.
-    expect(outubro.blockAt!.getTime()).toBe(outubro.dueAt.getTime() + 3 * MS_DIA);
+    expect(outubro.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
   });
 
-  it('dois meses acumulam 60 dias a partir da data do pagamento', async () => {
+  it('o lote NAO abre a fatura do mes seguinte ao ultimo pago (F88)', async () => {
     const { subscriptionId } = await novaAssinatura('2026-06-01T00:00:00Z');
 
     await registrarLote.executar(
@@ -380,19 +371,13 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         idempotencyKey: randomUUID(),
         agora: new Date('2026-09-15T12:00:00.000Z'),
       },
-      'corr-acumula',
+      'corr-sem-seguinte',
     );
 
-    const novembro = await db.invoice.findUniqueOrThrow({
-      where: {
-        tenantId_subscriptionId_billingPeriod: {
-          tenantId: contexto.tenantId,
-          subscriptionId,
-          billingPeriod: new Date('2026-11-01T00:00:00Z'),
-        },
-      },
+    const novembro = await db.invoice.findUnique({
+      where: { tenantId_subscriptionId_billingPeriod: { tenantId: contexto.tenantId, subscriptionId, billingPeriod: new Date('2026-11-01T00:00:00Z') } },
     });
-    expect(novembro.dueAt.toISOString()).toBe('2026-11-14T00:00:00.000Z');
+    expect(novembro).toBeNull();
   });
 
   it('mes JA PAGO some da faixa e nao pode ser pago de novo', async () => {

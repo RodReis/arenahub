@@ -610,12 +610,11 @@ export class BillingController {
   @ApiOkResponse({
     schema: {
       type: 'object',
-      required: ['paymentId', 'invoiceId', 'faturaReaberta', 'vencimentoRestaurado'],
+      required: ['paymentId', 'invoiceId', 'faturaReaberta'],
       properties: {
         paymentId: { type: 'string' },
         invoiceId: { type: 'string' },
         faturaReaberta: { type: 'boolean' },
-        vencimentoRestaurado: { type: 'boolean' },
       },
     },
   })
