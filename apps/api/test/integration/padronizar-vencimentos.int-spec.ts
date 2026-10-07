@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import { SchedulerRegistry } from '@nestjs/schedule';
 
 import { AppModule } from '../../src/app.module.js';
 import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 import { executarSaneamento } from '../../src/scripts/padronizar-vencimentos/executar.js';
+import { silenciarAgendadores } from '../../src/scripts/padronizar-vencimentos/seguranca.js';
 
 /**
  * Saneamento da F88 (SPEC-088 4.5) contra banco de verdade: dry-run nao grava,
@@ -35,7 +37,7 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
   const matriculas = { semAssinatura: '', ancorada: '', vencidaSet: '', outAberta: '', outVencida: '' };
   const ids = { ancorada: '', vencidaSet: '', outAberta: '', outVencida: '', diaria: '', staff: '', semOut: '' };
   const subs = { vencidaSet: '', outVencida: '', pagaLote: '', pagaAvulsa: '' };
-  const faturas = { nov: '', set: '', outAberta: '', outVencida: '', diaria: '', loteOut: '', loteNov: '', loteDez: '', avulsa: '' };
+  const faturas = { nov: '', set: '', outAberta: '', outVencida: '', diaria: '', loteOut: '', loteNov: '', loteDez: '', avulsa: '', diariaPaga: '' };
 
   async function aluno(profile: 'STUDENT' | 'STAFF', plano: string | null, statusSub: 'ACTIVE' | 'PAST_DUE' = 'ACTIVE') {
     contador += 1;
@@ -179,6 +181,9 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
     const I = await aluno('STUDENT', planoDiariaId);
     ids.diaria = I.studentId;
     faturas.diaria = await fatura(I, { periodo: '2026-10-01', status: 'OPEN', dueAt: '2026-10-07', blockAt: '2026-10-08T03:00:00Z' });
+    // Diaria PAGA sem cobertura: o passe ja tem o proprio fim; o script nao pode escrever pagamento + 30.
+    faturas.diariaPaga = await fatura(I, { periodo: '2026-09-01', status: 'PAID', dueAt: '2026-09-05', blockAt: null, paidAt: '2026-09-05T18:00:00Z' });
+    await pagamento(faturas.diariaPaga, '2026-09-05T18:00:00Z', null);
     matriculas.semAssinatura = (await aluno('STUDENT', null)).matricula;
   });
 
@@ -266,6 +271,8 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
     expect(await db.invoice.count({ where: { tenantId, billingPeriod: d('2026-10-01T00:00:00Z'), subscriptionId: subs.pagaAvulsa } })).toBe(1);
     expect(await db.invoice.count({ where: { tenantId, studentId: { in: [ids.staff, ids.diaria] }, billingPeriod: d('2026-10-01T00:00:00Z') } })).toBe(1);
 
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: faturas.diariaPaga } })).coverageEndsAt).toBeNull();
+
     const cobertura = async (id: string) => (await db.invoice.findUniqueOrThrow({ where: { id } })).coverageEndsAt?.toISOString().slice(0, 10);
     expect([await cobertura(faturas.loteOut), await cobertura(faturas.loteNov), await cobertura(faturas.loteDez), await cobertura(faturas.avulsa)]).toEqual([
       '2026-11-06', '2026-12-06', '2027-01-05', '2026-10-05',
@@ -282,7 +289,31 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
       outubroCriadas: 0, coberturasPreenchidas: 0, falhas: 0,
     });
     expect(await foto()).toBe(antes);
+    expect((await db.invoice.findUniqueOrThrow({ where: { id: faturas.diariaPaga } })).coverageEndsAt).toBeNull();
     expect(r.seriamBloqueados).toEqual([matriculas.vencidaSet]);
+  });
+
+  it('silenciarAgendadores para todo cron, interval e timeout do AppModule', async () => {
+    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    await modulo.init();
+
+    try {
+      const registro = modulo.get(SchedulerRegistry);
+      const crons = [...registro.getCronJobs().values()];
+
+      // Sem isto o teste passaria em falso (nada agendado = nada a parar).
+      expect(crons.length).toBeGreaterThan(0);
+      expect(crons.some((c) => c.isActive)).toBe(true);
+
+      silenciarAgendadores(modulo);
+
+      expect(crons.some((c) => c.isActive)).toBe(false);
+      expect(registro.getCronJobs().size).toBe(0);
+      expect(registro.getIntervals()).toEqual([]);
+      expect(registro.getTimeouts()).toEqual([]);
+    } finally {
+      await modulo.close();
+    }
   });
 
   it('para quando o dueDay do tenant nao e 10', async () => {

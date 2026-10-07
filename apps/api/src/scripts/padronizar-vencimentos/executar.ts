@@ -294,7 +294,14 @@ async function preencherCoberturas(
   gravar: boolean,
 ): Promise<{ preenchidas: number; semData: number; falhas: number }> {
   const alvo = await db.invoice.findMany({
-    where: { tenantId, status: 'PAID', coverageEndsAt: null },
+    // Diaria fora: a cobertura dela e o proprio `endsAt` do passe (vender-diaria),
+    // nao pagamento + 30 dias.
+    where: {
+      tenantId,
+      status: 'PAID',
+      coverageEndsAt: null,
+      subscription: { plan: { billingMode: { not: 'DIARIA' } } },
+    },
     select: {
       id: true,
       billingPeriod: true,
