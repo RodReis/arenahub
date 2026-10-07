@@ -175,14 +175,14 @@ const esquemaDeCriacao = z
      * default do schema): todo cadastro de sempre, sem este campo, funciona
      * igual.
      */
-    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']).optional(),
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']).optional(),
   })
   .strict();
 
 /** `PATCH /:id/profile` -- F82, mesma troca de `/team/:id/profile`. */
 const esquemaDePerfil = z
   .object({
-    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER']),
+    profile: z.enum(['ADMIN', 'STUDENT', 'STAFF', 'TRAINER', 'PERMUTA_TACIO', 'PERMUTA_DOUGLAS']),
     version: z.number().int().min(0),
   })
   .strict();

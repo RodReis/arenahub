@@ -38,7 +38,9 @@ describe('AlterarPerfil', () => {
     const select = screen.getByTestId('campo-perfil');
     const opcoes = Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
 
-    expect(opcoes).toEqual(expect.arrayContaining(['Aluno', 'Professor', 'Funcionário', 'Administrador']));
+    expect(opcoes).toEqual(
+      expect.arrayContaining(['Aluno', 'Professor', 'Funcionário', 'Administrador', 'Permuta-Tacio', 'Permuta-Douglas']),
+    );
   });
 
   it('envia o campo oculto de id com o nome pedido', () => {

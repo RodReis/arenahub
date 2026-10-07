@@ -40,7 +40,11 @@ export interface LinhaDeRelatorio {
   valor: number;
 }
 
-/** `dd/mm/yyyy` para `Date` em meia-noite UTC -- mesmo formato do import-pacto. */
+/**
+ * `dd/mm/yyyy` para `Date` ao MEIO-DIA UTC (09h no Brasil), igual a
+ * `instanteDoPagamento` da baixa pela tela. Meia-noite UTC aparecia no painel
+ * como 21h do dia ANTERIOR: o pagamento de 02/09 saia "01/09/2026, 21:00".
+ */
 export function parsearDataBr(valor: string): Date {
   const partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor);
 
@@ -48,7 +52,7 @@ export function parsearDataBr(valor: string): Date {
 
   const [, dia, mes, ano] = partes;
 
-  return new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  return new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia), 12));
 }
 
 /** Reais para centavos -- `Math.round` evita erro de ponto flutuante (1.1*100). */

@@ -49,7 +49,7 @@ describe('planejarReconciliacao', () => {
 
     expect(planos[0]!.studentId).toBe('id-Ana Souza');
     expect(planos[0]!.acoes).toEqual([
-      { tipo: 'DAR_BAIXA', faturaId: 'fat-1', totalMinor: 15000, valorMinor: 15000, pagoEm: new Date(Date.UTC(2026, 8, 5)) },
+      { tipo: 'DAR_BAIXA', faturaId: 'fat-1', totalMinor: 15000, valorMinor: 15000, pagoEm: new Date(Date.UTC(2026, 8, 5, 12)) },
     ]);
   });
 

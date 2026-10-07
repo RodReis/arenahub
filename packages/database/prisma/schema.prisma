@@ -178,6 +178,10 @@ enum StudentProfile {
   STAFF
   /// Professor ou personal. Acesso liberado por vinculo.
   TRAINER
+  /// Permuta com o Tacio: sem cobranca, acesso liberado por vinculo, igual ao professor.
+  PERMUTA_TACIO
+  /// Permuta com o Douglas: sem cobranca, acesso liberado por vinculo, igual ao professor.
+  PERMUTA_DOUGLAS
 
   @@map("student_profile")
 }

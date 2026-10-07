@@ -139,6 +139,21 @@ describe('StudentsController PATCH /:id/profile (F82)', () => {
     expect((resposta.body as { profile: string }).profile).toBe('TRAINER');
   });
 
+  it.each(['PERMUTA_TACIO', 'PERMUTA_DOUGLAS'])(
+    'PATCH /api/v1/students/:id/profile aceita o perfil %s e responde 200',
+    async (profile) => {
+      const aluno = await criarAlunoDeFixture();
+
+      const resposta = await request(servidor())
+        .patch(`/api/v1/students/${aluno.id}/profile`)
+        .set('Cookie', conta.cookie)
+        .send({ profile, version: 0 });
+
+      expect(resposta.status).toBe(200);
+      expect((resposta.body as { profile: string }).profile).toBe(profile);
+    },
+  );
+
   it('PATCH /api/v1/students/:id/profile com version desatualizada responde 409', async () => {
     const aluno = await criarAlunoDeFixture();
 
