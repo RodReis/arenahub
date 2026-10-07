@@ -2,7 +2,7 @@
 
 - **Data:** 07/10/2026
 - **Origem:** pedido do PI na conversa de 07/10/2026 (brainstorming)
-- **Status:** desenho aprovado pelo PI; spec aguardando revisão
+- **Status:** desenho aprovado pelo PI; implementada na F86 (balcão)
 - **Fatias:** `F86` / `SPEC-086` (balcão, esta) e `F87` / `SPEC-087` (totem, registrada na §9). Números
   conferidos por grep em 07/10/2026: último alocado é `F85`/`SPEC-085`.
 - **MVP:** MVP2 (cobrança)
@@ -120,10 +120,15 @@ Duplo clique: a trava do passo 1 serializa as duas chamadas e a segunda devolve
 ## 7. Painel (`admin-web`)
 
 - Ficha do aluno **sem assinatura vigente**: botão **"Vender diária"** ao lado de "Atribuir plano".
-- Painel de venda: plano (pré-selecionado se houver só uma `DIARIA` ativa), valor, forma de pagamento,
-  valor recebido e troco.
-- Sucesso: "Diária paga. Acesso até 23:59" + recibo existente (`emitir-recibo`). Erro e aviso por
-  Toast, nunca Alert.
+- Painel de venda: plano (escolha só se houver mais de uma `DIARIA` ativa), valor, forma de pagamento.
+  O painel **não pede valor recebido** nem emite recibo: a API aceita `receivedAmountMinor` (o troco
+  vira crédito), mas o balcão hoje recebe o valor exato, como no pagamento em lote; o recibo se emite
+  pelo Financeiro do aluno, como já é.
+- Sucesso: "Diária paga. O acesso vale até 23:59." Erro e aviso por Toast, nunca Alert. O botão mostra
+  o valor ("Receber R$ 30,00") e **não** diz que o pagamento "libera" a catraca: quem libera é o
+  entitlement (regra 1).
+- A ficha de quem tem diária **não** mostra "Cobrança recorrente" (não há o que cobrar depois), e o
+  plano de diária **não** aparece na lista de "Atribuir plano".
 - Formulário de plano: opção "Diária" no modo de cobrança.
 - UI passa por `impeccable` e `frontend-design:frontend-design` antes do commit; segue
   `docs/design/DS-PAINEL.md`.
@@ -147,7 +152,10 @@ continua contando como **recebido** (`Payment`). Leitores de assinatura que ganh
 emite), `alunosElegiveis` da retenção (exige `startsAt` 30 dias atrás) e a coluna "Plano" da lista de
 alunos (mostrar "Diaria" ali é informação útil à recepção).
 
-Cada leitor filtrado ganha **teste canário** (diária no cenário, indicador inalterado).
+Cada leitor de dinheiro e aviso ganha **teste canário** (diária no cenário, indicador inalterado).
+`retention-scores`, `retention-experiments` e `retention-snapshots` ganharam o filtro **sem canário
+próprio** (montar snapshot e experimento só para provar um `where` custaria mais que o risco); a
+regressão fica com as suítes `retencao-*`.
 
 Fora de escopo (YAGNI): card "diárias vendidas" no painel financeiro.
 

@@ -201,6 +201,14 @@ Transições declaradas: `Invoice PAID → ACTIVE`; `invoice vencida + carência
 / retomar / cancelar manualmente com auditoria.
 **`[indefinido]`:** o que entra e sai de `PENDING`; gatilho de `EXPIRED`; destino de "retomar".
 
+**Plano `DIARIA` (F86).** Venda avulsa de um dia, não contrato. Só se vende por
+`POST /students/:id/day-pass`: uma transação cria assinatura `PENDING` + entitlement `SCHEDULED`, abre a
+invoice com vencimento na compra e registra o pagamento manual, que promove os dois para `ACTIVE`
+(`ativarDireitoDeAcessoSePendente`) — o acesso nasce junto do pagamento. Vale até 00:00 local do dia
+seguinte (fuso da unidade de origem do aluno). Atribuir ou trocar para um plano `DIARIA` é recusado
+(`DAY_PASS_PLAN_NOT_ASSIGNABLE`). Fica fora de receita recorrente, inadimplência e aviso de vencimento
+(`ASSINATURA_QUE_NAO_E_DIARIA`). Expira pelo job de `endsAt` como qualquer assinatura.
+
 ### 3.3 `Entitlement`
 `SCHEDULED | ACTIVE | SUSPENDED | REVOKED | EXPIRED`
 Transições declaradas: `Subscription ACTIVE → ACTIVE`; inadimplência → suspende; compensação →
