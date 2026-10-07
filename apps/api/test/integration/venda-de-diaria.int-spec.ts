@@ -424,4 +424,74 @@ describe('F86 -- diaria avulsa no balcao', () => {
       ).rejects.toMatchObject({ code: 'STUDENT_NOT_FOUND' });
     });
   });
+
+  describe('plano de diaria nao se atribui nem se troca', () => {
+    it('POST /subscriptions (ativarAssinatura) com plano DIARIA: 422 e nada gravado', async () => {
+      const diaria = await criarPlano(db, c, { nome: `Diaria nao atribuivel ${c.sufixo}` });
+      const studentId = await criarAluno(db, c);
+
+      await expect(
+        membership.ativarAssinatura(
+          contextoDe(c),
+          {
+            studentId,
+            planId: diaria,
+            startsAt: AGORA,
+            endsAt: new Date('2027-10-07T00:00:00Z'),
+            reason: 'tentativa de acesso gratis',
+          },
+          'corr-guarda-1',
+        ),
+      ).rejects.toMatchObject({ code: 'DAY_PASS_PLAN_NOT_ASSIGNABLE' });
+
+      expect(await db.subscription.count({ where: { tenantId: c.tenantId, studentId } })).toBe(0);
+    });
+
+    it('agendar troca para plano DIARIA: 422', async () => {
+      const mensal = await criarPlano(db, c, {
+        nome: `Mensal origem ${c.sufixo}`,
+        billingMode: 'AVULSO',
+        amountMinor: 15000,
+      });
+      const diaria = await criarPlano(db, c, { nome: `Diaria destino ${c.sufixo}` });
+      const studentId = await criarAluno(db, c);
+      const assinatura = await db.subscription.create({
+        data: { tenantId: c.tenantId, studentId, planId: mensal, status: 'ACTIVE', startsAt: AGORA },
+      });
+
+      await expect(
+        membership.agendarTrocaDePlano(
+          contextoDe(c),
+          assinatura.id,
+          { planId: diaria, versaoEsperada: assinatura.version, reason: 'tentativa' },
+          'corr-guarda-2',
+          AGORA,
+        ),
+      ).rejects.toMatchObject({ code: 'DAY_PASS_PLAN_NOT_ASSIGNABLE' });
+    });
+
+    it('trocar plano no ato para plano DIARIA: 422', async () => {
+      const mensal = await criarPlano(db, c, {
+        nome: `Mensal origem agora ${c.sufixo}`,
+        billingMode: 'AVULSO',
+        amountMinor: 15000,
+      });
+      const diaria = await criarPlano(db, c, { nome: `Diaria destino agora ${c.sufixo}` });
+      const studentId = await criarAluno(db, c);
+      const assinatura = await db.subscription.create({
+        data: { tenantId: c.tenantId, studentId, planId: mensal, status: 'ACTIVE', startsAt: AGORA },
+      });
+
+      await expect(
+        membership.trocarPlanoDaAssinatura(
+          contextoDe(c),
+          assinatura.id,
+          { planId: diaria, versaoEsperada: assinatura.version, reason: 'tentativa' },
+          'corr-guarda-3',
+          AGORA,
+          () => Promise.reject(new Error('nao deveria chegar a reabrir parcela')),
+        ),
+      ).rejects.toMatchObject({ code: 'DAY_PASS_PLAN_NOT_ASSIGNABLE' });
+    });
+  });
 });

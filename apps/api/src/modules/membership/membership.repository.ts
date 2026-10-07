@@ -112,6 +112,21 @@ export class AlunoJaTemAssinaturaVigenteError extends ErroDeDominio {
 }
 
 /**
+ * Plano de diaria so se VENDE (`POST /students/:id/day-pass`), nunca se atribui
+ * nem se troca para ele (F86): atribuir daria acesso sem pagamento e com datas
+ * livres, e trocar um mensalista para diaria nao tem significado de negocio.
+ */
+export class PlanoDeDiariaSoPorVendaError extends ErroDeDominio {
+  constructor() {
+    super(
+      'DAY_PASS_PLAN_NOT_ASSIGNABLE',
+      422,
+      'Plano de diaria so se vende em "Vender diaria": atribuir ou trocar para ele daria acesso sem pagamento',
+    );
+  }
+}
+
+/**
  * Plano sem janela de acesso nao gera direito nenhum.
  *
  * O snapshot de politica sairia vazio e o entitlement nasceria ATIVO sem
@@ -792,6 +807,7 @@ export class MembershipRepository {
 
     // Sem janela o entitlement nasceria ATIVO sem liberar hora nenhuma --
     // ver `PlanoSemJanelaError`. Antes da transacao: nao ha o que desfazer.
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
@@ -1219,6 +1235,7 @@ export class MembershipRepository {
     // Falha ANTES da transacao: nao ha o que desfazer. Mesma ordem de
     // `ativarAssinatura` (linha 680) -- o entitlement nunca nasce sem
     // janela nenhuma (PlanoSemJanelaError).
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     const janelas: JanelaDeAcesso[] = plano.accessWindows.map((j) => ({
@@ -1459,6 +1476,7 @@ export class MembershipRepository {
 
     const plano = await this.encontrarPlano(contexto, entrada.planId);
     if (!plano) throw new PlanoNaoEncontradoError();
+    if (plano.billingMode === 'DIARIA') throw new PlanoDeDiariaSoPorVendaError();
     if (plano.accessWindows.length === 0) throw new PlanoSemJanelaError();
 
     return this.db.$transaction(async (tx) => {
