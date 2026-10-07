@@ -835,6 +835,14 @@ indevida) sistemática. É barato decidir e caro descobrir depois.
 **O que a spec de F15 precisa fechar:** nome e formato do campo de âncora, e o comportamento
 quando a academia troca o valor com aluno **já em carência**.
 
+**Emenda de 07/10/2026 (F88, decisão do PI):** a carência padrão do tenant inaugural passa a ser
+**5 dias** (`BillingSettings.graceDays @default(5)`; vencimento dia 10 bloqueia a partir de 15, às
+00:00 locais). O instante de bloqueio é a **meia-noite local de `dueAt` + carência**, no fuso da
+unidade do aluno (`ciclo-de-cobranca.instanteDeBloqueio`), e é gravado em `Invoice.blockAt` na
+abertura da fatura. O job de inadimplência passa a rodar todo dia às 00:10 (America/Sao_Paulo), só
+sobre aluno `STUDENT` e plano que não seja `DIARIA`, e só liga com
+`BILLING_DELINQUENCY_JOB_ENABLED=true` (INV-164).
+
 ---
 
 <a id="adr-020"></a>
@@ -4706,7 +4714,8 @@ A academia funciona no modelo **"pagou, usou"**, sem contrato de 12 meses (o PI 
    mês pago continuava aparecendo como "Adiantado").
 2. **Pedir a data do pagamento** (`paidAt`, dia, nunca futura). A vigência conta dela: a próxima
    invoice devida passa a vencer em `data + 30 dias × meses pagos`, e o bloqueio segue
-   `vencimento + carência` (`graceDays` do tenant) — INV-163.
+   `vencimento + carência` (`graceDays` do tenant) — INV-163. *(A parte do vencimento
+   foi **revogada em 07/10/2026**: ver a emenda seguinte.)*
 3. **Deixar a recepção dispensar, na hora, os meses anteriores não usados** (`dispensar[]`): a
    invoice vira `CANCELLED`, sai da inadimplência e fica no histórico. O que não é pago nem
    dispensado segue em aberto (e continua podendo bloquear após a carência).
@@ -4715,7 +4724,25 @@ Contrato da rota: `POST /subscriptions/:id/manual-payment-batch` troca `ateCompe
 `competencias: ['YYYY-MM']`, `dispensar: ['YYYY-MM']` e `paidAt: 'YYYY-MM-DD'`. Efeito colateral
 conhecido: o lote **abre a invoice seguinte** ao último mês pago para ancorar a vigência, então a
 ficha deixa de mostrar "nenhuma cobrança em aberto" logo após o pagamento (aparece a próxima, com o
-vencimento novo).
+vencimento novo). *(Revogado em
+07/10/2026: o lote não abre mais a fatura seguinte.)*
+
+### Emenda de 07/10/2026 — a âncora `data + 30 × N` foi revogada (F88, decisão do PI)
+
+A âncora que a emenda de 01/10/2026 criou **deixou de existir**. O PI padronizou o vencimento
+(SPEC-088, [desenho](../superpowers/specs/2026-10-07-padronizar-vencimento-design.md)):
+
+1. **Todo vencimento é o dia do ciclo** (`dueDay` do tenant, hoje 10) da própria competência. A
+   data do pagamento **não desloca** nenhum vencimento.
+2. **A data do pagamento só define `Invoice.coverageEndsAt`** — "até quando o mês pago cobre", campo
+   **informativo** (mostrado na coluna "Vence em" da fatura paga). Não alimenta bloqueio, direito de
+   acesso nem cobrança. No lote, a posição `k` é contada por competência paga:
+   `coverageEndsAt = dia do pagamento + 30 dias × k`.
+3. **O lote não abre mais a fatura seguinte**; quem abre as faturas é o job do dia 01 (INV-164).
+4. O bloqueio segue `vencimento + carência` a partir da **meia-noite local** do dia do vencimento
+   (ADR-019, emenda de 07/10/2026).
+
+INV-163 emendada; a restauração de vencimento do cancelamento (ADR-065) deixou de existir.
 
 ### Consequências
 
@@ -4852,6 +4879,9 @@ lançamento"*.
 - O pagamento em lote ancora o vencimento da fatura seguinte (`dia + N × 30 dias`). O cancelamento
   devolve essa data ao padrão do ciclo **somente** quando o lote inteiro foi desfeito e a data ainda é a
   que o lote gravou; fora disso não toca (outra decisão ou pagamento já mexeu nela).
+  *(Emenda de 07/10/2026, F88: **a restauração de vencimento deixou de existir.** O lote não ancora
+  mais o vencimento da fatura seguinte (ADR-063), então não há data a devolver. O cancelamento só
+  reabre a fatura e zera `coverageEndsAt`; a resposta da rota não traz mais `vencimentoRestaurado`.)*
 - **Quando se cancela (decisão do PI, 05/10/2026, depois da revisão da F85):** só competência
   **adiantada** ou competência com **2+ pagamentos confirmados**; mês que já passou **nunca**; mês
   corrente com um pagamento só, **não**. Com 2+ pagamentos a fatura continua paga e, se o cancelado era

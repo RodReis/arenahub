@@ -9,7 +9,7 @@
 | **Status** | `aprovada-pi` |
 | **Criada em** | 2026-10-07 |
 | **Aprovada pelo PI em** | 07/10/2026 (desenho aprovado em chat) |
-| **Card** | — |
+| **Card** | [#621](https://github.com/RodReis/arenahub/issues/621) |
 
 ---
 
