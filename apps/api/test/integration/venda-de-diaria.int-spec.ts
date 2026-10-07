@@ -343,6 +343,39 @@ describe('F86 -- diaria avulsa no balcao', () => {
       expect(await db.subscription.count({ where: { tenantId: c.tenantId, studentId } })).toBe(2);
     });
 
+    it('reajuste no MEIO do mes: vende e cobra o preco vigente na compra, nao o da competencia', async () => {
+      const planId = await criarPlano(db, c, { nome: `Diaria reajustada ${c.sufixo}` });
+      // R$ 35,00 vigente desde 00:00Z de hoje (07/10), dia 7 do mes: a tela mostra 3500.
+      await db.planPrice.create({
+        data: {
+          tenantId: c.tenantId,
+          planId,
+          amountMinor: 3500,
+          validFrom: new Date('2026-10-07T00:00:00.000Z'),
+        },
+      });
+      const studentId = await criarAluno(db, c);
+
+      await expect(
+        venderDiaria.executar(
+          contextoDe(c),
+          venda(studentId, planId, { expectedTotalMinor: 3000 }),
+          'corr-reajuste-velho',
+          AGORA,
+        ),
+      ).rejects.toMatchObject({ code: 'PRICE_CHANGED' });
+
+      const vendida = await venderDiaria.executar(
+        contextoDe(c),
+        venda(studentId, planId, { expectedTotalMinor: 3500 }),
+        'corr-reajuste-novo',
+        AGORA,
+      );
+
+      const invoice = await db.invoice.findUniqueOrThrow({ where: { id: vendida.invoiceId } });
+      expect(invoice.totalMinor).toBe(3500);
+    });
+
     it('preco mudou depois de a tela abrir: 409 PRICE_CHANGED', async () => {
       const planId = await criarPlano(db, c, { nome: `Diaria preco ${c.sufixo}` });
       const studentId = await criarAluno(db, c);

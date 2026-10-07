@@ -4,7 +4,6 @@ import { ErroDeDominio } from '../../common/http/erro-de-dominio.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { BillingRepository, PlanoSemPrecoVigenteError } from '../billing/billing.repository.js';
-import { competenciaDe } from '../billing/domain/ciclo-de-cobranca.js';
 import { precoVigenteEm } from '../billing/domain/dinheiro.js';
 import { StudentRepository } from '../students/student.repository.js';
 import { fimDaDiaria, haJanelaAteOFimDoDia } from './domain/diaria.js';
@@ -90,7 +89,9 @@ export class VenderDiariaUseCase {
       throw new PlanoDeDiariaInvalidoError();
     }
 
-    const preco = precoVigenteEm(plano.prices, competenciaDe(agora));
+    // O preco vigente NO INSTANTE da compra, nao o da competencia: competencia e conceito
+    // do ciclo mensal, e um reajuste no meio do mes valeria so a partir do dia 1o seguinte.
+    const preco = precoVigenteEm(plano.prices, agora);
     if (!preco) throw new PlanoSemPrecoVigenteError();
     if (preco.amountMinor !== entrada.expectedTotalMinor) throw new PrecoDaDiariaMudouError();
 

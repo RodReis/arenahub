@@ -108,6 +108,10 @@ export class BillingRepository {
        * Vencimento e bloqueio EXPLICITOS (F86, diaria): a diaria vence na compra
        * e bloqueia no fim do dia -- `dueDay` e carencia sao do ciclo MENSAL e nao
        * descrevem um dia. Ausente = ciclo mensal, como sempre foi.
+       *
+       * Com `vencimento`, o PRECO tambem e o vigente em `emQue` (o instante da compra), e
+       * nao o da competencia: a diaria nao tem ciclo, e um reajuste no meio do mes valeria
+       * so a partir do dia 1o seguinte.
        */
       vencimento?: { dueAt: Date; blockAt: Date };
     },
@@ -137,7 +141,10 @@ export class BillingRepository {
       throw new ConfiguracaoFinanceiraAusenteError();
     }
 
-    const preco = precoVigenteEm(assinatura.plan.prices, competencia);
+    const preco = precoVigenteEm(
+      assinatura.plan.prices,
+      entrada.vencimento ? entrada.emQue : competencia,
+    );
 
     if (!preco) {
       throw new PlanoSemPrecoVigenteError();
