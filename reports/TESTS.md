@@ -15,9 +15,9 @@
 
 | nível | testes | pass | falha | cobertura % |
 |---|---:|---:|---:|---:|
-| unitário | 4330 | 4330 | 0 | 74.0 |
+| unitário | 4391 | 4391 | 0 | 73.0 |
 | contrato | 0 | 0 | 0 | — |
-| integração | 1551 | 1551 | 0 | 82.0 |
+| integração | 1632 | 1632 | 0 | 82.7 |
 | e2e | 0 | 0 | 0 | — |
 | hardware | 0 | 0 | 0 | — |
 | segurança | 0 | 0 | 0 | — |
@@ -203,3 +203,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-05 | #571 | F85 | integração | 1548 | 1548 | 0 | 82.0 | [#572](https://github.com/RodReis/arenahub/pull/572) — número local do `test:report`; CI verde nos dois jobs |
 | 2026-10-05 | #571 | F85 | unitário | 4330 | 4330 | 0 | 74.0 | [#573](https://github.com/RodReis/arenahub/pull/573) — grade de cobranças; número local do `test:report` |
 | 2026-10-05 | #571 | F85 | integração | 1551 | 1551 | 0 | 82.0 | [#573](https://github.com/RodReis/arenahub/pull/573) — grade de cobranças; número local do `test:report` |
+| 2026-10-07 | #616 | SPEC-086 | unitário | 4391 | 4391 | 0 | 73.0 | — |
+| 2026-10-07 | #616 | SPEC-086 | integração | 1632 | 1632 | 0 | 82.7 | — |
