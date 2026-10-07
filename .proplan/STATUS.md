@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -34,6 +34,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][FIX] Baixas importadas: "Pago em" um dia antes e "Vence em" sem relação com o pagamento (#613, finalizado em: 2026-10-07)
+- [MVP1][FIX] Perfis Permuta-Tacio e Permuta-Douglas, liberados na catraca e sem cobrança como o professor (#614, finalizado em: 2026-10-07)
 - [MVP1][FIX] Troca de plano vale no ato, com preço na combo (#610, finalizado em: 2026-10-06)
 - [FIX] API atrás do proxy da Railway: sem trust proxy o throttle por IP enxerga o IP do proxy (#605, finalizado em: 2026-10-06)
 - [MVP0][FIX] Foto do leitor pode sobrescrever a da recepção; externalUserIds sem formato nem cota (#601, finalizado em: 2026-10-06)
