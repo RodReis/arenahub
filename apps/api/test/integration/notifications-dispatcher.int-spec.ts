@@ -156,7 +156,7 @@ describe('F73 -- despachante de outbox fim a fim', () => {
   // o evento era marcado como publicado mesmo assim -- XP nunca creditado.
   it('AssessmentPublished credita o XP ao aluno (escopo de tenant aberto pelo despachante)', async () => {
     const avaliador = await db.user.create({
-      data: { email: `f73-xp-${sufixo}@exemplo.test`, passwordHash: 'hash-de-teste' },
+      data: { email: `f73-xp-${sufixo}@exemplo.test`, passwordHash: 'scrypt$v=1$fixture-sem-senha-real' },
       select: { id: true },
     });
     await db.xpRuleVersion.create({
