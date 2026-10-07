@@ -1,0 +1,30 @@
+/**
+ * Painel de venda da diaria (F86): uma coluna curta, na mesma escala do painel de
+ * troca de plano. So tokens do DS-PAINEL -- nenhuma cor literal.
+ */
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 480px;
+  padding: 16px;
+  border: 1px solid var(--ah-border-subtle);
+  border-left: 3px solid var(--ah-accent-500);
+  border-radius: var(--ah-radius-card);
+  background: var(--ah-surface-raised);
+  box-sizing: border-box;
+}
+
+.valor {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}

@@ -65,7 +65,7 @@ function entitlement(sobrescritas: Record<string, unknown> = {}) {
   };
 }
 
-function responder(direitos: unknown[]) {
+function responder(direitos: unknown[], planosExtras: unknown[] = []) {
   vi.mocked(chamarApi).mockImplementation((caminho: string) => {
     if (caminho.endsWith('/entitlements')) {
       return Promise.resolve({ ok: true, dados: direitos, cookiesDaApi: [] });
@@ -80,6 +80,7 @@ function responder(direitos: unknown[]) {
             isActive: true,
             currentPrice: { amountMinor: 15000, currency: 'BRL' },
           },
+          ...planosExtras,
         ],
         cookiesDaApi: [],
       });
@@ -154,6 +155,52 @@ describe('ficha do aluno', () => {
     await renderizar();
 
     expect(screen.getByRole('heading', { name: 'Atribuir plano', hidden: true })).toBeInTheDocument();
+  });
+
+  /*
+   * F86 -- diaria avulsa. O plano de diaria tem fluxo proprio (com pagamento): vende-se
+   * so a quem esta sem plano, e NUNCA aparece na lista de atribuicao por datas, que
+   * daria acesso sem cobrar.
+   */
+  const PLANO_DE_DIARIA = {
+    id: 'plano-diaria',
+    name: 'Diaria',
+    isActive: true,
+    billingMode: 'DIARIA',
+    currentPrice: { amountMinor: 3000, currency: 'BRL' },
+  };
+
+  it('aluno sem plano ve a secao Diaria e pode abrir a venda', async () => {
+    responder([], [PLANO_DE_DIARIA]);
+
+    await renderizar();
+
+    expect(screen.getByRole('heading', { name: 'Diária', hidden: true })).toBeInTheDocument();
+    expect(screen.getByTestId('abrir-venda-de-diaria')).toBeInTheDocument();
+  });
+
+  it('o plano de diaria nao aparece na lista de atribuicao com datas', async () => {
+    const usuario = userEvent.setup();
+    responder([], [PLANO_DE_DIARIA]);
+
+    await renderizar();
+    await usuario.click(screen.getByTestId(`abrir-plano-${ALUNO_ID}`));
+
+    const opcoes = within(screen.getByTestId('campo-plano'))
+      .getAllByRole('option', { hidden: true })
+      .map((o) => o.textContent ?? '');
+
+    expect(opcoes.some((o) => o.startsWith('Programa Adultos'))).toBe(true);
+    expect(opcoes.some((o) => o.startsWith('Diaria'))).toBe(false);
+  });
+
+  it('aluno com plano vigente nao ve a secao Diaria', async () => {
+    responder([entitlement()], [PLANO_DE_DIARIA]);
+
+    await renderizar();
+
+    expect(screen.queryByRole('heading', { name: 'Diária', hidden: true })).toBeNull();
+    expect(screen.queryByTestId('abrir-venda-de-diaria')).toBeNull();
   });
 
   /**

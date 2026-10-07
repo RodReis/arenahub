@@ -126,6 +126,15 @@ const MENSAGEM: Record<string, string> = {
   PLAN_PRICE_RETROACTIVE:
     'A data de início não pode estar no passado — reajuste retroativo não é permitido.',
   CREDENTIAL_ALREADY_ASSIGNED: 'Este número já está vinculado a outro aluno.',
+  DAY_PASS_PLAN_INVALID: 'Este plano não é uma diária ativa. Escolha outro plano de diária.',
+  DAY_PASS_CLOSED_TODAY:
+    'O plano não tem horário de acesso restante hoje na unidade do aluno. Ajuste as janelas do plano.',
+  DAY_PASS_PLAN_NOT_ASSIGNABLE:
+    'Plano de diária só se vende em "Vender diária": ele não pode ser atribuído com datas.',
+  STUDENT_HAS_ACTIVE_SUBSCRIPTION: 'Este aluno já tem plano vigente.',
+  PRICE_CHANGED: 'O preço da diária mudou. Recarregue a ficha e confira o valor.',
+  BILLING_SETTINGS_MISSING:
+    'A academia ainda não configurou vencimento e carência. Configure em Financeiro antes de cobrar.',
 };
 
 function texto(formulario: FormData, campo: string): string {
@@ -682,4 +691,59 @@ export async function definirCredencial(
   revalidatePath(`/students/${studentId}`);
 
   return { sucesso: { kind: resposta.dados.kind, externalId: resposta.dados.externalId } };
+}
+
+export type ResultadoDaDiaria =
+  | { ok: true; paymentId: string; endsAt: string }
+  | { ok: false; error: string };
+
+const esquemaDeDiaria = z.object({
+  studentId: z.string().uuid(),
+  planId: z.string().uuid(),
+  channel: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO']),
+  expectedTotalMinor: z.number().int().positive(),
+});
+
+/**
+ * Vende a diaria avulsa -- `POST /api/v1/students/:id/day-pass` (F86). Recebe os
+ * campos direto (nao `FormData`): quem chama e um componente que ja os tem
+ * montados, e nao ha formulario a preencher.
+ *
+ * O `expectedTotalMinor` e o que a TELA mostrou: o servidor recalcula pelo preco
+ * vigente e recusa (`PRICE_CHANGED`) se divergir -- conferencia, nao autoridade.
+ */
+export async function venderDiaria(input: {
+  studentId: string;
+  planId: string;
+  channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
+  expectedTotalMinor: number;
+}): Promise<ResultadoDaDiaria> {
+  const analisado = esquemaDeDiaria.safeParse(input);
+
+  if (!analisado.success) {
+    return { ok: false, error: 'Confira os dados informados.' };
+  }
+
+  const resposta = await chamarApi<{ paymentId: string; endsAt: string }>(
+    `/api/v1/students/${analisado.data.studentId}/day-pass`,
+    {
+      metodo: 'POST',
+      corpo: {
+        planId: analisado.data.planId,
+        channel: analisado.data.channel,
+        expectedTotalMinor: analisado.data.expectedTotalMinor,
+      },
+    },
+  );
+
+  if (!resposta.ok || !resposta.dados) {
+    return {
+      ok: false,
+      error: frase(resposta.erro?.code ?? '', 'Não foi possível vender a diária'),
+    };
+  }
+
+  revalidatePath(`/students/${analisado.data.studentId}`);
+
+  return { ok: true, paymentId: resposta.dados.paymentId, endsAt: resposta.dados.endsAt };
 }
