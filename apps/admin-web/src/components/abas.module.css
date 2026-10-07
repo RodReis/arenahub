@@ -73,14 +73,19 @@
 }
 
 /*
-  A aba ativa carrega TRÊS canais: cor, fundo tingido e a barra embaixo. Só a
-  cor deixaria de fora quem opera com brilho baixo, que é o caso do balcão sob
-  luz fluorescente forte.
+  A aba ativa carrega TRÊS canais: cor, a barra embaixo e o negrito. Só a cor
+  deixaria de fora quem opera com brilho baixo, que é o caso do balcão sob luz
+  fluorescente forte.
+
+  SEM fundo tingido pelo accent: um tingimento a 7% derrubou o contraste do
+  texto para 4,37 (mínimo 4,5, M1-NFR-008) e o axe do CI barrou. O par
+  garantido pelo gate é `--ah-action-text` sobre superfície limpa -- o fundo
+  da ativa fica no da página.
 */
 .abaAtiva,
 .abaAtiva:hover {
   color: var(--ah-action-text);
-  background: color-mix(in srgb, var(--ah-action-text) 7%, transparent);
+  background: transparent;
 }
 
 .abaAtiva::after {
