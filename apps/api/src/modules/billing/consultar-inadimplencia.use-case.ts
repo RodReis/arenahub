@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import { deveBloquear } from './domain/bloqueio-por-inadimplencia.js';
 
 /**
@@ -520,7 +521,7 @@ export class ConsultarInadimplenciaUseCase {
      * inadimplente, porque o proprio atraso tira a assinatura de `ACTIVE`.
      */
     const pagantes = await this.db.subscription.count({
-      where: { tenantId: contexto.tenantId, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+      where: { tenantId: contexto.tenantId, status: { in: ['ACTIVE', 'PAST_DUE'] }, ...ASSINATURA_QUE_NAO_E_DIARIA },
     });
 
     const inadimplentes = new Set(linhas.map((l) => l.studentId)).size;

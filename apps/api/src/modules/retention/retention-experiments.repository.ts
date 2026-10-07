@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { EfeitoAdverso, ParticipanteDoExperimento } from './domain/analise-itt.js';
 import type { GrupoDoExperimento } from './domain/randomizacao.js';
@@ -189,7 +190,7 @@ export class RetentionExperimentsRepository implements PortaDeExperimentos {
           select: {
             status: true,
             subscriptions: {
-              where: { tenantId: contexto.tenantId },
+              where: { tenantId: contexto.tenantId, ...ASSINATURA_QUE_NAO_E_DIARIA },
               orderBy: [{ startsAt: 'desc' }, { id: 'asc' }],
               take: 1,
               select: { status: true },

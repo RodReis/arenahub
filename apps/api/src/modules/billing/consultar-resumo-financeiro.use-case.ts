@@ -3,6 +3,7 @@ import { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   ltv,
@@ -439,7 +440,7 @@ export class ConsultarResumoFinanceiroUseCase {
           continuam plausiveis sozinhos.
         */
         this.db.subscription.findMany({
-          where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] }, ...ASSINATURA_QUE_NAO_E_DIARIA },
           select: { status: true, planId: true, studentId: true },
         }),
 
@@ -473,7 +474,7 @@ export class ConsultarResumoFinanceiroUseCase {
         // completo, com a medicao das duas tentativas, em
         // `alunosDaOcupacao` mais abaixo.
         this.db.subscription.findMany({
-          where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          where: { ...doTenant, status: { in: ['ACTIVE', 'PAST_DUE'] }, ...ASSINATURA_QUE_NAO_E_DIARIA },
           select: { studentId: true },
           distinct: ['studentId'],
         }),
