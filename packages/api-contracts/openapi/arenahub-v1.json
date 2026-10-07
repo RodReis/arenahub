@@ -3028,6 +3028,47 @@
         ]
       }
     },
+    "/api/v1/billing/monthly-invoices/run": {
+      "post": {
+        "operationId": "BillingController_gerarFaturasDoMes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "elegiveis",
+                    "criadas",
+                    "jaExistiam",
+                    "falhas"
+                  ],
+                  "properties": {
+                    "elegiveis": {
+                      "type": "integer"
+                    },
+                    "criadas": {
+                      "type": "integer"
+                    },
+                    "jaExistiam": {
+                      "type": "integer"
+                    },
+                    "falhas": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
     "/api/v1/subscriptions/{id}/recurrence/cancel": {
       "post": {
         "operationId": "BillingController_cancelarRecorrencia",

@@ -35,6 +35,7 @@ import { janelaPadrao } from './domain/resumo-financeiro.js';
 import { ListarInvoicesUseCase, TAMANHO_MAXIMO_DA_PAGINA } from './listar-invoices.use-case.js';
 import { CriarCobrancaPixUseCase } from './criar-cobranca-pix.use-case.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
+import { GerarFaturasDoMesUseCase, type ResultadoDaGeracao } from './gerar-faturas-do-mes.use-case.js';
 import { CancelarRecorrenciaUseCase } from './cancelar-recorrencia.use-case.js';
 import { AderirARecorrenciaUseCase } from './aderir-a-recorrencia.use-case.js';
 import { RodarCicloDeAssinaturasUseCase } from './rodar-ciclo-de-assinaturas.use-case.js';
@@ -530,6 +531,7 @@ export class BillingController {
     private readonly pagos: ConsultarPagosUseCase,
     private readonly resumoFinanceiro: ConsultarResumoFinanceiroUseCase,
     private readonly aplicarInadimplencia: AplicarInadimplenciaUseCase,
+    private readonly faturasDoMes: GerarFaturasDoMesUseCase,
     private readonly liberacao: LiberacaoFinanceiraUseCase,
     private readonly consultarMesesPagaveis: ConsultarMesesPagaveisUseCase,
     private readonly registrarPagamentoEmLote: RegistrarPagamentoEmLoteUseCase,
@@ -1033,6 +1035,28 @@ export class BillingController {
       cobrancasDisparadas: resultado.cobrancasDisparadas,
       puladas: resultado.puladas.map((pulada) => ({ ...pulada })),
     };
+  }
+
+  /**
+   * Gera a fatura do mes sob demanda (F88). O cron do dia 01 faz o mesmo;
+   * reexecutar e seguro (INV-066).
+   */
+  @Post('billing/monthly-invoices/run')
+  @RequirePermissions('billing.manage')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['elegiveis', 'criadas', 'jaExistiam', 'falhas'],
+      properties: {
+        elegiveis: { type: 'integer' },
+        criadas: { type: 'integer' },
+        jaExistiam: { type: 'integer' },
+        falhas: { type: 'integer' },
+      },
+    },
+  })
+  async gerarFaturasDoMes(): Promise<ResultadoDaGeracao> {
+    return this.faturasDoMes.executar(this.contexto.require().tenantId, new Date());
   }
 
   /**
