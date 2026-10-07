@@ -194,7 +194,7 @@ export interface DadosDeCriacaoDePlano {
    * Modalidade de cobranca (ADR-043, Decisao 2). Ausente = `AVULSO`, que e o
    * default da coluna -- plano criado por chamador antigo continua avulso.
    */
-  billingMode?: 'AVULSO' | 'ASSINATURA' | undefined;
+  billingMode?: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | undefined;
   /**
    * Limite mensal de convidados (F76, ADR-060). Ausente = sem o beneficio,
    * mesmo default da coluna.

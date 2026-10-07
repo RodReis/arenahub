@@ -120,7 +120,7 @@ interface Entitlement {
   /** #337: troca de plano já agendada para o próximo ciclo, ou nula/ausente. */
   scheduledPlanChange?: { planId: string; effectiveFrom: string } | null;
   /** F56: modalidade do plano da assinatura. Nulo em cortesia. */
-  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | null;
   /** F56: já existe recorrência instalada no provedor? */
   recorrenciaAtiva: boolean;
   /** F56: preço vigente do plano — o valor que o aceite autoriza. */

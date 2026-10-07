@@ -51,7 +51,7 @@ const esquemaDePlano = z
      * default da coluna: chamador que nao conhece o campo continua criando
      * plano avulso, e nenhum plano passa a cobrar sozinho por omissao.
      */
-    billingMode: z.enum(['AVULSO', 'ASSINATURA']).optional(),
+    billingMode: z.enum(['AVULSO', 'ASSINATURA', 'DIARIA']).optional(),
     /**
      * Limite mensal de convidados (F76, ADR-060). Ausente = sem o
      * beneficio, mesmo default da coluna.
@@ -155,7 +155,7 @@ interface PlanoDto {
   /** Todas as vigencias, para a tela mostrar o historico de reajuste. */
   prices: PrecoDto[];
   /** Como o plano cobra (ADR-043, Decisao 2). */
-  billingMode: 'AVULSO' | 'ASSINATURA';
+  billingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
   /** Limite mensal de convidados (F76, ADR-060). Nulo = sem o beneficio. */
   guestPassesPerMonth: number | null;
 }
@@ -193,7 +193,7 @@ interface EntitlementDto {
    * Modalidade do plano da assinatura (ADR-043, Decisao 2). Nulo em cortesia,
    * que nao nasce de assinatura.
    */
-  planBillingMode: 'AVULSO' | 'ASSINATURA' | null;
+  planBillingMode: 'AVULSO' | 'ASSINATURA' | 'DIARIA' | null;
   /**
    * Ja existe cobranca recorrente instalada? A tela escolhe entre "ativar" e
    * "encerrar" por este campo -- e nao pela modalidade, que so diz o que o

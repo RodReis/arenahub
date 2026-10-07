@@ -249,6 +249,12 @@ enum PlanBillingMode {
   /// O ArenaHub gera a invoice do periodo E cobra sozinho no cartao salvo,
   /// com o retry do tenant.
   ASSINATURA
+  /// Diaria avulsa (F86): o aluno SEM plano paga na recepcao e usa a academia
+  /// so naquele dia, ate 23:59 no fuso da unidade. NAO e contrato: fica fora de
+  /// receita recorrente, inadimplencia e aviso de vencimento. So se vende por
+  /// `POST /students/:id/day-pass` -- atribuir ou trocar para este plano e
+  /// recusado, porque daria acesso sem pagamento e com datas livres.
+  DIARIA
 
   @@map("plan_billing_mode")
 }

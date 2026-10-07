@@ -27,7 +27,7 @@ const esquemaDePlano = z.object({
   name: z.string().trim().min(1, 'Informe o nome do plano').max(120, 'Nome longo demais'),
   description: z.string().trim().max(500, 'Descrição longa demais').optional(),
   gymUnitIds: z.array(z.string().uuid()).min(1, 'Selecione ao menos uma unidade'),
-  billingMode: z.enum(['AVULSO', 'ASSINATURA']).catch('AVULSO'),
+  billingMode: z.enum(['AVULSO', 'ASSINATURA', 'DIARIA']).catch('AVULSO'),
 });
 
 /**

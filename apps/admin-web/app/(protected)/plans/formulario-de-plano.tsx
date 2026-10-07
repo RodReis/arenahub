@@ -232,9 +232,15 @@ export function FormularioDePlano({ unidades }: Props) {
           Assinatura — o sistema cobra sozinho no cartão salvo, depois que o aluno aderir
         </label>
 
+        <label className={estilos['marcador']}>
+          <input type="radio" name="billingMode" value="DIARIA" data-testid="modalidade-diaria" />
+          Diária — o aluno sem plano paga na recepção e usa a academia só naquele dia, até 23:59
+        </label>
+
         <p role="note">
           Na assinatura, o aluno adere uma vez na ficha dele, com o cartão cadastrado e aceite
-          na tela. Criar o plano como assinatura não cobra ninguém.
+          na tela. Criar o plano como assinatura não cobra ninguém. Plano de diária não se
+          atribui com datas: ele se vende pelo botão “Vender diária” na ficha do aluno.
         </p>
       </fieldset>
 

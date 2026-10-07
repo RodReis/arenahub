@@ -278,6 +278,7 @@ const CATALOGO = [
   {
     name: 'Diaria',
     description: 'Acesso avulso de um dia.',
+    billingMode: 'DIARIA' as const,
     amountMinor: 3_000,
     memberLimit: null,
     beneficios: [{ item: 'Acesso a academia', detail: 'Um dia' }],
@@ -394,8 +395,16 @@ async function semear(): Promise<void> {
     for (const definicao of CATALOGO) {
       const plano = await db.plan.upsert({
         where: { tenantId_name: { tenantId: tenant.id, name: definicao.name } },
-        create: { tenantId: tenant.id, name: definicao.name, description: definicao.description },
-        update: { description: definicao.description },
+        create: {
+          tenantId: tenant.id,
+          name: definicao.name,
+          description: definicao.description,
+          ...(definicao.billingMode === undefined ? {} : { billingMode: definicao.billingMode }),
+        },
+        update: {
+          description: definicao.description,
+          ...(definicao.billingMode === undefined ? {} : { billingMode: definicao.billingMode }),
+        },
       });
 
       /*

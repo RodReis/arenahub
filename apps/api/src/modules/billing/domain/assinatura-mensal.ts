@@ -22,7 +22,7 @@ export class AdesaoInvalidaError extends ErroDeDominio {
 /** O que precisa ser verdade para o aluno aderir. `SPEC-056` 2.2. */
 export interface CandidatoAAdesao {
   /** Modalidade do plano da assinatura. */
-  readonly modalidadeDoPlano: 'AVULSO' | 'ASSINATURA';
+  readonly modalidadeDoPlano: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
   /** O plano tem preco vigente na data da adesao? */
   readonly planoTemPrecoVigente: boolean;
   /** CPF do aluno, como esta cadastrado. Nulo = ausente. */
