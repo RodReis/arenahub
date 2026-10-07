@@ -194,6 +194,24 @@ describe('ficha do aluno', () => {
     expect(opcoes.some((o) => o.startsWith('Diaria'))).toBe(false);
   });
 
+  it('diaria ja paga nao mostra "Cobranca recorrente" (nao ha o que cobrar depois)', async () => {
+    responder([entitlement({ planBillingMode: 'DIARIA' })], [PLANO_DE_DIARIA]);
+
+    await renderizar();
+
+    expect(screen.queryByRole('heading', { name: 'Cobrança recorrente', hidden: true })).toBeNull();
+  });
+
+  it('plano mensal continua mostrando "Cobranca recorrente"', async () => {
+    responder([entitlement({ planBillingMode: 'AVULSO' })]);
+
+    await renderizar();
+
+    expect(
+      screen.getByRole('heading', { name: 'Cobrança recorrente', hidden: true }),
+    ).toBeInTheDocument();
+  });
+
   it('aluno com plano vigente nao ve a secao Diaria', async () => {
     responder([entitlement()], [PLANO_DE_DIARIA]);
 

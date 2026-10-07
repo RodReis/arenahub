@@ -813,7 +813,8 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
 
               So aparece com assinatura vigente: sem plano nao ha o que cobrar.
             */}
-            {assinaturaVigente ? (
+            {/* DIARIA ja nasce paga e vence no mesmo dia: nao ha recorrencia a ativar. */}
+            {assinaturaVigente && assinaturaVigente.billingMode !== 'DIARIA' ? (
               <section aria-labelledby="titulo-recorrencia" className={estilos['secao']}>
                 <h2 id="titulo-recorrencia">Cobrança recorrente</h2>
 
