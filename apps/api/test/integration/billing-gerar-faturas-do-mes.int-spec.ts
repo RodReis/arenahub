@@ -87,6 +87,8 @@ describe('GerarFaturasDoMesUseCase', () => {
     status?: 'ACTIVE' | 'SUSPENDED';
     billingMode?: 'AVULSO' | 'DIARIA';
     statusAssinatura?: 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+    startsAt?: Date;
+    endsAt?: Date;
   }): Promise<{ studentId: string; subscriptionId: string }> {
     contador += 1;
     const estudante = await db.student.create({
@@ -108,7 +110,8 @@ describe('GerarFaturasDoMesUseCase', () => {
         studentId: estudante.id,
         planId: opcoes.billingMode === 'DIARIA' ? planoDiariaId : planoMensalId,
         status: opcoes.statusAssinatura ?? 'ACTIVE',
-        startsAt: new Date('2026-01-01T00:00:00Z'),
+        startsAt: opcoes.startsAt ?? new Date('2026-01-01T00:00:00Z'),
+        endsAt: opcoes.endsAt ?? null,
       },
       select: { id: true },
     });
@@ -151,6 +154,30 @@ describe('GerarFaturasDoMesUseCase', () => {
     expect(segunda.falhas).toBe(0);
     expect(await db.invoice.count({ where: { tenantId } })).toBe(total);
     expect(await db.invoiceSequence.findUnique({ where: { tenantId } })).toEqual(sequenciaAntes);
+  });
+
+  it('respeita a vigencia: contrato que acabou na virada ou que so comeca depois nao recebe fatura', async () => {
+    // fev/2027, 00:05 em Sao Paulo
+    const virada = new Date('2027-02-01T03:05:00Z');
+    const terminouNaVirada = await aluno({ endsAt: new Date('2027-02-01T03:00:00Z') });
+    const terminaDepois = await aluno({ endsAt: new Date('2027-03-01T03:00:00Z') });
+    const comecaEmMesFuturo = await aluno({ startsAt: new Date('2027-03-15T12:00:00Z') });
+    const comecaNoMes = await aluno({ startsAt: new Date('2027-02-20T12:00:00Z') });
+
+    await gerar.executar(tenantId, virada);
+
+    const geradas = new Set(
+      (
+        await db.invoice.findMany({
+          where: { tenantId, billingPeriod: new Date('2027-02-01T00:00:00Z') },
+          select: { subscriptionId: true },
+        })
+      ).map((i) => i.subscriptionId),
+    );
+    expect(geradas.has(terminouNaVirada.subscriptionId)).toBe(false);
+    expect(geradas.has(comecaEmMesFuturo.subscriptionId)).toBe(false);
+    expect(geradas.has(terminaDepois.subscriptionId)).toBe(true);
+    expect(geradas.has(comecaNoMes.subscriptionId)).toBe(true);
   });
 
   it('o scheduler abre o proprio contexto de tenant (sem requisicao)', async () => {

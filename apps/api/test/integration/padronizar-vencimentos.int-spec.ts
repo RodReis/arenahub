@@ -228,6 +228,9 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
     expect(r.semAssinaturaVigente).toEqual([matriculas.semAssinatura]);
     expect(r.seriamBloqueados).toEqual([matriculas.vencidaSet]);
     expect(linhas.join('\n')).not.toContain('Sigiloso');
+    // Antes de 15/10 a out/26 nova ainda nao bloqueia: sem linha de alerta.
+    expect(linhas).toContain('[padronizar] seriam bloqueados por out/26 nova   : 0');
+    expect(linhas.some((l) => l.includes('ATENCAO'))).toBe(false);
     expect(linhas.some((l) => l.includes(matriculas.vencidaSet))).toBe(true);
   });
 
@@ -313,6 +316,51 @@ describe('padronizar-vencimentos (executarSaneamento)', () => {
       expect(registro.getTimeouts()).toEqual([]);
     } finally {
       await modulo.close();
+    }
+  });
+
+  it('depois de 15/10, a out/26 que o script cria ja nasce bloqueando: entra no relatorio e avisa', async () => {
+    const outro = await db.tenant.create({
+      data: { slug: `pad-b-${sufixo}`, legalName: `Padronizar B ${sufixo} LTDA`, displayName: `Padronizar B ${sufixo}` },
+    });
+
+    try {
+      await db.billingSettings.create({ data: { tenantId: outro.id, dueDay: 10, graceDays: 5 } });
+      const unidade = await db.gymUnit.create({
+        data: { tenantId: outro.id, code: 'SP', name: 'Sao Paulo', timezone: 'America/Sao_Paulo', openingHours: {} },
+      });
+      const plano = await db.plan.create({
+        data: {
+          tenantId: outro.id, name: `Mensal B ${sufixo}`, billingMode: 'AVULSO',
+          prices: { create: [{ tenantId: outro.id, amountMinor: 10000, currency: 'BRL', validFrom: d('2026-01-01T00:00:00Z') }] },
+        },
+        select: { id: true },
+      });
+      const matricula = `PADB-${sufixo}`;
+      const estudante = await db.student.create({
+        data: {
+          tenantId: outro.id, gymUnitId: unidade.id, membershipNumber: matricula, fullName: 'Nome Sigiloso B',
+          birthDate: d('2000-01-01T00:00:00Z'), profile: 'STUDENT', status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      await db.subscription.create({
+        data: { tenantId: outro.id, studentId: estudante.id, planId: plano.id, status: 'ACTIVE', startsAt: d('2026-01-01T00:00:00Z') },
+      });
+
+      const linhas: string[] = [];
+      const r = await executarSaneamento(
+        { db, billing },
+        { slug: outro.slug, gravar: false, agora: d('2026-10-16T12:00:00Z'), escrever: (l) => linhas.push(l) },
+      );
+
+      expect(r.outubroCriadas).toBe(1);
+      expect(r.seriamBloqueados).toEqual([matricula]);
+      expect(linhas).toContain('[padronizar] seriam bloqueados por out/26 nova   : 1');
+      expect(linhas.some((l) => l.startsWith('[padronizar] ATENCAO'))).toBe(true);
+      expect(linhas.join('\n')).not.toContain('Sigiloso');
+    } finally {
+      await db.tenant.deleteMany({ where: { id: outro.id } });
     }
   });
 

@@ -1,10 +1,32 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { fimDaDiaria, haJanelaAteOFimDoDia } from './diaria.js';
+import { diaDeAcessoDaDiaria, fimDaDiaria, haJanelaAteOFimDoDia } from './diaria.js';
 import type { JanelaDeAcesso } from './plan.js';
 
 const SP = 'America/Sao_Paulo';
 const UNIDADE = 'unidade-1';
+
+describe('diaDeAcessoDaDiaria', () => {
+  it('e o dia LOCAL da compra, como data em meia-noite UTC (convencao do dueAt)', () => {
+    // sabado 10/10 12:00 em Sao Paulo
+    expect(diaDeAcessoDaDiaria(new Date('2026-10-10T15:00:00.000Z'), SP).toISOString()).toBe(
+      '2026-10-10T00:00:00.000Z',
+    );
+  });
+
+  it('23:30 locais ainda e o dia local, embora ja seja o dia seguinte em UTC', () => {
+    // sabado 23:30 em Sao Paulo = domingo 02:30Z
+    expect(diaDeAcessoDaDiaria(new Date('2026-10-11T02:30:00.000Z'), SP).toISOString()).toBe(
+      '2026-10-10T00:00:00.000Z',
+    );
+  });
+
+  it('00:00 local ja e o dia seguinte', () => {
+    expect(diaDeAcessoDaDiaria(new Date('2026-10-11T03:00:00.000Z'), SP).toISOString()).toBe(
+      '2026-10-11T00:00:00.000Z',
+    );
+  });
+});
 
 describe('fimDaDiaria', () => {
   it('e a meia-noite local do dia seguinte', () => {

@@ -38,6 +38,11 @@ export function planejarFaturaAberta(
   return igual ? null : { dueAt, blockAt, status };
 }
 
+/** Instante em que a fatura NOVA da competencia passa a bloquear (vencimento + carencia, meia-noite local). */
+export function bloqueioDaFaturaNova(competencia: Date, politica: Politica): Date {
+  return instanteDeBloqueio(proximoVencimento(competencia, politica.dueDay), politica.graceDays, politica.fuso);
+}
+
 export interface FaturaPaga {
   readonly invoiceId: string;
   readonly billingPeriod: Date;

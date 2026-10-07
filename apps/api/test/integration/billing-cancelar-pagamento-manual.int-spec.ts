@@ -356,11 +356,21 @@ describe('CancelarPagamentoManualUseCase', () => {
     await pagarLote(subscriptionId, ['2026-11', '2026-12']);
     const pagamentoNov = await pagamentoDe(subscriptionId, '2026-11');
     const pagamentoDez = await pagamentoDe(subscriptionId, '2026-12');
+    const novAntes = await invoiceDe(subscriptionId, '2026-11');
+    const dezAntes = await invoiceDe(subscriptionId, '2026-12');
+    expect(novAntes.coverageEndsAt).not.toBeNull();
 
     await cancelarPagamento(pagamentoDez.id);
 
-    expect((await invoiceDe(subscriptionId, '2026-11')).status).toBe('PAID');
-    expect((await invoiceDe(subscriptionId, '2026-12')).status).toBe('OPEN');
+    const novDepois = await invoiceDe(subscriptionId, '2026-11');
+    expect(novDepois.status).toBe('PAID');
+    // F88: a cobertura do irmao nao e tocada (nem zerada, nem recalculada) e nenhum vencimento do lote muda.
+    expect(novDepois.coverageEndsAt).toEqual(novAntes.coverageEndsAt);
+    expect(novDepois.dueAt).toEqual(novAntes.dueAt);
+    const dezDepois = await invoiceDe(subscriptionId, '2026-12');
+    expect(dezDepois.status).toBe('OPEN');
+    expect(dezDepois.coverageEndsAt).toBeNull();
+    expect(dezDepois.dueAt).toEqual(dezAntes.dueAt);
 
     await cancelarPagamento(pagamentoNov.id);
 

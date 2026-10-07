@@ -4,7 +4,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import type { BillingRepository } from '../../modules/billing/billing.repository.js';
 import { assinaturasElegiveisParaFaturaMensal } from '../../modules/billing/gerar-faturas-do-mes.use-case.js';
 import type { PrismaService } from '../../persistence/prisma.service.js';
-import { coberturasDosPagos, planejarFaturaAberta, type FaturaPaga } from './dominio.js';
+import { bloqueioDaFaturaNova, coberturasDosPagos, planejarFaturaAberta, type FaturaPaga } from './dominio.js';
 
 /** O saneamento assume o ciclo da Arena Positiva (SPEC-088): para se o tenant for outro. */
 const DIA_DO_VENCIMENTO = 10;
@@ -190,8 +190,11 @@ export async function executarSaneamento(
     // Mesma elegibilidade do job mensal (`assinaturasElegiveisParaFaturaMensal`).
     const elegiveis = await db.comTenant((tx) =>
       tx.subscription.findMany({
-        where: assinaturasElegiveisParaFaturaMensal(tenantId),
-        select: { id: true },
+        where: assinaturasElegiveisParaFaturaMensal(tenantId, agora),
+        select: {
+          id: true,
+          student: { select: { membershipNumber: true, gymUnit: { select: { timezone: true } } } },
+        },
         orderBy: { id: 'asc' },
       }),
     );
@@ -204,6 +207,19 @@ export async function executarSaneamento(
       ).map((i) => i.subscriptionId),
     );
     const semOutubro = elegiveis.filter((e) => !comOutubro.has(e.id));
+    // A out/26 nova nasce com bloqueio em 15/10 00:00 local: depois disso ja nasce bloqueando.
+    const bloqueadosPelaOutNova = semOutubro
+      .filter((e) =>
+        jaBloqueia(
+          bloqueioDaFaturaNova(COMPETENCIA_OUT, {
+            dueDay: DIA_DO_VENCIMENTO,
+            graceDays: CARENCIA,
+            fuso: e.student.gymUnit.timezone,
+          }),
+          agora,
+        ),
+      )
+      .map((e) => e.student.membershipNumber);
     let outubroCriadas = gravar ? 0 : semOutubro.length;
 
     if (gravar) {
@@ -253,17 +269,25 @@ export async function executarSaneamento(
     ).map((s) => s.membershipNumber);
 
     const seriamBloqueados = [
-      ...new Set(
-        planejadas
+      ...new Set([
+        ...planejadas
           .filter(({ f, plano }) => f.student.profile === 'STUDENT' && jaBloqueia(plano?.blockAt ?? f.blockAt, agora))
           .map(({ f }) => f.student.membershipNumber),
-      ),
+        ...bloqueadosPelaOutNova,
+      ]),
     ].sort();
 
     linha('STUDENT ativo sem assinatura vigente', semAssinaturaVigente.length);
     if (semAssinaturaVigente.length > 0) escrever(`[padronizar]   matriculas: ${semAssinaturaVigente.join(', ')}`);
     linha('seriam bloqueados no 1o job', seriamBloqueados.length);
     if (seriamBloqueados.length > 0) escrever(`[padronizar]   matriculas: ${seriamBloqueados.join(', ')}`);
+    linha('seriam bloqueados por out/26 nova', bloqueadosPelaOutNova.length);
+    if (bloqueadosPelaOutNova.length > 0) {
+      escrever(
+        '[padronizar] ATENCAO: a out/26 nova ja nasce vencida alem da carencia -- os alunos acima, sem out/26 paga, ' +
+          'serao bloqueados na 1a execucao do job de inadimplencia.',
+      );
+    }
     linha('falhas', falhas);
 
     if (!gravar) escrever('[padronizar] dry-run -- nada foi gravado. Rode com --gravar para aplicar.');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { coberturasDosPagos, planejarFaturaAberta } from './dominio.js';
+import { bloqueioDaFaturaNova, coberturasDosPagos, planejarFaturaAberta } from './dominio.js';
 
 const SP = 'America/Sao_Paulo';
 const cfg = { dueDay: 10, graceDays: 5, fuso: SP };
@@ -45,6 +45,12 @@ describe('planejarFaturaAberta', () => {
         d('2026-10-07T15:00:00Z'),
       ),
     ).toBeNull();
+  });
+});
+
+describe('bloqueioDaFaturaNova', () => {
+  it('out/26: vence 10/10 e bloqueia 15/10 00:00 local', () => {
+    expect(bloqueioDaFaturaNova(d('2026-10-01T00:00:00Z'), cfg)).toEqual(d('2026-10-15T03:00:00Z'));
   });
 });
 

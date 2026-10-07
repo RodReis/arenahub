@@ -4,7 +4,7 @@ import type { Prisma } from '@arenahub/database';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { BillingRepository } from './billing.repository.js';
-import { competenciaDe } from './domain/ciclo-de-cobranca.js';
+import { competenciaDe, inicioDoProximoCiclo } from './domain/ciclo-de-cobranca.js';
 
 export interface ResultadoDaGeracao {
   readonly elegiveis: number;
@@ -29,13 +29,25 @@ export interface ResultadoDaGeracao {
 /**
  * Quem recebe fatura mensal (SPEC-088 3). Fonte unica: o job e o script de
  * saneamento (`padronizar-vencimentos`) usam esta mesma consulta.
+ *
+ * Alem do status, a VIGENCIA: contrato que terminou (`endsAt <= agora`) ainda
+ * pode estar `ACTIVE` -- o job de expiracao roda na mesma virada e nao ha ordem
+ * garantida -- e assinatura vendida com `startsAt` em mes futuro nao deve ser
+ * cobrada agora. `startsAt` dentro do mes corrente continua elegivel.
  */
-export function assinaturasElegiveisParaFaturaMensal(tenantId: string): Prisma.SubscriptionWhereInput {
+export function assinaturasElegiveisParaFaturaMensal(
+  tenantId: string,
+  agora: Date,
+): Prisma.SubscriptionWhereInput {
   return {
     tenantId,
     status: { in: ['ACTIVE', 'PAST_DUE'] },
     plan: { billingMode: { not: 'DIARIA' } },
     student: { profile: 'STUDENT', status: 'ACTIVE' },
+    AND: [
+      { OR: [{ endsAt: null }, { endsAt: { gt: agora } }] },
+      { startsAt: { lt: inicioDoProximoCiclo(agora) } },
+    ],
   };
 }
 
@@ -62,7 +74,7 @@ export class GerarFaturasDoMesUseCase {
     // `comTenant`: o filtro passa por `students`, que tem RLS (issue #306).
     const assinaturas = await this.db.comTenant((tx) =>
       tx.subscription.findMany({
-        where: assinaturasElegiveisParaFaturaMensal(tenantId),
+        where: assinaturasElegiveisParaFaturaMensal(tenantId, agora),
         select: { id: true },
         orderBy: { id: 'asc' },
       }),
