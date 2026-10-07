@@ -26,7 +26,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 #### Dois atores escrevem no Git — quem cede no conflito
 
-O Cowork pusha documento direto na `main`; o Code entrega por PR. Como o Cowork não abre PR, **ele nunca vê conflito** — quem colide é sempre o Code, com branch aberta enquanto a `main` andou.
+O Cowork pusha documento direto na `main`; o Code entrega por PR e ou caso o PI peça para fazer so push na main. Como o Cowork não abre PR, **ele nunca vê conflito** — quem colide é sempre o Code, com branch aberta enquanto a `main` andou.
 
 **Regra:** o Code **rebase e reaplica** — divergiu da `main`, re-sincroniza e reaplica o próprio trabalho por cima. O Code **nunca desfaz** linha escrita pelo Cowork: se o `docs/STATUS.md` divergiu, **a versão da `main` vence** e o Code reaplica o próprio progresso por cima.
 
