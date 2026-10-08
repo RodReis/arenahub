@@ -162,6 +162,13 @@ describe('perfis de sistema', () => {
   });
 
   describe('separacao entre perfis', () => {
+    it('billing.settings.manage: dono e gerente tem, financeiro e recepcao nao', () => {
+      expect(PERMISSOES_DO_OWNER).toContain('billing.settings.manage');
+      expect(PERMISSOES_DO_MANAGER).toContain('billing.settings.manage');
+      expect(PERMISSOES_DO_FINANCEIRO).not.toContain('billing.settings.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.settings.manage');
+    });
+
     it('so o OWNER e o MANAGER gerenciam usuarios', () => {
       /*
        * Era so o OWNER (F79/F80). Decisao do PI, 02/10/2026: a gerente

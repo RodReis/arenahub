@@ -67,6 +67,10 @@ export const PERMISSOES_DO_OWNER = [
   'billing.read',
   'billing.manage',
   'billing.payment.manual',
+  // F89: o dono define dia de gerar, vencimento e dias de bloqueio. Separada de
+  // `billing.manage` (que o Financeiro tem): mudar a regra de cobranca da
+  // academia inteira nao e ato de quem lanca pagamento.
+  'billing.settings.manage',
   // F15: liberacao financeira excepcional. Separada de `billing.manage` pelo
   // mesmo motivo dos dois acima -- liberar o acesso de quem DEVE, sem o
   // pagamento entrar, e ato excepcional com prazo e nome gravados.
