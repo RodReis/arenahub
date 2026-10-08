@@ -34,6 +34,50 @@ describe('proximoNumeroLivre', () => {
     expect(proximoNumeroLivre(ocupados)).toBe(String(NUMERO_MINIMO));
   });
 
+  /**
+   * Decisao do PI (08/10/2026): o numero automatico comeca em 10.000 (5
+   * digitos), nao em 100.000.000.000. Abaixo do piso ficam os numeros do
+   * software de fabrica (1, 2, 3...) -- eles nao contam e nunca sao gerados.
+   */
+  it('comeca em 10000 e nunca gera numero do software de fabrica', () => {
+    expect(NUMERO_MINIMO).toBe(10_000);
+    expect(proximoNumeroLivre(new Set(['1', '2', '3', '9999']))).toBe('10000');
+  });
+
+  it('numero curto ja existente (ex.: importado, 26633) conta como ocupado e nunca e repetido', () => {
+    const ocupados = new Set<string>();
+    for (let n = NUMERO_MINIMO; n <= 26_633; n += 1) ocupados.add(String(n));
+
+    expect(proximoNumeroLivre(ocupados)).toBe('26634');
+  });
+
+  /**
+   * UNICIDADE: para qualquer conjunto de ocupados, o resultado nunca esta nele
+   * e e o PRIMEIRO livre (nenhum numero livre fica para tras). Conjuntos
+   * pseudo-aleatorios deterministas (LCG), com ruido fora da faixa.
+   */
+  it('nunca devolve numero ocupado e sempre o primeiro livre, em conjuntos variados', () => {
+    let semente = 12345;
+    const proximo = (limite: number): number => {
+      semente = (semente * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return semente % limite;
+    };
+
+    for (let rodada = 0; rodada < 200; rodada += 1) {
+      const ocupados = new Set<string>(['1', '42', '9999', 'abc']);
+      const quantidade = proximo(300);
+      for (let i = 0; i < quantidade; i += 1) ocupados.add(String(NUMERO_MINIMO + proximo(400)));
+
+      const resultado = proximoNumeroLivre(ocupados);
+
+      expect(ocupados.has(resultado)).toBe(false);
+      expect(Number(resultado)).toBeGreaterThanOrEqual(NUMERO_MINIMO);
+      for (let n = NUMERO_MINIMO; n < Number(resultado); n += 1) {
+        expect(ocupados.has(String(n))).toBe(true);
+      }
+    }
+  });
+
   it('ignora valor nao numerico', () => {
     const ocupados = new Set(['abc', '12.5', '-5']);
 
