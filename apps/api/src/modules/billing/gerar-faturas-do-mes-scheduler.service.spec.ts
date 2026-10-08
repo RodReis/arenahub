@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants.js';
 
+import { FUSO_DOS_AGENDADORES } from './domain/configuracao-de-pagamento.js';
 import { GerarFaturasDoMesSchedulerService } from './gerar-faturas-do-mes-scheduler.service.js';
 
 /**
@@ -83,5 +85,21 @@ describe('GerarFaturasDoMesSchedulerService -- dia de gerar por tenant', () => {
       jaExistiam: 1,
       falhas: 1,
     });
+  });
+});
+
+describe('GerarFaturasDoMesSchedulerService -- agendamento', () => {
+  // Sem isto, deixar a expressao mensal antiga ('5 0 1 * *') passaria em todo
+  // teste e a F89 viraria no-op em producao fora do dia 01.
+  it('o @Cron roda todo dia as 00:05 de Brasilia', () => {
+    const metodo: unknown = Reflect.get(GerarFaturasDoMesSchedulerService.prototype, 'executarComTrava');
+    const opcoes: unknown = Reflect.getMetadata(SCHEDULE_CRON_OPTIONS, metodo as object);
+
+    expect(opcoes).toMatchObject({
+      cronTime: '5 0 * * *',
+      timeZone: FUSO_DOS_AGENDADORES,
+      name: 'gerar-faturas-do-mes',
+    });
+    expect(FUSO_DOS_AGENDADORES).toBe('America/Sao_Paulo');
   });
 });
