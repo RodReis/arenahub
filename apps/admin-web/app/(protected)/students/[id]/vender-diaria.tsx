@@ -133,19 +133,21 @@ export function VenderDiaria({ studentId, planos, impedido, emAtraso = false }: 
             </option>
           ))}
         </SelectField>
-      ) : (
-        <p>{plano.name}</p>
-      )}
+      ) : null}
 
-      <p className={estilos['valor']} data-testid="diaria-valor">
-        {formatarDinheiro(plano.amountMinor, plano.currency)}
-      </p>
+      <div className={estilos['resumo']}>
+        {planos.length === 1 ? <p className={estilos['plano']}>{plano.name}</p> : null}
+        <p className={estilos['valor']} data-testid="diaria-valor">
+          {formatarDinheiro(plano.amountMinor, plano.currency)}
+        </p>
+      </div>
 
       <SeletorDeForma onEscolher={setForma} escolhida={forma} />
 
       <div className={estilos['acoes']}>
         <Button
           type="button"
+          variant="solid"
           disabled={enviando}
           data-testid="confirmar-diaria"
           onClick={() => void confirmar()}

@@ -25,14 +25,26 @@
  * As quatro formas em linha, quebrando sozinhas -- a pessoa esta no balcao e a
  * tela pode estar num monitor estreito de caixa.
  *
- * `auto-fit` com minimo de 132 px: em tela larga os quatro cabem numa linha;
- * num monitor de caixa viram dois por dois, sem nunca deixar um botao orfao
- * ocupando a largura inteira, que era o que `flex-wrap` produzia.
+ * OU QUATRO EM LINHA OU DOIS POR DOIS, nunca 3+1: `auto-fit` com minimo de
+ * 132 px deixava o "Credito" sozinho na segunda linha em qualquer largura
+ * entre tres e quatro colunas (o cartao estreito da ficha caia justo ali).
+ * A largura que decide e a do PROPRIO seletor (container query), nao a da
+ * janela -- o mesmo componente vive na cobranca inteira e num meio cartao.
  */
+.seletor {
+  container-type: inline-size;
+}
+
 .opcoes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+@container (min-width: 560px) {
+  .opcoes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /*
