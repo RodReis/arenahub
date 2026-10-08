@@ -837,7 +837,8 @@ quando a academia troca o valor com aluno **já em carência**.
 
 **Emenda de 07/10/2026 (F88, decisão do PI):** a carência padrão do tenant inaugural passa a ser
 **5 dias** (`BillingSettings.graceDays @default(5)`; vencimento dia 10 bloqueia a partir de 15, às
-00:00 locais). O instante de bloqueio é a **meia-noite local de `dueAt` + carência**, no fuso da
+00:00 locais). *(Padrão; configurável por tenant desde a F89, em Configuração > Pagamento — a mudança
+vale só para parcelas futuras, `blockAt` fica congelado na abertura.)* O instante de bloqueio é a **meia-noite local de `dueAt` + carência**, no fuso da
 unidade do aluno (`ciclo-de-cobranca.instanteDeBloqueio`), e é gravado em `Invoice.blockAt` na
 abertura da fatura. O job de inadimplência passa a rodar todo dia às 00:10 (America/Sao_Paulo), só
 sobre aluno `STUDENT` e plano que não seja `DIARIA`, e só liga com
@@ -4732,13 +4733,15 @@ vencimento novo). *(Revogado em
 A âncora que a emenda de 01/10/2026 criou **deixou de existir**. O PI padronizou o vencimento
 (SPEC-088, [desenho](../superpowers/specs/2026-10-07-padronizar-vencimento-design.md)):
 
-1. **Todo vencimento é o dia do ciclo** (`dueDay` do tenant, hoje 10) da própria competência. A
+1. **Todo vencimento é o dia do ciclo** (`dueDay` do tenant, padrão 10; configurável por tenant desde
+   a F89) da própria competência. A
    data do pagamento **não desloca** nenhum vencimento.
 2. **A data do pagamento só define `Invoice.coverageEndsAt`** — "até quando o mês pago cobre", campo
    **informativo** (mostrado na coluna "Vence em" da fatura paga). Não alimenta bloqueio, direito de
    acesso nem cobrança. No lote, a posição `k` é contada por competência paga:
    `coverageEndsAt = dia do pagamento + 30 dias × k`.
-3. **O lote não abre mais a fatura seguinte**; quem abre as faturas é o job do dia 01 (INV-164).
+3. **O lote não abre mais a fatura seguinte**; quem abre as faturas é o job mensal, no dia 01 por
+   padrão (configurável por tenant desde a F89; INV-164).
 4. O bloqueio segue `vencimento + carência` a partir da **meia-noite local** do dia do vencimento
    (ADR-019, emenda de 07/10/2026).
 
