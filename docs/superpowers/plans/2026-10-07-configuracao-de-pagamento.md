@@ -24,7 +24,7 @@
 - Salvar a configuração **nunca** altera `Invoice` (`dueAt`, `blockAt` ficam congelados na abertura).
 - Não stagear `CLAUDE.md` (alteração do usuário). Nada de `git add -A`; sempre os arquivos da tarefa.
 - Commits terminam com `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. PR descrito com `refs #624` (nunca `closes`).
-- **PARADA OBRIGATÓRIA ANTES DO PR:** o PI avisou (07/10/2026) que, depois de terminar esta tarefa, **antes de abrir o PR** há mais um ajuste dele. Ao fim da Task 7 o controlador PARA, reporta e espera o ajuste. Não dar `git push` nem `gh pr create` antes disso.
+- **Ajuste do PI incluído (07/10/2026):** antes do PR o PI pediu que a venda da diária também apareça na tela de Cobrança do aluno quando ele não tem plano vinculado (Task 7). Com plano vinculado, a tela fica como hoje. A diária continua também na aba Plano.
 
 ## Review Focus
 
@@ -34,7 +34,8 @@
 4. **`PUT` incompleto ou com tipo errado** (campo ausente, `"10"` string, `10.5`, `null`): 4xx com código estável, nada gravado. (Task 3)
 5. **Tenant sem linha em `billing_settings`:** `GET` devolve 1/10/5 sem criar linha; `PUT` cria a linha. (Task 3)
 6. **Usuário sem a permissão** abre a tela e vê os valores sem o botão Salvar; o `PUT` direto devolve 403. (Tasks 3 e 6)
-7. **Duas abas salvando:** vale a última gravação, e a auditoria guarda antigo e novo de cada uma. (Task 3)
+7. **Cobrança sem plano:** o aluno sem assinatura vê "Vender diária" na tela de Cobrança; com assinatura ACTIVE ou SUSPENDED (que usa a faixa de meses) a venda **não** aparece; aluno impedido (BLOCKED/CANCELLED/ARCHIVED) vê o aviso, não o botão. (Task 7)
+8. **Duas abas salvando:** vale a última gravação, e a auditoria guarda antigo e novo de cada uma. (Task 3)
 
 ---
 
@@ -760,7 +761,161 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: Documentação, gate local e PARADA antes do PR
+### Task 7: Diária na tela de Cobrança (ajuste do PI)
+
+**Contexto:** hoje "Vender diária" só existe na aba Plano da ficha (`students/[id]/page.tsx` ~linha 900, só quando o aluno está sem plano vigente). Na tela **Cobrança** (`students/[id]/billing`), um aluno sem assinatura vê só "Este aluno não tem assinatura ativa" (`painel-de-cobranca.tsx` ~linha 96). O PI quer a venda da diária **na mesma tela em que se recebe o plano**: com plano vinculado, a Cobrança fica como hoje; sem plano, mostra a diária. Pode ficar nas duas telas.
+
+**Files:**
+- Create: `apps/admin-web/src/billing/planos-de-diaria.ts` e `planos-de-diaria.test.ts`
+- Modify: `apps/admin-web/app/(protected)/students/[id]/page.tsx` (usar o helper no lugar do `flatMap` inline, ~linhas 275-286)
+- Modify: `apps/admin-web/app/(protected)/students/[id]/billing/page.tsx` (buscar planos, calcular `impedido`, passar `diaria`)
+- Modify: `apps/admin-web/app/(protected)/students/[id]/billing/painel-de-cobranca.tsx` e `painel-de-cobranca.module.css`; teste novo ou existente do painel
+- Modify: `apps/admin-web/app/actions/membership.ts` (`venderDiaria`: revalidar também a Cobrança) e o teste da action
+- Modify: `apps/admin-web/tests/e2e/billing.e2e-spec.ts` (o `sem-assinatura-ativa` continua; acrescentar a diária)
+
+**Interfaces:**
+- Consumes: `VenderDiaria` (`students/[id]/vender-diaria.tsx`, props `{ studentId, planos, impedido, emAtraso? }`) e `PlanoDeDiaria` do mesmo arquivo; `impedeAcesso(situacao: string): boolean` de `src/students/formatar.ts`.
+- Produces: `planosDeDiariaDe(planos: readonly PlanoDaLista[]): PlanoDeDiaria[]`, com `PlanoDaLista = { id: string; name: string; isActive: boolean; billingMode?: 'AVULSO' | 'ASSINATURA' | 'DIARIA'; currentPrice?: { amountMinor: number; currency: string } | null }`; prop opcional nova de `PainelDeCobranca`: `diaria?: { studentId: string; planos: readonly PlanoDeDiaria[]; impedido: boolean }`.
+
+- [ ] **Step 1: Helper compartilhado (teste primeiro)**
+
+`planos-de-diaria.test.ts` (Vitest):
+
+```ts
+import { describe, expect, it } from 'vitest';
+
+import { planosDeDiariaDe } from './planos-de-diaria';
+
+const preco = { amountMinor: 3000, currency: 'BRL' };
+
+describe('planosDeDiariaDe', () => {
+  it('so plano DIARIA, ativo e com preco vigente', () => {
+    const lista = [
+      { id: 'a', name: 'Diaria', isActive: true, billingMode: 'DIARIA' as const, currentPrice: preco },
+      { id: 'b', name: 'Mensal', isActive: true, billingMode: 'AVULSO' as const, currentPrice: preco },
+      { id: 'c', name: 'Diaria inativa', isActive: false, billingMode: 'DIARIA' as const, currentPrice: preco },
+      { id: 'd', name: 'Diaria sem preco', isActive: true, billingMode: 'DIARIA' as const, currentPrice: null },
+      { id: 'e', name: 'Sem modo', isActive: true },
+    ];
+
+    expect(planosDeDiariaDe(lista)).toEqual([
+      { id: 'a', name: 'Diaria', amountMinor: 3000, currency: 'BRL' },
+    ]);
+  });
+});
+```
+
+Implementação (`planos-de-diaria.ts`) = o `flatMap` hoje inline em `page.tsx` (linhas ~275-286), movido sem mudar o comportamento:
+
+```ts
+import type { PlanoDeDiaria } from '../../app/(protected)/students/[id]/vender-diaria';
+
+export interface PlanoDaLista {
+  id: string;
+  name: string;
+  isActive: boolean;
+  billingMode?: 'AVULSO' | 'ASSINATURA' | 'DIARIA';
+  currentPrice?: { amountMinor: number; currency: string } | null;
+}
+
+/** Planos que a recepcao pode vender como diaria: modalidade DIARIA, ativo e com preco vigente. */
+export function planosDeDiariaDe(planos: readonly PlanoDaLista[]): PlanoDeDiaria[] {
+  return planos.flatMap((p) =>
+    p.billingMode === 'DIARIA' && p.isActive && p.currentPrice
+      ? [{ id: p.id, name: p.name, amountMinor: p.currentPrice.amountMinor, currency: p.currentPrice.currency }]
+      : [],
+  );
+}
+```
+
+Em `students/[id]/page.tsx`, troque o bloco `const planosDeDiaria = planos.flatMap(...)` por `const planosDeDiaria = planosDeDiariaDe(planos);` (importe o helper). Comportamento idêntico; os testes existentes da ficha seguem verdes.
+
+- [ ] **Step 2: Página de Cobrança busca os planos**
+
+Em `billing/page.tsx`, acrescente `chamarApi<PlanoDaLista[]>('/api/v1/plans')` ao `Promise.all` (linha ~105). Falha ao listar planos **não derruba a tela**: use `resposta.dados ?? []` (sem plano de diária o `VenderDiaria` já mostra a nota "Nenhum plano de diária ativo com preço…"). Calcule:
+
+```ts
+const diaria = {
+  studentId: id,
+  planos: planosDeDiariaDe(respostaDosPlanos.dados ?? []),
+  impedido: aluno !== null && impedeAcesso(aluno.status),
+};
+```
+
+(use o nome real da variável do aluno nessa página) e passe `diaria={diaria}` ao `PainelDeCobranca`.
+
+- [ ] **Step 3: Painel mostra a diária só quando não há plano (teste primeiro)**
+
+No teste do painel (crie `painel-de-cobranca.test.tsx` se não existir; siga `faixa-de-meses.test.tsx` para mockar `next/navigation` e as actions), casos:
+
+```tsx
+const diaria = {
+  studentId: 's1',
+  planos: [{ id: 'p', name: 'Diaria', amountMinor: 3000, currency: 'BRL' }],
+  impedido: false,
+};
+
+it('sem assinatura: mostra o vazio E a venda de diaria', () => {
+  render(<PainelDeCobranca subscriptionId={null} subscriptionIdParaPagamento={null} mesesPagaveis={[]} diaria={diaria} />);
+  expect(screen.getByTestId('sem-assinatura-ativa')).toBeInTheDocument();
+  expect(screen.getByTestId('abrir-venda-de-diaria')).toBeInTheDocument();
+});
+
+it('com assinatura ativa: NAO mostra a venda de diaria', () => {
+  render(<PainelDeCobranca subscriptionId="sub" subscriptionIdParaPagamento="sub" mesesPagaveis={[]} diaria={diaria} />);
+  expect(screen.queryByTestId('abrir-venda-de-diaria')).not.toBeInTheDocument();
+});
+
+it('assinatura suspensa (so faixa de meses): NAO mostra a venda de diaria', () => {
+  render(<PainelDeCobranca subscriptionId={null} subscriptionIdParaPagamento="sub" mesesPagaveis={[]} diaria={diaria} />);
+  expect(screen.queryByTestId('abrir-venda-de-diaria')).not.toBeInTheDocument();
+});
+
+it('aluno impedido: mostra o aviso, nao o botao', () => {
+  render(<PainelDeCobranca subscriptionId={null} subscriptionIdParaPagamento={null} mesesPagaveis={[]} diaria={{ ...diaria, impedido: true }} />);
+  expect(screen.getByTestId('diaria-impedida')).toBeInTheDocument();
+  expect(screen.queryByTestId('abrir-venda-de-diaria')).not.toBeInTheDocument();
+});
+```
+
+Implementação em `painel-de-cobranca.tsx`: nova prop opcional `diaria`. No ramo `subscriptionId === null && subscriptionIdParaPagamento === null`, mantenha o `EmptyState` (`testId="sem-assinatura-ativa"`, mesmo título) mas troque o `hint` por `"Atribua um plano na aba Plano ou venda uma diária abaixo."` e, **depois** dele, renderize quando `diaria !== undefined`:
+
+```tsx
+<div className={estilos['diaria']} data-testid="diaria-na-cobranca">
+  <h3>Diária</h3>
+  <p className={estilos['nota']}>Acesso pago no balcão, válido até 23:59 de hoje.</p>
+  <VenderDiaria studentId={diaria.studentId} planos={diaria.planos} impedido={diaria.impedido} />
+</div>
+```
+
+Importe `VenderDiaria` de `'../vender-diaria'`. Acrescente `.diaria` (e `.nota`, se faltar) em `painel-de-cobranca.module.css` só com tokens do `DS-PAINEL.md`, sem hex. Hoje o único teste que olha o vazio é `tests/e2e/billing.e2e-spec.ts:62` (por testid, que não muda); se algum teste unitário afirma o texto do `hint`, atualize-o.
+
+- [ ] **Step 4: Atualizar a Cobrança depois da venda**
+
+Em `app/actions/membership.ts`, na `venderDiaria`, ao lado de `revalidatePath(`/students/${analisado.data.studentId}`)` (linha ~747) acrescente `revalidatePath(`/students/${analisado.data.studentId}/billing`)`. No teste da action, afirme as **duas** revalidações.
+
+- [ ] **Step 5: E2E**
+
+Em `tests/e2e/billing.e2e-spec.ts` (linha ~62, caso do aluno sem assinatura): além de `sem-assinatura-ativa`, afirme `abrir-venda-de-diaria` visível. Se o fluxo de venda da diária já tem E2E (`grep -rn "venda-de-diaria" apps/admin-web/tests`), reutilize-o para vender **a partir da Cobrança** e conferir o toast "Diária paga". Rebuilde o painel antes de rodar (o `next start` serve build antigo).
+
+- [ ] **Step 6: Rodar**
+
+Run: `pnpm --filter @arenahub/admin-web test`, `typecheck`, `lint --force`. Suba o painel e **abra** a Cobrança de um aluno sem plano e a de um com plano, contra o banco descartável; confira a diferença. Expected: verde.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/admin-web/src/billing/planos-de-diaria.ts apps/admin-web/src/billing/planos-de-diaria.test.ts "apps/admin-web/app/(protected)/students/[id]/page.tsx" "apps/admin-web/app/(protected)/students/[id]/billing" apps/admin-web/app/actions/membership.ts apps/admin-web/tests/e2e/billing.e2e-spec.ts
+git commit -m "feat: venda de diaria tambem na tela de Cobranca do aluno sem plano (F89, ajuste do PI, refs #624)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```
+
+(Inclua no `git add` o teste da action, se ele ficar fora dos caminhos acima.)
+
+---
+
+### Task 8: Documentação e gate local
 
 **Files:**
 - Modify: `docs/CONVENTION.md` (INV-164)
@@ -789,6 +944,6 @@ git commit -m "docs: INV-164, STATUS e DEVELOPMENT da F89 (refs #624)
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 5: PARAR**
+- [ ] **Step 5: Fechar a entrega**
 
-**Não** dar push nem abrir PR. Reportar ao controlador: lista de commits, resultado do gate e pendências. O PI tem mais um ajuste a pedir antes do PR; o controlador espera, aplica e só então segue o fluxo de PR do projeto (PR `refs #624`, `gh run watch --exit-status`, merge, `fechar-card`, `proplan:done`).
+Com o gate verde, siga o fluxo de PR do projeto: `git push -u origin feat/f89-configuracao-pagamento`, PR com `refs #624` (o corpo cita a spec, o desenho, o ajuste do PI da diária na Cobrança e o ruling R7), `gh run watch <id> --exit-status` em background com aviso de espera, conferir job a job, merge, preencher o PR no `TESTS.md`, `fechar-card` e `proplan:done`. O aceite é do PI.

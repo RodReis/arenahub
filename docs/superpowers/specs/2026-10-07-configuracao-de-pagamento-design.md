@@ -82,6 +82,21 @@ gerar nem é configuração: é a expressão do cron.
 - Quem não tem `billing.settings.manage` vê os valores em leitura, sem botão de salvar.
 - Segue `docs/design/DS-PAINEL.md`: tokens, sem hex literal.
 
+### 4.5 Ajuste do PI (07/10/2026): diária também na tela de Cobrança
+
+Pedido do PI antes do PR: a venda da diária passa a aparecer **na mesma tela em que se recebe o plano** (aba
+Cobrança da ficha do aluno, `students/[id]/billing`).
+
+- Aluno **sem plano vinculado** (sem assinatura `ACTIVE` ou `SUSPENDED`): a Cobrança mostra o vazio de hoje com o
+  texto ajustado ("Atribua um plano na aba Plano ou venda uma diária abaixo.") e, logo depois, o bloco **Diária**
+  com o mesmo componente `VenderDiaria` da aba Plano.
+- Aluno **com plano vinculado**: a Cobrança fica exatamente como hoje (faixa de meses, sem diária).
+- Aluno impedido (`BLOCKED`, `CANCELLED`, `ARCHIVED`): o bloco mostra o aviso, não o botão.
+- A diária **continua também na aba Plano**. O helper que escolhe os planos de diária sai do `page.tsx` da ficha e vira
+  função compartilhada pelas duas telas. Depois da venda, a Cobrança é revalidada.
+- Sem mudança de API: a regra de que quem tem plano não compra diária continua só na API
+  (`STUDENT_HAS_ACTIVE_SUBSCRIPTION`).
+
 ## 5. Efeito em produção
 
 - Nenhuma mudança de comportamento no deploy: os valores iniciais são os do job atual (1, 10, 5).
