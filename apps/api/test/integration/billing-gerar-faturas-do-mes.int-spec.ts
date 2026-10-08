@@ -204,4 +204,98 @@ describe('GerarFaturasDoMesUseCase', () => {
       jest.restoreAllMocks();
     }
   });
+
+  it('dois tenants com dias diferentes: so o do dia de hoje gera', async () => {
+    // Tenant B (o do cenario) gera no dia 1; o tenant A criado aqui, no dia 5.
+    const tenantA = await db.tenant.create({
+      data: {
+        slug: `gfm-a-${sufixo}`,
+        legalName: `Gerar Faturas A ${sufixo} LTDA`,
+        displayName: `Gerar Faturas A ${sufixo}`,
+      },
+    });
+    const competencia = new Date('2026-11-01T00:00:00Z');
+
+    try {
+      await db.billingSettings.create({
+        data: { tenantId: tenantA.id, invoiceGenerationDay: 5, dueDay: 10, graceDays: 5 },
+      });
+      const unidadeA = await db.gymUnit.create({
+        data: {
+          tenantId: tenantA.id,
+          code: 'SP',
+          name: 'Sao Paulo',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+      const planoA = await db.plan.create({
+        data: {
+          tenantId: tenantA.id,
+          name: `Mensal A ${sufixo}`,
+          billingMode: 'AVULSO',
+          prices: {
+            create: [
+              {
+                tenantId: tenantA.id,
+                amountMinor: 10000,
+                currency: 'BRL',
+                validFrom: new Date('2026-01-01T00:00:00Z'),
+              },
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      const estudanteA = await db.student.create({
+        data: {
+          tenantId: tenantA.id,
+          gymUnitId: unidadeA.id,
+          membershipNumber: `GFM-A-${sufixo}`,
+          fullName: 'Aluno GFM A',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          profile: 'STUDENT',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      const assinaturaA = await db.subscription.create({
+        data: {
+          tenantId: tenantA.id,
+          studentId: estudanteA.id,
+          planId: planoA.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-01-01T00:00:00Z'),
+        },
+        select: { id: true },
+      });
+      // Aluno elegivel do tenant B: se B gerasse hoje (dia 5), receberia fatura.
+      const alunoB = await aluno({});
+      jest
+        .spyOn(moduleRef.get(BillingRepository), 'listarTenantsAtivos')
+        .mockResolvedValue([tenantA.id, tenantId]);
+
+      const r = await moduleRef
+        .get(GerarFaturasDoMesSchedulerService)
+        .executarCiclo(new Date('2026-11-05T12:00:00Z'));
+
+      expect(r.tenants).toBe(2);
+      expect(r.foraDoDia).toBe(1);
+      expect(r.falhas).toBe(0);
+      expect(r.criadas).toBe(1);
+      expect(
+        await db.invoice.count({
+          where: { tenantId: tenantA.id, subscriptionId: assinaturaA.id, billingPeriod: competencia },
+        }),
+      ).toBe(1);
+      expect(
+        await db.invoice.count({
+          where: { tenantId, subscriptionId: alunoB.subscriptionId, billingPeriod: competencia },
+        }),
+      ).toBe(0);
+    } finally {
+      jest.restoreAllMocks();
+      await db.tenant.deleteMany({ where: { id: tenantA.id } });
+    }
+  });
 });
