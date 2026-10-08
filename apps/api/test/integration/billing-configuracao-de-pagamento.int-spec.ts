@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -255,6 +255,70 @@ describe('F89 -- configuracao de pagamento', () => {
     const logs = await auditorias(tenantId);
     expect(logs).toHaveLength(logsAntes + 2);
     expect(logs.at(-1)?.metadata).toEqual({ before: primeira, after: segunda });
+  });
+
+  it('auditoria que falha desfaz a gravacao da linha (FK do ator)', async () => {
+    // Tenant PROPRIO: nao depende do estado que os outros casos deixaram.
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `f89-tx-${sufixo}`,
+        legalName: `Config Pagamento tx ${sufixo} LTDA`,
+        displayName: `Config Pagamento tx ${sufixo}`,
+      },
+    });
+
+    try {
+      const inicial = { invoiceGenerationDay: 2, dueDay: 9, graceDays: 4 };
+      await db.billingSettings.create({ data: { tenantId: tenant.id, ...inicial } });
+
+      // `audit_logs.actor_id` tem FK para `users`: um uuid inexistente faz o
+      // INSERT da auditoria falhar DEPOIS do upsert, dentro da transacao.
+      const atorInexistente = { ...contextoDe(tenant.id), actorId: randomUUID() };
+
+      await expect(
+        useCase.salvar(atorInexistente, { invoiceGenerationDay: 7, dueDay: 21, graceDays: 9 }, 'corr-tx'),
+      ).rejects.toThrow();
+
+      expect(await useCase.obter(tenant.id)).toEqual(inicial);
+      expect(await auditorias(tenant.id)).toHaveLength(0);
+    } finally {
+      await db.tenant.deleteMany({ where: { id: tenant.id } });
+    }
+  });
+
+  it('linha e auditoria na MESMA transacao: abortar depois das duas escritas desfaz as duas', async () => {
+    // A auditoria aqui NAO falha (ator valido): o que se prova e que, se a
+    // transacao nao chega ao commit, nem a linha nem a auditoria ficam. Se
+    // qualquer uma das duas escritas usasse o client fora de `tx`, ela
+    // comitaria sozinha e sobraria rastro.
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `f89-ab-${sufixo}`,
+        legalName: `Config Pagamento ab ${sufixo} LTDA`,
+        displayName: `Config Pagamento ab ${sufixo}`,
+      },
+    });
+    const original = db.$transaction.bind(db) as (f: unknown, o?: unknown) => Promise<unknown>;
+    const espiao = jest.spyOn(db, '$transaction').mockImplementation(((executar: unknown, opcoes?: unknown) =>
+      original(async (tx: unknown) => {
+        await (executar as (t: unknown) => Promise<unknown>)(tx);
+        throw new Error('aborta antes do commit');
+      }, opcoes)) as unknown as typeof db.$transaction);
+
+    try {
+      const inicial = { invoiceGenerationDay: 2, dueDay: 9, graceDays: 4 };
+      await db.billingSettings.create({ data: { tenantId: tenant.id, ...inicial } });
+
+      await expect(
+        useCase.salvar(contextoDe(tenant.id), { invoiceGenerationDay: 7, dueDay: 21, graceDays: 9 }, 'corr-ab'),
+      ).rejects.toThrow('aborta antes do commit');
+
+      expect(await useCase.obter(tenant.id)).toEqual(inicial);
+      expect(await auditorias(tenant.id)).toHaveLength(0);
+    } finally {
+      espiao.mockRestore();
+      await db.tenant.deleteMany({ where: { id: tenant.id } });
+    }
   });
 
   it('o banco recusa escrita direta fora dos limites (CHECK)', async () => {
