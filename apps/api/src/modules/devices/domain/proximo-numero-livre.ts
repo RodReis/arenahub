@@ -3,15 +3,19 @@
  *
  * O numero do equipamento (CATRACA/`enrollid`) NAO E SEQUENCIAL (decisao do
  * PI, issue #475): `MAX + 1` colide com numero baixo ja usado por outro
- * cadastro. A funcao certa e achar o primeiro buraco a partir do piso, e o
- * piso evita os numeros baixos que o software de fabrica costuma usar --
- * mesma razao de `ENROLL_ID_MINIMO` em `apps/edge-agent/src/domain/external-enroll-id.ts`.
+ * cadastro. A funcao certa e achar o primeiro buraco a partir do piso.
  *
- * Faixa igual a do cadastro facial automatico (`docs/vendor/topdata`): o
- * equipamento aceita ate 12 digitos, e cartao/facial dividem o mesmo espaco
- * de numero no leitor (a coluna CATRACA mostra os dois juntos).
+ * PISO DE 10.000 (decisao do PI, 08/10/2026 -- antes era 100.000.000.000, e o
+ * numero de 12 digitos na tela da recepcao era grande demais). Abaixo dele
+ * ficam os numeros que o software de fabrica costuma usar (1, 2, 3...), que
+ * esta funcao nunca gera. Acima, o que ja existe de curto (importado, cartao,
+ * cadastro no leitor) CONTA como ocupado: por isso o chamador passa a uniao
+ * das tres fontes (`TurnstileNumberService.proximoLivre`).
+ *
+ * Teto igual ao do equipamento: ate 12 digitos, e cartao/facial dividem o
+ * mesmo espaco de numero no leitor (a coluna CATRACA mostra os dois juntos).
  */
-export const NUMERO_MINIMO = 100_000_000_000;
+export const NUMERO_MINIMO = 10_000;
 export const NUMERO_MAXIMO = 999_999_999_999;
 
 /**
@@ -38,7 +42,7 @@ export function proximoNumeroLivre(ocupados: ReadonlySet<string>): string {
     if (!numeros.has(candidato)) return String(candidato);
   }
 
-  // Faixa inteira ocupada (9*10^11 numeros) -- nunca deve acontecer na
+  // Faixa inteira ocupada (quase 10^12 numeros) -- nunca deve acontecer na
   // pratica, mas falhar alto aqui e melhor que devolver numero fora da
   // faixa que o equipamento recusaria.
   throw new Error('nenhum numero livre na faixa do equipamento');

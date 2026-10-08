@@ -8,6 +8,7 @@ import { comContexto } from '@arenahub/database';
 
 import { AppModule } from '../../src/app.module.js';
 import { PasswordService } from '../../src/modules/auth/password.service.js';
+import { NUMERO_MINIMO } from '../../src/modules/devices/domain/proximo-numero-livre.js';
 import { TurnstileNumberService } from '../../src/modules/students/turnstile-number.service.js';
 import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
@@ -25,6 +26,8 @@ describe('numero de catraca automatico', () => {
 
   const conta = { email: `tn-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' };
   const vizinha = { email: `tn-viz-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' };
+  // Tenant SEM nenhum aluno: o primeiro numero livre e exatamente o piso.
+  const curta = { email: `tn-curta-${sufixo}@exemplo.test`, tenantId: '', unidadeId: '', cookie: '' };
   // Numeros do leitor deste run: o sufixo evita colisao entre execucoes.
   const numeroDoLeitor = (n: number): string => `${parseInt(sufixo, 16) % 1_000_000}${String(n).padStart(6, '0')}`;
   let leitorId = '';
@@ -150,6 +153,7 @@ describe('numero de catraca automatico', () => {
 
     await montarAcademia(conta, `tn-${sufixo}`);
     await montarAcademia(vizinha, `tn-viz-${sufixo}`);
+    await montarAcademia(curta, `tn-curta-${sufixo}`);
 
     const node = await db.edgeNode.create({
       data: { tenantId: conta.tenantId, gymUnitId: conta.unidadeId, code: `EDGE-TN-${sufixo}` },
@@ -182,12 +186,12 @@ describe('numero de catraca automatico', () => {
 
   afterAll(async () => {
     // Suite que cria tenant apaga o tenant: o cascade leva alunos e credenciais.
-    for (const c of [conta, vizinha]) {
+    for (const c of [conta, vizinha, curta]) {
       if (c.tenantId) {
         await db.tenant.delete({ where: { id: c.tenantId } }).catch(() => undefined);
       }
     }
-    await db.user.deleteMany({ where: { email: { in: [conta.email, vizinha.email] } } });
+    await db.user.deleteMany({ where: { email: { in: [conta.email, vizinha.email, curta.email] } } });
     await app?.close();
   });
 
@@ -200,7 +204,7 @@ describe('numero de catraca automatico', () => {
       (c) => c.kind === 'FACIAL_ENROLL_ID',
     );
     expect(facial).toBeDefined();
-    expect(Number(facial!.externalId)).toBeGreaterThanOrEqual(100_000_000_000);
+    expect(Number(facial!.externalId)).toBeGreaterThanOrEqual(NUMERO_MINIMO);
   });
 
   it('gerar de novo para o mesmo aluno devolve o mesmo numero', async () => {
@@ -239,13 +243,81 @@ describe('numero de catraca automatico', () => {
     const numeros = resultados.map((r) => r.externalId);
     expect(new Set(numeros).size).toBe(5);
     for (const n of numeros) {
-      expect(Number(n)).toBeGreaterThanOrEqual(100_000_000_000);
+      expect(Number(n)).toBeGreaterThanOrEqual(NUMERO_MINIMO);
       expect(Number(n)).toBeLessThanOrEqual(999_999_999_999);
     }
     const gravadas = await db.studentCredential.findMany({
       where: { studentId: { in: ids }, kind: 'FACIAL_ENROLL_ID' },
     });
     expect(gravadas.map((c) => c.externalId).sort()).toEqual([...numeros].sort());
+  });
+
+  /**
+   * UNICIDADE na faixa curta (piso 10.000, decisao do PI de 08/10/2026).
+   *
+   * Tenant sem aluno nenhum: o primeiro livre e o piso, entao da para ocupar
+   * os numeros de baixo por cada fonte e provar que NENHUM deles e gerado de
+   * novo -- leitor (`DeviceReaderNumber`) e cartao (`TURNSTILE_CARD`) aqui;
+   * o vinculo (`DeviceUser`) tem o teste proprio mais abaixo.
+   */
+  it('faixa curta: numero ocupado por leitor ou cartao nunca e gerado, nem em paralelo', async () => {
+    const piso = NUMERO_MINIMO;
+    const doTenant = <T>(fn: () => Promise<T>): Promise<T> =>
+      comContexto({ kind: 'tenant', tenantId: curta.tenantId }, fn);
+
+    const node = await db.edgeNode.create({
+      data: { tenantId: curta.tenantId, gymUnitId: curta.unidadeId, code: `EDGE-TNC-${sufixo}` },
+    });
+    const leitor = await db.device.create({
+      data: {
+        tenantId: curta.tenantId,
+        gymUnitId: curta.unidadeId,
+        edgeNodeId: node.id,
+        kind: 'FACIAL_READER',
+        model: 'AiFace',
+        serial: `TNC-${sufixo}`,
+      },
+    });
+    // Fonte 1: o leitor ja tem o numero do piso.
+    await db.deviceReaderNumber.create({
+      data: { tenantId: curta.tenantId, deviceId: leitor.id, externalUserId: String(piso), seenAt: new Date() },
+    });
+
+    // Fonte 2: um aluno com CARTAO no numero seguinte (o facial do cadastro sai).
+    const donoDoCartao = await criarAluno(curta);
+    expect(await db.studentCredential.findFirst({
+      where: { studentId: donoDoCartao, kind: 'FACIAL_ENROLL_ID' },
+    })).toMatchObject({ externalId: String(piso + 1) });
+    await db.studentCredential.deleteMany({ where: { studentId: donoDoCartao } });
+    await db.studentCredential.create({
+      data: { tenantId: curta.tenantId, studentId: donoDoCartao, kind: 'TURNSTILE_CARD', externalId: String(piso + 1) },
+    });
+
+    // Pulou o do leitor e o do cartao: o proximo livre e piso + 2.
+    const seguinte = await criarAluno(curta);
+    expect(await db.studentCredential.findFirst({
+      where: { studentId: seguinte, kind: 'FACIAL_ENROLL_ID' },
+    })).toMatchObject({ externalId: String(piso + 2) });
+
+    // Cinco cadastros em paralelo: distintos, todos acima dos ocupados.
+    const ids = await Promise.all(Array.from({ length: 5 }, () => criarAluno(curta)));
+    const gravados = (
+      await db.studentCredential.findMany({
+        where: { studentId: { in: ids }, kind: 'FACIAL_ENROLL_ID' },
+      })
+    ).map((c) => Number(c.externalId));
+    expect(gravados).toHaveLength(5);
+    expect(new Set(gravados).size).toBe(5);
+    for (const n of gravados) expect(n).toBeGreaterThanOrEqual(piso + 3);
+
+    // E ninguem do tenant repete numero (qualquer tipo de credencial).
+    const todos = (await db.studentCredential.findMany({ where: { tenantId: curta.tenantId } })).map(
+      (c) => c.externalId,
+    );
+    expect(new Set(todos).size).toBe(todos.length);
+    expect(await doTenant(() => app.get(TurnstileNumberService).proximoLivre(curta.tenantId))).toBe(
+      String(Math.max(piso + 2, ...gravados) + 1),
+    );
   });
 
   it('se a geracao do numero falha, o cadastro ainda responde 201 e o aluno fica sem numero', async () => {
@@ -278,7 +350,7 @@ describe('numero de catraca automatico', () => {
       const r = await postar(id, {});
       expect(r.status).toBe(200);
       const corpo = r.body as { externalId: string; linkedReaders: number };
-      expect(Number(corpo.externalId)).toBeGreaterThanOrEqual(100_000_000_000);
+      expect(Number(corpo.externalId)).toBeGreaterThanOrEqual(NUMERO_MINIMO);
       expect(corpo.linkedReaders).toBe(0);
     });
 
