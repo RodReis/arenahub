@@ -42,6 +42,7 @@ gerar nem é configuração: é a expressão do cron.
 | R4 | Permissão nova `billing.settings.manage`, só do OWNER (fora do MANAGER). | O Financeiro tem `billing.manage` e não deve mudar a regra de cobrança da academia. | Mover a permissão de papel. |
 | R5 | O cron do gerador roda **todo dia** às 00:05 de Brasília e cada tenant só gera se o dia de hoje for o seu `invoiceGenerationDay`. Continua sem recuperar dia perdido. | Mantém a regra "todo dia X" literal, sem gerar fatura retroativa. A rota manual `POST billing/monthly-invoices/run` cobre a falha. | Trocar `==` por `>=` e já recupera. |
 | R6 | Rótulo da UI: "Dias de bloqueio após o vencimento". | `graceDays` do **contrato da plataforma** é outra coisa (suspensão do tenant) e confunde. | Só texto. |
+| R7 | O `CHECK` de banco de `grace_days` é `BETWEEN 0 AND 30`; o mínimo de 1 vale na API. | Há teste de integração com tenant sem carência (`graceDays: 0`) e o domínio já aceita 0. | Apertar o `CHECK` numa migration nova. |
 
 ## 4. Desenho
 
@@ -51,7 +52,7 @@ gerar nem é configuração: é a expressão do cron.
 - Migration aditiva. Backfill automático pelo `DEFAULT 1`: toda linha existente fica com 1, e produção já tem
   `due_day = 10` e `grace_days = 5`. A tela abre exatamente com os valores do job atual.
 - `CHECK` no banco para R1 e R2:
-  `invoice_generation_day BETWEEN 1 AND 28`, `due_day BETWEEN 1 AND 28`, `grace_days BETWEEN 1 AND 30`,
+  `invoice_generation_day BETWEEN 1 AND 28`, `due_day BETWEEN 1 AND 28`, `grace_days BETWEEN 0 AND 30`,
   `invoice_generation_day <= due_day`. A migration confere antes que nenhuma linha existente viola (produção
   não viola; um teste de migração cobre).
 
