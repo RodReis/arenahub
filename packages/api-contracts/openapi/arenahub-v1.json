@@ -3620,6 +3620,78 @@
         ]
       }
     },
+    "/api/v1/billing/settings": {
+      "get": {
+        "operationId": "ConfiguracaoDePagamentoController_obter",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "invoiceGenerationDay",
+                    "dueDay",
+                    "graceDays"
+                  ],
+                  "properties": {
+                    "invoiceGenerationDay": {
+                      "type": "integer"
+                    },
+                    "dueDay": {
+                      "type": "integer"
+                    },
+                    "graceDays": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ConfiguracaoDePagamento"
+        ]
+      },
+      "put": {
+        "operationId": "ConfiguracaoDePagamentoController_salvar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "invoiceGenerationDay",
+                    "dueDay",
+                    "graceDays"
+                  ],
+                  "properties": {
+                    "invoiceGenerationDay": {
+                      "type": "integer"
+                    },
+                    "dueDay": {
+                      "type": "integer"
+                    },
+                    "graceDays": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ConfiguracaoDePagamento"
+        ]
+      }
+    },
     "/api/v1/plans": {
       "post": {
         "operationId": "MembershipController_criarPlano",
