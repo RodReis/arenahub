@@ -1,30 +1,49 @@
 /**
- * Painel de venda da diaria (F86): uma coluna curta, na mesma escala do painel de
- * troca de plano. So tokens do DS-PAINEL -- nenhuma cor literal.
+ * Painel de venda da diaria (F86). Mesmo desenho do "Receber no balcao" da
+ * cobranca de planos (`billing/faixa-de-meses.module.css`): sem moldura propria
+ * (quem abriga -- cobranca ou SectionCard -- ja e o card), resumo em barra
+ * tingida de accent, formas em largura total e "Receber" cheio. So tokens do
+ * DS-PAINEL -- nenhuma cor literal.
  */
 .painel {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 640px;
-  padding: 16px;
-  border: 1px solid var(--ah-border-subtle);
-  border-left: 3px solid var(--ah-accent-500);
-  border-radius: var(--ah-radius-card);
-  background: var(--ah-surface-raised);
+  width: 100%;
   box-sizing: border-box;
+}
+
+.resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  border-radius: var(--ah-radius-control);
+  border: 1px solid color-mix(in srgb, var(--ah-action-solid) 28%, var(--ah-border-subtle));
+  background: color-mix(in srgb, var(--ah-action-solid) 6%, var(--ah-surface-raised));
+}
+
+.plano {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
 }
 
 .valor {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: var(--ah-type-body-strong-weight);
   font-variant-numeric: tabular-nums;
 }
 
+/* "Receber" ocupa a linha, como na faixa de meses; "Cancelar" ao lado. */
 .acoes {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 12px;
-  align-items: center;
+  align-items: stretch;
 }

@@ -817,6 +817,20 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
             </div>
 
             {/*
+              ISSUE #396 -- numero que o leitor reconhece (cartao de catraca
+              e/ou identificador facial). Caminho MANUAL: quem cadastra o
+              aluno direto no painel, fora do import em lote do Pacto, nao
+              tinha onde digitar o numero que a academia ja levantou por
+              fora. Logo abaixo de "Direitos de acesso" porque e a mesma
+              pergunta -- "este aluno consegue passar na catraca".
+            */}
+            <div className={estilos['largo']}>
+            <SectionCard title="Número da catraca" icon="scan-face">
+              <CredencialDeAcesso studentId={aluno.id} credenciais={credenciais} />
+            </SectionCard>
+            </div>
+
+            {/*
               F56 -- cobranca recorrente, ao lado do plano e nao numa aba
               propria: quem atribui o plano de assinatura e quem ativa a
               cobranca, na mesma conversa com o aluno.
@@ -903,19 +917,6 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
               </SectionCard>
             )}
 
-            {/*
-              ISSUE #396 -- numero que o leitor reconhece (cartao de catraca
-              e/ou identificador facial). Caminho MANUAL: quem cadastra o
-              aluno direto no painel, fora do import em lote do Pacto, nao
-              tinha onde digitar o numero que a academia ja levantou por
-              fora. Junto de "Direitos de acesso" porque e a mesma pergunta
-              -- "este aluno consegue passar na catraca".
-            */}
-            <div className={estilos['largo']}>
-            <SectionCard title="Número da catraca" icon="scan-face">
-              <CredencialDeAcesso studentId={aluno.id} credenciais={credenciais} />
-            </SectionCard>
-            </div>
             </div>
 
             {/*

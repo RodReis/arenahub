@@ -155,7 +155,7 @@
   padding: 10px 14px;
   border-radius: var(--ah-radius-control);
   background: color-mix(in srgb, var(--ah-action-solid) 6%, var(--ah-surface-raised));
-  border-left: 3px solid var(--ah-action-solid);
+  border: 1px solid color-mix(in srgb, var(--ah-action-solid) 28%, var(--ah-border-subtle));
   color: var(--ah-text-strong);
   font-size: var(--ah-type-body-size);
   line-height: var(--ah-type-body-lh);

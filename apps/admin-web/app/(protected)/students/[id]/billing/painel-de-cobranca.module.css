@@ -51,7 +51,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--ah-border-subtle);
 }
@@ -59,9 +59,9 @@
 .diaria h3 {
   margin: 0;
   color: var(--ah-text-strong);
-  font-size: var(--ah-type-body-size);
-  line-height: var(--ah-type-body-lh);
-  font-weight: var(--ah-type-heading-weight);
+  font-size: var(--ah-type-body-strong-size);
+  line-height: var(--ah-type-body-strong-lh);
+  font-weight: var(--ah-type-body-strong-weight);
 }
 
 .diaria .nota {
