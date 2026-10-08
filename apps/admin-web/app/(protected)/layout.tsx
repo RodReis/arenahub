@@ -140,6 +140,12 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/units', label: 'Unidades' },
   /*
+    CONFIGURAÇÃO -- F89. Dia de gerar, de vencer e de bloquear a catraca: uso
+    raro, mesmo grupo de Unidades. Quem lê cobrança vê; só
+    `billing.settings.manage` edita (a página decide).
+  */
+  { href: '/configuracao', label: 'Configuração', exigePermissao: 'billing.read' },
+  /*
     TERMO BIOMÉTRICO -- issue #491. Configuração de uso raro (publica-se uma
     vez, revisa-se de ano em ano), mesmo grupo de Dispositivos. Sem ele
     nenhuma biometria nasce. `consent.manage` é o que a rota de publicação

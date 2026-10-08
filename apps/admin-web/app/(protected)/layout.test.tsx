@@ -234,6 +234,20 @@ describe('seletor de unidade no topbar', () => {
       expect(screen.getByRole('link', { name: 'Cobrança' })).toBeInTheDocument();
     });
 
+    /* Configuração (F89): visível a quem lê cobrança, escondida de quem não lê. */
+    it('mostra Configuração só a quem tem billing.read', async () => {
+      responder([unidade('Matriz')], ['billing.read']);
+      const { unmount } = await renderizar();
+
+      expect(screen.getByRole('link', { name: 'Configuração' })).toHaveAttribute('href', '/configuracao');
+      unmount();
+
+      responder([unidade('Matriz')], []);
+      await renderizar();
+
+      expect(screen.queryByRole('link', { name: 'Configuração' })).toBeNull();
+    });
+
     /* O rótulo aparece UMA vez por grupo, não a cada item dele. */
     it('não repete o rótulo nos demais itens do grupo', async () => {
       responder([unidade('Matriz')], ['billing.dashboard']);
