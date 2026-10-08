@@ -299,11 +299,11 @@ describe('F89 -- configuracao de pagamento', () => {
       },
     });
     const original = db.$transaction.bind(db) as (f: unknown, o?: unknown) => Promise<unknown>;
-    const espiao = jest.spyOn(db, '$transaction').mockImplementation(((executar: unknown, opcoes?: unknown) =>
+    const espiao = jest.spyOn(db, '$transaction').mockImplementation((executar: unknown, opcoes?: unknown) =>
       original(async (tx: unknown) => {
         await (executar as (t: unknown) => Promise<unknown>)(tx);
         throw new Error('aborta antes do commit');
-      }, opcoes)) as unknown as typeof db.$transaction);
+      }, opcoes));
 
     try {
       const inicial = { invoiceGenerationDay: 2, dueDay: 9, graceDays: 4 };
