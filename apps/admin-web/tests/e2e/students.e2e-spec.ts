@@ -557,16 +557,24 @@ test.describe('navegação da recepção', () => {
  * `dialog[open]`.
  */
 test.describe('numero da catraca automatico', () => {
-  /** Os 12 digitos do visor, depois de provar que vem em quatro blocos de tres. */
+  /**
+   * Os digitos do visor, depois de provar o agrupamento: blocos de tres a
+   * partir da DIREITA (`10 000`, `26 634`, `100 000 000 007`), so o primeiro
+   * pode ter menos de tres. O piso do numero automatico e 10.000 (PI,
+   * 08/10/2026), entao a quantidade de blocos varia com o tamanho do numero.
+   */
   async function lerVisor(visor: import('@playwright/test').Locator): Promise<string> {
-    const blocos = visor.getByTestId('numero-em-destaque-valor').locator('span');
+    const valor = visor.getByTestId('numero-em-destaque-valor');
+    const blocos = valor.locator('span');
+    const digitos = ((await valor.textContent()) ?? '').replace(/\s/g, '');
 
-    await expect(blocos).toHaveCount(4);
-    for (let i = 0; i < 4; i += 1) {
+    await expect(blocos).toHaveCount(Math.ceil(digitos.length / 3));
+    await expect(blocos.first()).toHaveText(/^\d{1,3}$/);
+    for (let i = 1; i < Math.ceil(digitos.length / 3); i += 1) {
       await expect(blocos.nth(i)).toHaveText(/^\d{3}$/);
     }
 
-    return (await visor.getByTestId('numero-em-destaque-valor').textContent()) ?? '';
+    return digitos;
   }
 
   test('a ficha do aluno novo mostra o numero em destaque e a lista mostra o mesmo', async ({
@@ -584,7 +592,7 @@ test.describe('numero da catraca automatico', () => {
     // O numero mora na aba Plano, junto de "Direitos de acesso".
     await page.getByTestId('aba-plano').click();
     const numeroDaFicha = await lerVisor(page.getByTestId('numero-em-destaque'));
-    expect(numeroDaFicha).toMatch(/^\d{12}$/);
+    expect(numeroDaFicha).toMatch(/^\d{5,12}$/);
 
     // Lista -> acao de linha -> "Gerar novo": o MESMO numero, nenhum outro.
     await page.goto('/students');
