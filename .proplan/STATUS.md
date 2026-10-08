@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -35,6 +35,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][SPEC-089][F89] Configuração > Pagamento: dia de gerar, vencimento e bloqueio configuráveis (#624, finalizado em: 2026-10-08)
+- [MVP2][SPEC-086][FIX] E2E da venda de diária falha fora do horário comercial (#625, finalizado em: 2026-10-08)
 - [MVP2][SPEC-088][F88] Padronizar vencimento, fatura mensal e bloqueio por inadimplência (#621, finalizado em: 2026-10-07)
 - [MVP2][SPEC-086][F86] Diária avulsa no balcão: aluno sem plano paga R$ 30,00 e usa no dia (#616, finalizado em: 2026-10-07)
 - [MVP2][FIX] Baixas importadas: "Pago em" um dia antes e "Vence em" sem relação com o pagamento (#613, finalizado em: 2026-10-07)
