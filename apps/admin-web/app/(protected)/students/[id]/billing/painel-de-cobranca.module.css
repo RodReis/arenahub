@@ -45,3 +45,25 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
 }
+
+/* Venda de diaria (sem plano): bloco proprio, separado do vazio acima. */
+.diaria {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.diaria h3 {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+  font-weight: var(--ah-type-heading-weight);
+}
+
+.diaria .nota {
+  margin: 0;
+}

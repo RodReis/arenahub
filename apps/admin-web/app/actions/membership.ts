@@ -745,6 +745,8 @@ export async function venderDiaria(input: {
   }
 
   revalidatePath(`/students/${analisado.data.studentId}`);
+  // A Cobranca tambem oferece a diaria: depois da venda ela deixa de ser "sem plano".
+  revalidatePath(`/students/${analisado.data.studentId}/billing`);
 
   return { ok: true, paymentId: resposta.dados.paymentId, endsAt: resposta.dados.endsAt };
 }

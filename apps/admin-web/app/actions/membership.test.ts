@@ -14,7 +14,9 @@ vi.mock('next/cache', () => ({
 }));
 
 import { chamarApi } from '../../lib/api/server-client';
-import { atribuirPlano, definirCredencial } from './membership';
+import { revalidatePath } from 'next/cache';
+
+import { atribuirPlano, definirCredencial, venderDiaria } from './membership';
 
 /*
  * UUIDs VALIDOS: o digito de versao (13o) e a variante (17o) nao sao livres.
@@ -222,5 +224,46 @@ describe('definirCredencial', () => {
     const r = await definirCredencial({}, credencial('FACIAL_ENROLL_ID', '100000000001'));
 
     expect(r.erro).toBe('Este número já está vinculado a outro aluno.');
+  });
+});
+
+describe('venderDiaria', () => {
+  beforeEach(() => {
+    vi.mocked(chamarApi).mockReset();
+    vi.mocked(revalidatePath).mockClear();
+  });
+
+  const entrada = {
+    studentId: ALUNO,
+    planId: PLANO,
+    channel: 'DINHEIRO' as const,
+    expectedTotalMinor: 3000,
+  };
+
+  it('depois da venda atualiza a ficha E a Cobranca do aluno', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: true,
+      dados: { paymentId: 'pay-1', endsAt: '2026-10-08T03:00:00.000Z' },
+      cookiesDaApi: [],
+    });
+
+    const r = await venderDiaria(entrada);
+
+    expect(r).toEqual({ ok: true, paymentId: 'pay-1', endsAt: '2026-10-08T03:00:00.000Z' });
+    expect(revalidatePath).toHaveBeenCalledWith(`/students/${ALUNO}`);
+    expect(revalidatePath).toHaveBeenCalledWith(`/students/${ALUNO}/billing`);
+  });
+
+  it('venda recusada nao revalida nada', async () => {
+    vi.mocked(chamarApi).mockResolvedValue({
+      ok: false,
+      erro: { type: 'about:blank', title: 'Conflito', status: 409, code: 'STUDENT_HAS_ACTIVE_SUBSCRIPTION', correlationId: 'c' },
+      cookiesDaApi: [],
+    });
+
+    const r = await venderDiaria(entrada);
+
+    expect(r.ok).toBe(false);
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
