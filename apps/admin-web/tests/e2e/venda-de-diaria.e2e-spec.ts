@@ -89,6 +89,13 @@ test('recepcao vende a diaria a um aluno sem plano e o acesso vale ate a meia-no
   expect(opcoes.some((o) => o.startsWith(nomeDoPlano))).toBe(false);
 
   await page.getByTestId('abrir-venda-de-diaria').click();
+  // Escolhe o plano criado aqui (janela 24h): o `Diaria` do seed fecha as 22:00 e vem primeiro.
+  const valorDoPlano = await page
+    .getByTestId('diaria-plano')
+    .locator('option', { hasText: nomeDoPlano })
+    .getAttribute('value');
+  expect(valorDoPlano).toBeTruthy();
+  await page.getByTestId('diaria-plano').selectOption(valorDoPlano);
   await expect(page.getByTestId('diaria-valor')).toContainText('R$ 30,00');
 
   await page.getByTestId('forma-dinheiro').click();
@@ -150,6 +157,7 @@ test('recepcao vende a diaria direto da tela de Cobranca do aluno sem plano', as
     .getByTestId('diaria-plano')
     .locator('option', { hasText: nomeDoPlano })
     .getAttribute('value');
+  expect(valorDoPlano).toBeTruthy();
   await page.getByTestId('diaria-plano').selectOption(valorDoPlano);
   await page.getByTestId('forma-dinheiro').click();
   await page.getByTestId('confirmar-diaria').click();
