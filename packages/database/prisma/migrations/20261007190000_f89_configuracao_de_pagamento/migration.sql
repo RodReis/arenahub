@@ -25,5 +25,6 @@ ON CONFLICT (code) DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r
 JOIN permissions p ON p.code = 'billing.settings.manage'
-WHERE r.name IN ('OWNER', 'MANAGER') AND r.is_system = true
+-- So o dono (spec da F89, R4): mudar a regra de cobranca da academia e dele.
+WHERE r.name = 'OWNER' AND r.is_system = true
 ON CONFLICT (role_id, permission_id) DO NOTHING;

@@ -454,8 +454,8 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   `ACTIVE` com assinatura vigente e plano `billingMode != DIARIA`. O agendador roda **todo dia** às
   00:05 e gera só para o tenant cujo dia de gerar é hoje; é idempotente por INV-066 (rodar de novo,
   ou pelo `POST /billing/monthly-invoices/run`, não duplica nem consome número). O dono configura
-  os três dias em Configuração > Pagamento (F89, permissão `billing.settings.manage`, OWNER e
-  MANAGER); a mudança vale **só para parcelas futuras** — `dueAt` e `blockAt` ficam congelados na
+  os três dias em Configuração > Pagamento (F89, permissão `billing.settings.manage`, só
+  OWNER); a mudança vale **só para parcelas futuras** — `dueAt` e `blockAt` ficam congelados na
   abertura da parcela. Limites: dia de gerar e vencimento de 1 a 28, dia de gerar não depois do
   vencimento, carência de 0 a 30 no banco e de 1 a 30 na API. (b) A inadimplência
   roda **todo dia às 00:10** só sobre aluno `STUDENT` e plano `!= DIARIA` (staff, professor e passe
