@@ -63,7 +63,8 @@ export class ConfiguracaoDePagamentoUseCase {
           targetId: contexto.tenantId,
           correlationId,
           // Espalhado: o tipo do Json do Prisma pede assinatura de indice.
-          metadata: { before: { ...(antes ?? CONFIGURACAO_DE_PAGAMENTO_PADRAO) }, after: { ...nova } },
+          // Sem linha previa nada estava em vigor pelo tenant: `before` e null.
+          metadata: { before: antes ? { ...antes } : null, after: { ...nova } },
         },
       });
 

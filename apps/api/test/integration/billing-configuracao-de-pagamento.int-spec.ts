@@ -155,6 +155,11 @@ describe('F89 -- configuracao de pagamento', () => {
 
     expect(await db.billingSettings.count({ where: { tenantId: tenantSemLinha } })).toBe(1);
     expect(await useCase.obter(tenantSemLinha)).toEqual(entrada);
+    // Sem linha previa nada estava em vigor: `before` e null, nao o padrao.
+    const log = await db.auditLog.findFirstOrThrow({
+      where: { tenantId: tenantSemLinha, action: 'billing.settings_updated' },
+    });
+    expect(log.metadata).toEqual({ before: null, after: entrada });
   });
 
   it('PUT grava auditoria billing.settings_updated com antigo e novo', async () => {
@@ -321,17 +326,16 @@ describe('F89 -- configuracao de pagamento', () => {
     }
   });
 
-  it('o banco recusa escrita direta fora dos limites (CHECK)', async () => {
+  it.each([
+    ['dia de gerar 0', { invoiceGenerationDay: 0 }, 'billing_settings_invoice_generation_day_check'],
+    ['vencimento 29', { dueDay: 29 }, 'billing_settings_due_day_check'],
+    ['bloqueio 31', { graceDays: 31 }, 'billing_settings_grace_days_check'],
+    ['gerar 20 depois do vencimento 10', { invoiceGenerationDay: 20 }, 'billing_settings_generation_before_due_check'],
+  ])('o banco recusa escrita direta (CHECK): %s', async (_rotulo, dados, restricao) => {
     await useCase.salvar(contextoDe(tenantId), PADRAO, 'corr-check');
 
-    // gerar 20 > vencer 10
-    await expect(
-      db.billingSettings.update({ where: { tenantId }, data: { invoiceGenerationDay: 20 } }),
-    ).rejects.toThrow();
-    // vencer 29
-    await expect(db.billingSettings.update({ where: { tenantId }, data: { dueDay: 29 } })).rejects.toThrow();
-    // bloqueio 31
-    await expect(db.billingSettings.update({ where: { tenantId }, data: { graceDays: 31 } })).rejects.toThrow();
+    // Com o Prisma 7 + adapter-pg o nome da restricao so vem no texto do erro.
+    await expect(db.billingSettings.update({ where: { tenantId }, data: dados })).rejects.toThrow(restricao);
 
     expect(await useCase.obter(tenantId)).toEqual(PADRAO);
   });
