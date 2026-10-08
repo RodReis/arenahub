@@ -20,7 +20,8 @@
 - Toast para info/warn/error; nunca `alert`. UI segue `docs/design/DS-PAINEL.md`: tokens, sem hex literal, sem `toLocaleString()` sem fuso.
 - Limites (valores exatos do spec §3 e §4.1): dia de gerar e dia de vencer **1 a 28**; dias de bloqueio **1 a 30** na API; dia de gerar **≤** dia de vencer.
 - **Ruling R7 (deste plano):** o `CHECK` de banco para `grace_days` é `BETWEEN 0 AND 30`, não `1 AND 30`. Motivo: `apps/api/test/integration/billing-inadimplencia.int-spec.ts:505` cria um tenant com `graceDays: 0` e o domínio já aceita 0. O limite de **1** é regra de entrada da API (`validarConfiguracaoDePagamento`). Custo se errado: apertar o `CHECK` numa migration nova.
-- Permissão nova `billing.settings.manage`: só OWNER (e MANAGER, que deriva do OWNER por subtração e não está na lista de negadas). Financeiro e Recepção **não** a têm.
+- Permissão nova `billing.settings.manage`: **só OWNER** (spec R4). *Correção feita na execução (commit `924c390`): este plano nasceu dando a permissão também ao MANAGER, o que contraria o spec; ela entrou em `NEGADAS_AO_MANAGER` e a migration concede só ao OWNER. Onde as Tasks abaixo dizem "OWNER e MANAGER", vale OWNER.* Financeiro, Recepção e MANAGER **não** a têm.
+- *Correção feita na execução (revisão final):* o gerador mensal gera no dia configurado **e nos dias seguintes do mês** até a fatura existir (`hoje >= dia`), não só no dia exato; assim mudar o dia para um dia já passado não pula o mês. Onde as Tasks 2 e 4 dizem "`==`"/"só no dia", vale `>=`; a função passou a se chamar `jaChegouODiaDeGerar`.
 - Salvar a configuração **nunca** altera `Invoice` (`dueAt`, `blockAt` ficam congelados na abertura).
 - Não stagear `CLAUDE.md` (alteração do usuário). Nada de `git add -A`; sempre os arquivos da tarefa.
 - Commits terminam com `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. PR descrito com `refs #624` (nunca `closes`).
