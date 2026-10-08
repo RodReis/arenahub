@@ -100,7 +100,7 @@ export interface DataLocal {
  * Sao Paulo ja e o dia seguinte em UTC, e contar a carencia sobre o dia
  * errado adianta o bloqueio em 24 horas.
  */
-function dataLocalDe(instante: Date, timeZone: string): DataLocal {
+export function dataLocalDe(instante: Date, timeZone: string): DataLocal {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',

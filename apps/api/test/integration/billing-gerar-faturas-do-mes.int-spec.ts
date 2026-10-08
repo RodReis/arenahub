@@ -204,4 +204,132 @@ describe('GerarFaturasDoMesUseCase', () => {
       jest.restoreAllMocks();
     }
   });
+
+  /** Tenant proprio com um aluno elegivel; `dia` e o `invoiceGenerationDay` dele. */
+  async function tenantComAluno(rotulo: string, dia: number) {
+    const tenant = await db.tenant.create({
+      data: {
+        slug: `gfm-${rotulo}-${sufixo}`,
+        legalName: `Gerar Faturas ${rotulo} ${sufixo} LTDA`,
+        displayName: `Gerar Faturas ${rotulo} ${sufixo}`,
+      },
+    });
+    await db.billingSettings.create({
+      data: { tenantId: tenant.id, invoiceGenerationDay: dia, dueDay: 25, graceDays: 5 },
+    });
+    const unidade = await db.gymUnit.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'SP',
+        name: 'Sao Paulo',
+        timezone: 'America/Sao_Paulo',
+        openingHours: {},
+      },
+    });
+    const plano = await db.plan.create({
+      data: {
+        tenantId: tenant.id,
+        name: `Mensal ${rotulo} ${sufixo}`,
+        billingMode: 'AVULSO',
+        prices: {
+          create: [
+            {
+              tenantId: tenant.id,
+              amountMinor: 10000,
+              currency: 'BRL',
+              validFrom: new Date('2026-01-01T00:00:00Z'),
+            },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    const estudante = await db.student.create({
+      data: {
+        tenantId: tenant.id,
+        gymUnitId: unidade.id,
+        membershipNumber: `GFM-${rotulo}-${sufixo}`,
+        fullName: `Aluno GFM ${rotulo}`,
+        birthDate: new Date('2000-01-01T00:00:00Z'),
+        profile: 'STUDENT',
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+    const assinatura = await db.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        studentId: estudante.id,
+        planId: plano.id,
+        status: 'ACTIVE',
+        startsAt: new Date('2026-01-01T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+
+    return { tenantId: tenant.id, subscriptionId: assinatura.id };
+  }
+
+  const faturasDe = (alvo: { tenantId: string; subscriptionId: string }, competencia: Date) =>
+    db.invoice.count({
+      where: { tenantId: alvo.tenantId, subscriptionId: alvo.subscriptionId, billingPeriod: competencia },
+    });
+
+  it('dois tenants com dias diferentes: so gera quem ja chegou ao dia', async () => {
+    // Hoje e 05/11. A (dia 5) chegou; B (dia 10, o tenant do cenario) ainda nao.
+    const competencia = new Date('2026-11-01T00:00:00Z');
+    const tenantA = await tenantComAluno('a', 5);
+    const alunoB = await aluno({});
+    await db.billingSettings.update({ where: { tenantId }, data: { invoiceGenerationDay: 10 } });
+    jest
+      .spyOn(moduleRef.get(BillingRepository), 'listarTenantsAtivos')
+      .mockResolvedValue([tenantA.tenantId, tenantId]);
+
+    try {
+      const r = await moduleRef
+        .get(GerarFaturasDoMesSchedulerService)
+        .executarCiclo(new Date('2026-11-05T12:00:00Z'));
+
+      expect(r.tenants).toBe(2);
+      expect(r.foraDoDia).toBe(1);
+      expect(r.falhas).toBe(0);
+      expect(r.criadas).toBe(1);
+      expect(await faturasDe(tenantA, competencia)).toBe(1);
+      expect(await faturasDe({ tenantId, subscriptionId: alunoB.subscriptionId }, competencia)).toBe(0);
+    } finally {
+      jest.restoreAllMocks();
+      await db.billingSettings.update({ where: { tenantId }, data: { invoiceGenerationDay: 1 } });
+      await db.tenant.deleteMany({ where: { id: tenantA.tenantId } });
+    }
+  });
+
+  it('dia trocado para um que ja passou: o mes ainda recebe a fatura, sem duplicar', async () => {
+    // Dia 20, hoje 10/11: nada. O dono muda para 5: o mesmo dia 10/11 gera.
+    const competencia = new Date('2026-11-01T00:00:00Z');
+    const alvo = await tenantComAluno('m', 20);
+    jest.spyOn(moduleRef.get(BillingRepository), 'listarTenantsAtivos').mockResolvedValue([alvo.tenantId]);
+    const scheduler = moduleRef.get(GerarFaturasDoMesSchedulerService);
+    const agora = new Date('2026-11-10T12:00:00Z');
+
+    try {
+      const antes = await scheduler.executarCiclo(agora);
+      expect(antes.foraDoDia).toBe(1);
+      expect(await faturasDe(alvo, competencia)).toBe(0);
+
+      await db.billingSettings.update({ where: { tenantId: alvo.tenantId }, data: { invoiceGenerationDay: 5 } });
+      const depois = await scheduler.executarCiclo(agora);
+      expect(depois.foraDoDia).toBe(0);
+      expect(depois.criadas).toBe(1);
+      expect(await faturasDe(alvo, competencia)).toBe(1);
+
+      // dia seguinte: a fatura ja existe, nada duplica
+      const diaSeguinte = await scheduler.executarCiclo(new Date('2026-11-11T12:00:00Z'));
+      expect(diaSeguinte.criadas).toBe(0);
+      expect(diaSeguinte.jaExistiam).toBe(1);
+      expect(await faturasDe(alvo, competencia)).toBe(1);
+    } finally {
+      jest.restoreAllMocks();
+      await db.tenant.deleteMany({ where: { id: alvo.tenantId } });
+    }
+  });
 });

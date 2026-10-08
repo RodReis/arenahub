@@ -61,6 +61,8 @@ test.describe('financeiro do aluno', () => {
     // servidor seria pior que não oferecer.
     await expect(page.getByTestId('sem-assinatura-ativa')).toBeVisible();
     await expect(page.getByTestId('gerar-cobranca')).toHaveCount(0);
+    // Sem plano, a mesma tela oferece a venda da diaria (ajuste do PI, F89).
+    await expect(page.getByTestId('abrir-venda-de-diaria')).toBeVisible();
   });
 
   test('a ficha do aluno leva ao financeiro', async ({ page }) => {

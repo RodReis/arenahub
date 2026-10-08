@@ -10,6 +10,7 @@ import {
   proximoVencimento,
 } from './domain/ciclo-de-cobranca.js';
 import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
+import { CONFIGURACAO_DE_PAGAMENTO_PADRAO } from './domain/configuracao-de-pagamento.js';
 import { precoVigenteEm } from './domain/dinheiro.js';
 import {
   abrirInvoice,
@@ -759,6 +760,16 @@ export class BillingRepository {
     });
 
     return tenants.map((t) => t.id);
+  }
+
+  /** Dia do mes em que o tenant gera a parcela; sem linha, 1 (o padrao do job). */
+  async diaDeGerarFaturas(tenantId: string): Promise<number> {
+    const linha = await this.db.billingSettings.findUnique({
+      where: { tenantId },
+      select: { invoiceGenerationDay: true },
+    });
+
+    return linha?.invoiceGenerationDay ?? CONFIGURACAO_DE_PAGAMENTO_PADRAO.invoiceGenerationDay;
   }
 }
 

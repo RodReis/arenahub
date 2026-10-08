@@ -6,6 +6,8 @@ import { BillingController } from './billing.controller.js';
 import { BillingRepository } from './billing.repository.js';
 import { AplicarInadimplenciaUseCase } from './aplicar-inadimplencia.use-case.js';
 import { AplicarInadimplenciaSchedulerService } from './aplicar-inadimplencia-scheduler.service.js';
+import { ConfiguracaoDePagamentoController } from './configuracao-de-pagamento.controller.js';
+import { ConfiguracaoDePagamentoUseCase } from './configuracao-de-pagamento.use-case.js';
 import { GerarFaturasDoMesUseCase } from './gerar-faturas-do-mes.use-case.js';
 import { GerarFaturasDoMesSchedulerService } from './gerar-faturas-do-mes-scheduler.service.js';
 import { ExpirarAssinaturasVencidasUseCase } from './expirar-assinaturas-vencidas.use-case.js';
@@ -72,7 +74,12 @@ import { WebhookController } from './webhook.controller.js';
    * em RUNTIME, na primeira tentativa de estorno.
    */
   imports: [AuthModule],
-  controllers: [BillingController, WebhookController, EstornoConciliacaoController],
+  controllers: [
+    BillingController,
+    WebhookController,
+    EstornoConciliacaoController,
+    ConfiguracaoDePagamentoController,
+  ],
   providers: [
     BillingRepository,
     CriarCobrancaPixUseCase,
@@ -93,6 +100,7 @@ import { WebhookController } from './webhook.controller.js';
     ExpirarAssinaturasSchedulerService,
     AplicarInadimplenciaSchedulerService,
     GerarFaturasDoMesUseCase,
+    ConfiguracaoDePagamentoUseCase,
     GerarFaturasDoMesSchedulerService,
     ConsultarInadimplenciaUseCase,
     ConsultarPagosUseCase,

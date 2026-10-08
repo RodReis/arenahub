@@ -11,8 +11,10 @@ import {
 } from '@arenahub/ui';
 
 import { formatarMesAno } from '../../../../../src/billing/meses-pagaveis';
+import { planosDeDiariaDe, type PlanoDaLista } from '../../../../../src/billing/planos-de-diaria';
 import { estadoExibido, faturaEmDestaque, venceEmDaLinha } from '../../../../../src/billing/vencimento';
 import { chamarApi } from '../../../../../lib/api/server-client';
+import { impedeAcesso } from '../../../../../src/students/formatar';
 import { consultarMesesPagaveis } from '../../../../actions/billing';
 import { CancelarPagamento } from './cancelar-pagamento';
 import { PainelDeCobranca } from './painel-de-cobranca';
@@ -71,6 +73,7 @@ interface Aluno {
   /** Anulavel: 308 alunos do Pacto nao tem (ADR-034). */
   cpf: string | null;
   address: { postalCode: string } | null;
+  status: string;
 }
 
 /** Resposta de `GET /students/:id/invoices` -- fuso da unidade do aluno (INV-144, ADR-019). F53. */
@@ -102,10 +105,11 @@ export default async function PaginaFinanceiroDoAluno({
 }) {
   const { id } = await params;
 
-  const [respostaDoAluno, respostaDasInvoices, respostaDosDireitos] = await Promise.all([
+  const [respostaDoAluno, respostaDasInvoices, respostaDosDireitos, respostaDosPlanos] = await Promise.all([
     chamarApi<Aluno>(`/api/v1/students/${id}`),
     chamarApi<InvoicesDoAluno>(`/api/v1/students/${id}/invoices`),
     chamarApi<Entitlement[]>(`/api/v1/students/${id}/entitlements`),
+    chamarApi<PlanoDaLista[]>('/api/v1/plans'),
   ]);
 
   if (!respostaDasInvoices.ok) {
@@ -194,6 +198,16 @@ export default async function PaginaFinanceiroDoAluno({
 
   const mesesPagaveis =
     assinaturaParaPagamento !== null ? await consultarMesesPagaveis(assinaturaParaPagamento) : [];
+
+  /*
+   * Diaria na Cobranca (ajuste do PI, F89). Falha ao listar planos NAO derruba a
+   * tela: sem plano de diaria o `VenderDiaria` mostra a propria nota.
+   */
+  const diaria = {
+    studentId: id,
+    planos: planosDeDiariaDe(respostaDosPlanos.dados ?? []),
+    impedido: aluno !== undefined && impedeAcesso(aluno.status),
+  };
 
   return (
     <section aria-labelledby="titulo-financeiro">
@@ -356,6 +370,7 @@ export default async function PaginaFinanceiroDoAluno({
         subscriptionId={assinaturaAtiva}
         subscriptionIdParaPagamento={assinaturaParaPagamento}
         mesesPagaveis={mesesPagaveis}
+        diaria={diaria}
       />
     </section>
   );

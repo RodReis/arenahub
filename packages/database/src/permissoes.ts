@@ -67,6 +67,10 @@ export const PERMISSOES_DO_OWNER = [
   'billing.read',
   'billing.manage',
   'billing.payment.manual',
+  // F89: o dono define dia de gerar, vencimento e dias de bloqueio. Separada de
+  // `billing.manage` (que o Financeiro tem): mudar a regra de cobranca da
+  // academia inteira nao e ato de quem lanca pagamento.
+  'billing.settings.manage',
   // F15: liberacao financeira excepcional. Separada de `billing.manage` pelo
   // mesmo motivo dos dois acima -- liberar o acesso de quem DEVE, sem o
   // pagamento entrar, e ato excepcional com prazo e nome gravados.
@@ -178,12 +182,14 @@ export const PERMISSOES_DO_OWNER = [
  *
  * - `retention.kill_switch`: desligar o scoring afeta a academia inteira --
  *   `decisao de operacao, nao de consulta`, como o proprio catalogo registra.
+ * - `billing.settings.manage` (F89): mudar a regra de cobranca da academia
+ *   inteira e do dono (spec da F89, R4).
  *
  * `user.manage`/`role.assign` ERAM negadas ao gerente ("quem decide quem
  * entra e o dono"). Decisao do PI, 02/10/2026: na Arena Positiva quem
  * administra a equipe e a gerente -- ela convida, revoga e troca perfil.
  */
-const NEGADAS_AO_MANAGER = ['retention.kill_switch'];
+const NEGADAS_AO_MANAGER = ['retention.kill_switch', 'billing.settings.manage'];
 
 export const PERMISSOES_DO_MANAGER = PERMISSOES_DO_OWNER.filter(
   (codigo) => !NEGADAS_AO_MANAGER.includes(codigo),

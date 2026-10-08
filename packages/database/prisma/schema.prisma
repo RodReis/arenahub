@@ -3434,6 +3434,9 @@ model BillingSettings {
   /// `0`, que bloqueia a catraca na meia-noite do proprio dia do
   /// vencimento -- severo demais para nascer por omissao.
   graceDays       Int         @default(5) @map("grace_days")
+  /// F89: dia do mes em que o job gera a parcela do mes. `CHECK` 1..28 e
+  /// `<= dueDay` na migration.
+  invoiceGenerationDay Int @default(1) @map("invoice_generation_day")
   /// Dias apos o vencimento em que cada tentativa de cobranca acontece.
   ///
   /// O TAMANHO DA LISTA E O MAXIMO DE TENTATIVAS -- nao existe um segundo

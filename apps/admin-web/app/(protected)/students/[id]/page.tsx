@@ -19,6 +19,7 @@ import {
 } from '@arenahub/ui';
 
 import { chamarApi } from '../../../../lib/api/server-client';
+import { planosDeDiariaDe } from '../../../../src/billing/planos-de-diaria';
 import { faturaEmDestaque, situacaoDeVencimento } from '../../../../src/billing/vencimento';
 import { AlterarPerfil } from '../../../../src/components/alterar-perfil';
 import { traduzir } from '../../../../src/operations/formatar';
@@ -272,18 +273,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
     cortesia de nao oferecer o que vai falhar.
   */
   const planosAtribuiveis = planos.filter((p) => p.billingMode !== 'DIARIA');
-  const planosDeDiaria = planos.flatMap((p) =>
-    p.billingMode === 'DIARIA' && p.isActive && p.currentPrice
-      ? [
-          {
-            id: p.id,
-            name: p.name,
-            amountMinor: p.currentPrice.amountMinor,
-            currency: p.currentPrice.currency,
-          },
-        ]
-      : [],
-  );
+  const planosDeDiaria = planosDeDiariaDe(planos);
 
   const nomeDaUnidade = (unidadeId: string): string =>
     unidades.find((unidade) => unidade.id === unidadeId)?.name ?? unidadeId;

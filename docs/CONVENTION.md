@@ -447,10 +447,19 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   Data de hoje grava o instante real; dia passado grava meio-dia UTC (nunca meia-noite, que o fuso
   mostra como o dia anterior). A restauração de vencimento ao cancelar pagamento (INV-069, F85)
   deixou de existir; cancelar zera `coverageEndsAt`.
-- **INV-164** **Fatura mensal automática e inadimplência só para aluno (F88).** (a) A fatura da
-  competência nasce **todo dia 01 às 00:05** (America/Sao_Paulo) para aluno `STUDENT` + `ACTIVE`
-  com assinatura vigente e plano `billingMode != DIARIA`; é idempotente por INV-066 (rodar de novo,
-  ou pelo `POST /billing/monthly-invoices/run`, não duplica nem consome número). (b) A inadimplência
+- **INV-164** **Fatura mensal automática e inadimplência só para aluno (F88; dias configuráveis
+  desde a F89).** (a) A fatura da competência nasce **no dia configurado do tenant**
+  (`BillingSettings.invoiceGenerationDay`, padrão 01), às 00:05 (America/Sao_Paulo), com vencimento
+  em `dueDay` (padrão 10) e bloqueio `graceDays` dias depois (padrão 5), para aluno `STUDENT` +
+  `ACTIVE` com assinatura vigente e plano `billingMode != DIARIA`. O agendador roda **todo dia** às
+  00:05 e gera para o tenant **no dia configurado e em todo dia seguinte do mesmo mês até a fatura
+  existir** (`hoje >= dia`, em Brasília), para que mudar o dia para um que já passou não pule o mês;
+  é idempotente por INV-066 (rodar de novo, nos dias seguintes ou pelo
+  `POST /billing/monthly-invoices/run`, não duplica nem consome número). O dono configura
+  os três dias em Configuração > Pagamento (F89, permissão `billing.settings.manage`, só
+  OWNER); a mudança vale **só para parcelas futuras** — `dueAt` e `blockAt` ficam congelados na
+  abertura da parcela. Limites: dia de gerar e vencimento de 1 a 28, dia de gerar não depois do
+  vencimento, carência de 0 a 30 no banco e de 1 a 30 na API. (b) A inadimplência
   roda **todo dia às 00:10** só sobre aluno `STUDENT` e plano `!= DIARIA` (staff, professor e passe
   de diária nunca são bloqueados por ela), e **só está ligada** quando
   `BILLING_DELINQUENCY_JOB_ENABLED=true` — ausente ou qualquer outro valor deixa o job desligado.

@@ -89,6 +89,13 @@ test('recepcao vende a diaria a um aluno sem plano e o acesso vale ate a meia-no
   expect(opcoes.some((o) => o.startsWith(nomeDoPlano))).toBe(false);
 
   await page.getByTestId('abrir-venda-de-diaria').click();
+  // Escolhe o plano criado aqui (janela 24h): o `Diaria` do seed fecha as 22:00 e vem primeiro.
+  const valorDoPlano = await page
+    .getByTestId('diaria-plano')
+    .locator('option', { hasText: nomeDoPlano })
+    .getAttribute('value');
+  expect(valorDoPlano).toBeTruthy();
+  await page.getByTestId('diaria-plano').selectOption(valorDoPlano);
   await expect(page.getByTestId('diaria-valor')).toContainText('R$ 30,00');
 
   await page.getByTestId('forma-dinheiro').click();
@@ -106,4 +113,58 @@ test('recepcao vende a diaria a um aluno sem plano e o acesso vale ate a meia-no
   const fim = new Date(ativo!.endsAt);
   expect(fim.getTime()).toBeGreaterThan(Date.now());
   expect(fim.getTime() - Date.now()).toBeLessThanOrEqual(24 * 3_600_000);
+});
+
+test('recepcao vende a diaria direto da tela de Cobranca do aluno sem plano', async ({ page }) => {
+  await entrar(page);
+
+  await cadastrarAluno(page, {
+    nome: `Aluno Diaria Cobranca ${Date.now()}`,
+    nascimento: '1990-05-20',
+    cpf: gerarCpfValido(),
+  });
+  await page.getByTestId('abrir-ficha').click();
+  await expect(page).toHaveURL(/\/students\/[0-9a-f-]{36}/);
+  const idDoAluno = page.url().split('/students/')[1]?.split('/')[0] ?? '';
+
+  const aluno = await page.request.get(`${API}/api/v1/students/${idDoAluno}`);
+  expect(aluno.ok()).toBeTruthy();
+  const unidadeId = ((await aluno.json()) as { gymUnitId: string }).gymUnitId;
+
+  const nomeDoPlano = `Diaria E2E Cobranca ${Date.now()}`;
+  const criado = await page.request.post(`${API}/api/v1/plans`, {
+    data: {
+      name: nomeDoPlano,
+      gymUnitIds: [unidadeId],
+      janelas: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        gymUnitId: unidadeId,
+        dayOfWeek,
+        startMinute: 0,
+        endMinute: 1440,
+      })),
+      amountMinor: 3000,
+      billingMode: 'DIARIA',
+    },
+  });
+  expect(criado.status()).toBe(201);
+
+  await page.goto(`/students/${idDoAluno}/billing`);
+  await expect(page.getByTestId('sem-assinatura-ativa')).toBeVisible();
+
+  await page.getByTestId('abrir-venda-de-diaria').click();
+  // Escolhe o plano criado aqui (janela 24h): o `Diaria` do seed fecha as 22:00 e vem primeiro.
+  const valorDoPlano = await page
+    .getByTestId('diaria-plano')
+    .locator('option', { hasText: nomeDoPlano })
+    .getAttribute('value');
+  expect(valorDoPlano).toBeTruthy();
+  await page.getByTestId('diaria-plano').selectOption(valorDoPlano);
+  await page.getByTestId('forma-dinheiro').click();
+  await page.getByTestId('confirmar-diaria').click();
+
+  await expect(page.getByText('Diária paga. O acesso vale até 23:59.')).toBeVisible();
+
+  const direitos = await page.request.get(`${API}/api/v1/students/${idDoAluno}/entitlements`);
+  const lista = (await direitos.json()) as { status: string }[];
+  expect(lista.some((d) => d.status === 'ACTIVE')).toBe(true);
 });

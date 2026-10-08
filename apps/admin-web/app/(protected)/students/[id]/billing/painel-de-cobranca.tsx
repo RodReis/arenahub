@@ -11,6 +11,7 @@ import estilos from './painel-de-cobranca.module.css';
 import { abrirCobranca, type EstadoDaInvoice } from '../../../../actions/billing';
 import type { MesPagavelUI } from '../../../../../src/billing/meses-pagaveis';
 import { FaixaDeMeses } from './faixa-de-meses';
+import { VenderDiaria, type PlanoDeDiaria } from '../vender-diaria';
 
 interface Props {
   readonly subscriptionId: string | null;
@@ -22,6 +23,16 @@ interface Props {
    */
   readonly subscriptionIdParaPagamento: string | null;
   readonly mesesPagaveis: readonly MesPagavelUI[];
+  /**
+   * Venda de diaria no balcao (ajuste do PI, F89). So aparece quando NAO ha
+   * plano vinculado (nem ativo nem suspenso); "quem tem plano nao compra
+   * diaria" continua sendo regra do servidor (`STUDENT_HAS_ACTIVE_SUBSCRIPTION`).
+   */
+  readonly diaria?: {
+    readonly studentId: string;
+    readonly planos: readonly PlanoDeDiaria[];
+    readonly impedido: boolean;
+  };
 }
 
 const ESTADO_DA_INVOICE: EstadoDaInvoice = {};
@@ -66,7 +77,7 @@ function BotaoDeGerar() {
  * GERAR a cobrança do mês continua separada, idempotente no servidor
  * (INV-066): clique duplo não cobra duas vezes, por isso sem confirmação.
  */
-export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, mesesPagaveis }: Props) {
+export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, mesesPagaveis, diaria }: Props) {
   const [estadoDaInvoice, gerar] = useActionState(abrirCobranca, ESTADO_DA_INVOICE);
   const router = useRouter();
 
@@ -93,11 +104,20 @@ export function PainelDeCobranca({ subscriptionId, subscriptionIdParaPagamento, 
       </header>
 
       {subscriptionId === null && subscriptionIdParaPagamento === null ? (
-        <EmptyState
-          testId="sem-assinatura-ativa"
-          title="Este aluno não tem assinatura ativa."
-          hint="A cobrança nasce da assinatura — atribua um plano antes de gerar."
-        />
+        <>
+          <EmptyState
+            testId="sem-assinatura-ativa"
+            title="Este aluno não tem assinatura ativa."
+            hint="Atribua um plano na aba Plano ou venda uma diária abaixo."
+          />
+          {diaria !== undefined ? (
+            <div className={estilos['diaria']} data-testid="diaria-na-cobranca">
+              <h3>Diária</h3>
+              <p className={estilos['nota']}>Acesso pago no balcão, válido até 23:59 de hoje.</p>
+              <VenderDiaria studentId={diaria.studentId} planos={diaria.planos} impedido={diaria.impedido} />
+            </div>
+          ) : null}
+        </>
       ) : subscriptionIdParaPagamento !== null && mesesPagaveis.length > 0 ? (
         <FaixaDeMeses
           // `key` muda sempre que o CONTEUDO da faixa muda (mes pago some,

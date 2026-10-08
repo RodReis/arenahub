@@ -66,7 +66,7 @@ describe('perfis de sistema', () => {
        * a divergencia comecaria a existir calada.
        */
       const esperado = PERMISSOES_DO_OWNER.filter(
-        (c) => !['retention.kill_switch'].includes(c),
+        (c) => !['retention.kill_switch', 'billing.settings.manage'].includes(c),
       );
 
       expect(PERMISSOES_DO_MANAGER).toEqual(esperado);
@@ -162,6 +162,13 @@ describe('perfis de sistema', () => {
   });
 
   describe('separacao entre perfis', () => {
+    it('billing.settings.manage: so o dono tem; gerente, financeiro e recepcao nao', () => {
+      expect(PERMISSOES_DO_OWNER).toContain('billing.settings.manage');
+      expect(PERMISSOES_DO_MANAGER).not.toContain('billing.settings.manage');
+      expect(PERMISSOES_DO_FINANCEIRO).not.toContain('billing.settings.manage');
+      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.settings.manage');
+    });
+
     it('so o OWNER e o MANAGER gerenciam usuarios', () => {
       /*
        * Era so o OWNER (F79/F80). Decisao do PI, 02/10/2026: a gerente
