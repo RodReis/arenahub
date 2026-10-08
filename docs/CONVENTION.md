@@ -452,8 +452,10 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   (`BillingSettings.invoiceGenerationDay`, padrão 01), às 00:05 (America/Sao_Paulo), com vencimento
   em `dueDay` (padrão 10) e bloqueio `graceDays` dias depois (padrão 5), para aluno `STUDENT` +
   `ACTIVE` com assinatura vigente e plano `billingMode != DIARIA`. O agendador roda **todo dia** às
-  00:05 e gera só para o tenant cujo dia de gerar é hoje; é idempotente por INV-066 (rodar de novo,
-  ou pelo `POST /billing/monthly-invoices/run`, não duplica nem consome número). O dono configura
+  00:05 e gera para o tenant **no dia configurado e em todo dia seguinte do mesmo mês até a fatura
+  existir** (`hoje >= dia`, em Brasília), para que mudar o dia para um que já passou não pule o mês;
+  é idempotente por INV-066 (rodar de novo, nos dias seguintes ou pelo
+  `POST /billing/monthly-invoices/run`, não duplica nem consome número). O dono configura
   os três dias em Configuração > Pagamento (F89, permissão `billing.settings.manage`, só
   OWNER); a mudança vale **só para parcelas futuras** — `dueAt` e `blockAt` ficam congelados na
   abertura da parcela. Limites: dia de gerar e vencimento de 1 a 28, dia de gerar não depois do

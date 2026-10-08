@@ -3,7 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   CONFIGURACAO_DE_PAGAMENTO_PADRAO,
   ConfiguracaoDePagamentoInvalidaError,
-  ehDiaDeGerar,
+  jaChegouODiaDeGerar,
   validarConfiguracaoDePagamento,
 } from './configuracao-de-pagamento.js';
 
@@ -35,15 +35,26 @@ describe('validarConfiguracaoDePagamento', () => {
   });
 });
 
-describe('ehDiaDeGerar', () => {
-  it('compara o dia do mes em Brasilia, nao em UTC', () => {
-    // 01/11 02:30Z ainda e 31/10 23:30 em Sao Paulo (UTC-3)
-    expect(ehDiaDeGerar(new Date('2026-11-01T02:30:00Z'), 1)).toBe(false);
-    expect(ehDiaDeGerar(new Date('2026-11-01T03:05:00Z'), 1)).toBe(true);
+describe('jaChegouODiaDeGerar', () => {
+  it('antes do dia nao chegou; no dia e depois dele, chegou', () => {
+    const hoje = new Date('2026-11-10T12:00:00Z');
+
+    expect(jaChegouODiaDeGerar(hoje, 11)).toBe(false);
+    expect(jaChegouODiaDeGerar(hoje, 10)).toBe(true);
+    expect(jaChegouODiaDeGerar(hoje, 5)).toBe(true);
   });
 
-  it('dia 28 em fevereiro de ano comum existe e bate', () => {
-    expect(ehDiaDeGerar(new Date('2027-02-28T12:00:00Z'), 28)).toBe(true);
-    expect(ehDiaDeGerar(new Date('2027-02-27T12:00:00Z'), 28)).toBe(false);
+  it('compara o dia do mes em Brasilia, nao em UTC', () => {
+    // 05/11 03:05Z = 00:05 em Sao Paulo (UTC-3): o cron dispara aqui
+    expect(jaChegouODiaDeGerar(new Date('2026-11-05T03:05:00Z'), 5)).toBe(true);
+    expect(jaChegouODiaDeGerar(new Date('2026-11-05T03:05:00Z'), 6)).toBe(false);
+    // 04/11 02:59Z ainda e 03/11 23:59 em Sao Paulo
+    expect(jaChegouODiaDeGerar(new Date('2026-11-04T02:59:00Z'), 4)).toBe(false);
+    expect(jaChegouODiaDeGerar(new Date('2026-11-04T02:59:00Z'), 3)).toBe(true);
+  });
+
+  it('dia 28 (o maximo) em fevereiro de ano comum existe e bate', () => {
+    expect(jaChegouODiaDeGerar(new Date('2027-02-28T12:00:00Z'), 28)).toBe(true);
+    expect(jaChegouODiaDeGerar(new Date('2027-02-27T12:00:00Z'), 28)).toBe(false);
   });
 });

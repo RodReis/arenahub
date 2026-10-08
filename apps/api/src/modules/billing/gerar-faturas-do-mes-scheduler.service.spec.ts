@@ -5,7 +5,7 @@ import { FUSO_DOS_AGENDADORES } from './domain/configuracao-de-pagamento.js';
 import { GerarFaturasDoMesSchedulerService } from './gerar-faturas-do-mes-scheduler.service.js';
 
 /**
- * F89 -- o job roda todo dia e cada tenant decide se hoje e o seu dia de gerar.
+ * F89 -- o job roda todo dia e cada tenant gera a partir do seu dia de gerar.
  * Sem banco: repositorio e use case sao falsos; `comContexto` so abre um
  * AsyncLocalStorage (exige uuid valido).
  */
@@ -31,8 +31,8 @@ function montar(dias: Record<string, number>) {
 }
 
 describe('GerarFaturasDoMesSchedulerService -- dia de gerar por tenant', () => {
-  it('gera so nos tenants cujo dia de gerar e hoje', async () => {
-    const { scheduler, executar } = montar({ [TENANT_A]: 5, [TENANT_B]: 1 });
+  it('gera nos tenants cujo dia de gerar chegou e pula os de dia posterior', async () => {
+    const { scheduler, executar } = montar({ [TENANT_A]: 5, [TENANT_B]: 10 });
     const agora = new Date('2026-11-05T12:00:00Z');
 
     const r = await scheduler.executarCiclo(agora);
@@ -42,15 +42,24 @@ describe('GerarFaturasDoMesSchedulerService -- dia de gerar por tenant', () => {
     expect(r).toEqual({ tenants: 2, foraDoDia: 1, ...RESULTADO });
   });
 
-  it('tenant com dia 1 (padrao) gera no dia 01 e nao no dia 02', async () => {
+  it('tenant com dia 1 (padrao) gera no dia 01 e continua gerando nos dias seguintes', async () => {
     const { scheduler, executar } = montar({ [TENANT_A]: 1 });
 
     const dia1 = await scheduler.executarCiclo(new Date('2026-12-01T12:00:00Z'));
     const dia2 = await scheduler.executarCiclo(new Date('2026-12-02T12:00:00Z'));
 
-    expect(executar).toHaveBeenCalledTimes(1);
+    expect(executar).toHaveBeenCalledTimes(2);
     expect(dia1.foraDoDia).toBe(0);
-    expect(dia2).toEqual({
+    expect(dia2.foraDoDia).toBe(0);
+  });
+
+  it('dia que ainda nao chegou nao gera: dia 10 em 05/11', async () => {
+    const { scheduler, executar } = montar({ [TENANT_A]: 10 });
+
+    const r = await scheduler.executarCiclo(new Date('2026-11-05T12:00:00Z'));
+
+    expect(executar).not.toHaveBeenCalled();
+    expect(r).toEqual({
       tenants: 1,
       foraDoDia: 1,
       elegiveis: 0,
@@ -60,13 +69,34 @@ describe('GerarFaturasDoMesSchedulerService -- dia de gerar por tenant', () => {
     });
   });
 
-  it('o dia e o de Brasilia, nao o UTC: 01/11 02:30Z ainda e 31/10', async () => {
-    const { scheduler, executar } = montar({ [TENANT_A]: 1 });
+  it('dia trocado de 20 para 5 em 10/11: o mes nao fica sem fatura', async () => {
+    const { scheduler, executar } = montar({ [TENANT_A]: 5 });
+    const agora = new Date('2026-11-10T12:00:00Z');
 
-    const r = await scheduler.executarCiclo(new Date('2026-11-01T02:30:00Z'));
+    const r = await scheduler.executarCiclo(agora);
+
+    expect(executar).toHaveBeenCalledWith(TENANT_A, agora);
+    expect(r.foraDoDia).toBe(0);
+  });
+
+  it('o dia e o de Brasilia, nao o UTC: 04/11 02:59Z ainda e 03/11', async () => {
+    const { scheduler, executar } = montar({ [TENANT_A]: 4 });
+
+    const r = await scheduler.executarCiclo(new Date('2026-11-04T02:59:00Z'));
 
     expect(executar).not.toHaveBeenCalled();
     expect(r.foraDoDia).toBe(1);
+  });
+
+  it('tenant fora do dia no comeco da lista nao impede o seguinte de gerar', async () => {
+    const { scheduler, executar } = montar({ [TENANT_A]: 20, [TENANT_B]: 5 });
+    const agora = new Date('2026-11-10T12:00:00Z');
+
+    const r = await scheduler.executarCiclo(agora);
+
+    expect(executar).toHaveBeenCalledTimes(1);
+    expect(executar).toHaveBeenCalledWith(TENANT_B, agora);
+    expect(r).toEqual({ tenants: 2, foraDoDia: 1, ...RESULTADO });
   });
 
   it('falha em um tenant nao impede os outros', async () => {

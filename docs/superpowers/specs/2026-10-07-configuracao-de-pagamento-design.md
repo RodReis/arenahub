@@ -40,7 +40,7 @@ gerar nem é configuração: é a expressão do cron.
 | R2 | Dia de gerar ≤ dia de vencer. | Senão a parcela nasce já vencida. | Remover um `CHECK`. |
 | R3 | Escopo por **tenant**, não por unidade. | `BillingSettings` já é por tenant. | Migration nova. |
 | R4 | Permissão nova `billing.settings.manage`, só do OWNER (fora do MANAGER). | O Financeiro tem `billing.manage` e não deve mudar a regra de cobrança da academia. | Mover a permissão de papel. |
-| R5 | O cron do gerador roda **todo dia** às 00:05 de Brasília e cada tenant só gera se o dia de hoje for o seu `invoiceGenerationDay`. Continua sem recuperar dia perdido. | Mantém a regra "todo dia X" literal, sem gerar fatura retroativa. A rota manual `POST billing/monthly-invoices/run` cobre a falha. | Trocar `==` por `>=` e já recupera. |
+| R5 | O cron do gerador roda **todo dia** às 00:05 de Brasília e cada tenant gera no seu `invoiceGenerationDay` **e em todo dia seguinte do mesmo mês até a fatura existir** (`hoje >= dia`). *Revisada na revisão final:* a versão original (`==`, sem recuperar dia perdido) pulava o mês inteiro quando o dono mudava o dia para um que já passou (dia 20 → 5 no dia 10: nunca chega ao 20 nem volta ao 5). | O gerador é idempotente (INV-066): nos dias seguintes as faturas existentes só contam em `jaExistiam`, nada duplica. Dias antes do configurado não fazem nada. A rota manual `POST billing/monthly-invoices/run` continua valendo para reexecução imediata. | Voltar para `==` reabre o buraco de mudar o dia para um já passado. |
 | R6 | Rótulo da UI: "Dias de bloqueio após o vencimento". | `graceDays` do **contrato da plataforma** é outra coisa (suspensão do tenant) e confunde. | Só texto. |
 | R7 | O `CHECK` de banco de `grace_days` é `BETWEEN 0 AND 30`; o mínimo de 1 vale na API. | Há teste de integração com tenant sem carência (`graceDays: 0`) e o domínio já aceita 0. | Apertar o `CHECK` numa migration nova. |
 
@@ -68,7 +68,8 @@ gerar nem é configuração: é a expressão do cron.
 ### 4.3 Cron
 
 - `GerarFaturasDoMesScheduler`: `@Cron('5 0 * * *', { timeZone: 'America/Sao_Paulo' })`, por tenant, dentro de
-  `comContexto`. Lê `invoiceGenerationDay` e só chama o caso de uso se o dia de hoje (Brasília) for igual.
+  `comContexto`. Lê `invoiceGenerationDay` e só chama o caso de uso se o dia de hoje (Brasília) for igual **ou
+  posterior** ao configurado (`jaChegouODiaDeGerar`); nos dias seguintes do mês a geração é idempotente.
 - O caso de uso `GerarFaturasDoMesUseCase` não muda, só o gatilho.
 - Inadimplência (`10 0 * * *`) não muda: já lê `graceDays` por tenant.
 - Log por tenant continua `criadas`, `jaExistiam`, `falhas`.
@@ -110,11 +111,12 @@ Cobrança da ficha do aluno, `students/[id]/billing`).
 
 ## 7. Testes
 
-- **Unit:** validação (limites e `gerar ≤ vencer`); decisão "hoje é o dia de gerar do tenant?" com o "agora"
-  por parâmetro, incluindo dia 28 e virada de mês.
+- **Unit:** validação (limites e `gerar ≤ vencer`); decisão "já chegou o dia de gerar do tenant?" (`hoje >= dia`)
+  com o "agora" por parâmetro, incluindo dia 28 e a virada de dia em Brasília.
 - **Integração:** `PUT` exige a permissão; recusa valor fora do limite e `gerar > vencer`; grava auditoria com
-  antigo e novo; **fatura aberta não muda** depois de salvar; o gerador de dois tenants com dias diferentes cria só
-  no dia certo de cada um; os `CHECK` do banco recusam escrita direta inválida.
+  antigo e novo; **fatura aberta não muda** depois de salvar; o gerador gera na data configurada e em qualquer dia
+  seguinte do mês até a fatura existir (dois tenants com dias diferentes; dia trocado para um já passado ainda gera
+  o mês); os `CHECK` do banco recusam escrita direta inválida.
 - **E2E:** abrir Configuração > Pagamento, ver 1/10/5, mudar e salvar, ver o toast e o exemplo atualizado.
 
 ## 8. Fora do escopo

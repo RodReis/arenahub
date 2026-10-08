@@ -56,7 +56,12 @@ export function validarConfiguracaoDePagamento(c: ConfiguracaoDePagamento): Conf
  */
 export const FUSO_DOS_AGENDADORES = 'America/Sao_Paulo';
 
-/** Hoje (em Brasilia) e o dia em que este tenant gera a parcela do mes? */
-export function ehDiaDeGerar(agora: Date, diaDeGerar: number): boolean {
-  return dataLocalDe(agora, FUSO_DOS_AGENDADORES).dia === diaDeGerar;
+/**
+ * Hoje, em Brasilia, e o dia de gerar configurado OU ja passou dele neste mes?
+ * `>=` e nao `===`: se o dono muda o dia para um que ja passou, o mes nao pode
+ * ficar sem fatura. O gerador e idempotente (INV-066), entao rodar nos dias
+ * seguintes so conta `jaExistiam`.
+ */
+export function jaChegouODiaDeGerar(agora: Date, diaDeGerar: number): boolean {
+  return dataLocalDe(agora, FUSO_DOS_AGENDADORES).dia >= diaDeGerar;
 }
