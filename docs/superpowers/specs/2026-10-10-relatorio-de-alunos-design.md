@@ -41,7 +41,7 @@ Módulo novo `apps/api/src/modules/reports/`.
 
 | Rota | Permissão | Resposta |
 |---|---|---|
-| `GET /api/v1/reports/students` | `student.read` | JSON paginado por cursor (`limit` ≤ 100, padrão 20) + `X-Total-Count` |
+| `GET /api/v1/reports/students` | `student.read` | envelope `{ total, linhas, proximoCursor }`, paginado por cursor (`limit` ≤ 100, padrão 20) |
 | `GET /api/v1/reports/students/export?format=pdf\|csv` | `student.read` | arquivo (`Content-Disposition: attachment`) |
 
 - **Um** use-case `ConsultarRelatorioDeAlunos` serve as duas rotas: a exportação chama o mesmo filtro sem cursor/limite. Isso garante arquivo = tela.
@@ -53,7 +53,7 @@ Módulo novo `apps/api/src/modules/reports/`.
 
 Cabeçalho comum: logo (lida do object storage via `Tenant.logoObjectKey`), razão social, CNPJ, endereço, telefone; depois filtros aplicados, data/hora de geração no fuso da unidade e total de alunos. Sem logo cadastrada, cabeçalho só com texto.
 
-- **PDF** (`pdfkit`, já dependência da API; padrão de `contrato-pdf.service.ts`): tabela com cabeçalho repetido a cada página e rodapé "Página X de Y".
+- **PDF** (`pdfkit`, já dependência da API; padrão de `contrato-pdf.service.ts`): tabela com cabeçalho repetido a cada página e rodapé "Página X de Y". A logo PNG/JPEG é embutida; a logo **SVG** não (o `pdfkit` não a renderiza) e o cabeçalho sai só com texto.
 - **CSV**: UTF-8 com BOM (Excel abre acentos), separador `;`, linhas de cabeçalho da academia no topo, depois a linha de colunas. Células passam por `formatarCelula` de `exports/domain/csv.ts` (escape RFC 4180 + neutralização de CSV injection).
 - Nome do arquivo: `relatorio-alunos-AAAA-MM-DD.pdf|csv`.
 - Não vão para o arquivo dado de saúde, biometria nem token. Nada de PII em log de erro.
