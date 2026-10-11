@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { FATURA_PAGA } from './domain/criterios-financeiros.js';
 
 /**
  * A aba "Pagantes" da tela de cobranca. Espelho de
@@ -94,8 +95,7 @@ export class ConsultarPagosUseCase {
       tx.invoice.findMany({
         where: {
           tenantId: contexto.tenantId,
-          status: 'PAID',
-          paidAt: { not: null },
+          ...FATURA_PAGA,
         },
         select: {
           id: true,

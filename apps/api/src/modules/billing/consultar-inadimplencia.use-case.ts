@@ -4,6 +4,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import { deveBloquear } from './domain/bloqueio-por-inadimplencia.js';
+import { faturaVencidaEmAberto } from './domain/criterios-financeiros.js';
 
 /**
  * A tela de inadimplencia e cobranca. `MVP-02` 7, Slice 2.4.
@@ -185,8 +186,7 @@ export class ConsultarInadimplenciaUseCase {
       tx.invoice.findMany({
         where: {
           tenantId: contexto.tenantId,
-          status: { in: ['OPEN', 'OVERDUE'] },
-          dueAt: { lt: agora },
+          ...faturaVencidaEmAberto(agora),
         },
         select: {
           id: true,
