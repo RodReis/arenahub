@@ -143,6 +143,36 @@ describe('Relatório de Alunos', () => {
     expect(screen.queryByLabelText('Plano')).toBeNull();
   });
 
+  it('`erro=muito-grande` (volta da exportação) explica o teto e não vai para a API nem para os links', async () => {
+    responder({ total: 30_000, linhas: [LINHA], proximoCursor: null });
+    await renderizar({ status: 'ACTIVE', erro: 'muito-grande' });
+
+    expect(screen.getByTestId('erro-de-exportacao').textContent).toContain('20.000');
+
+    const chamada = vi
+      .mocked(chamarApi)
+      .mock.calls.find(([c]) => String(c).startsWith('/api/v1/reports/students'));
+
+    expect(String(chamada?.[0])).not.toContain('erro=');
+    expect(screen.getByRole('link', { name: /exportar csv/i }).getAttribute('href')).toBe(
+      '/reports/students/export?status=ACTIVE&format=csv',
+    );
+  });
+
+  it('`erro=falha` mostra a mensagem genérica; sem `erro` não há aviso; valor estranho é ignorado', async () => {
+    responder({ total: 1, linhas: [LINHA], proximoCursor: null });
+    await renderizar({ erro: 'falha' });
+
+    expect(screen.getByTestId('erro-de-exportacao').textContent).toContain('Não foi possível');
+  });
+
+  it('sem `erro` (ou com valor desconhecido) não aparece aviso de exportação', async () => {
+    responder({ total: 1, linhas: [LINHA], proximoCursor: null });
+    await renderizar({ erro: 'qualquer-coisa' });
+
+    expect(screen.queryByTestId('erro-de-exportacao')).toBeNull();
+  });
+
   it('API recusa (sem student.read): erro de permissão, sem tabela', async () => {
     vi.mocked(chamarApi).mockResolvedValue({
       ok: false,

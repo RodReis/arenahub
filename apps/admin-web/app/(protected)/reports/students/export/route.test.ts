@@ -87,21 +87,40 @@ describe('GET /reports/students/export', () => {
     expect(resposta.headers.get('x-interno')).toBeNull();
   });
 
-  it('erro da API (403, 422...) vira o mesmo status, sem corpo da API', async () => {
+  it('422 (acima do teto): volta para a tela com o filtro e `erro=muito-grande`, sem `format`', async () => {
     lerCookie.mockReturnValue({ name: 'arenahub_access', value: 'tok' });
     globalThis.fetch = (() =>
       Promise.resolve(new Response('{"code":"REPORT_TOO_LARGE"}', { status: 422 })));
 
-    const resposta = await GET(requisicao('format=csv'));
+    const resposta = await GET(requisicao('format=csv&status=ACTIVE&tenantId=outro'));
 
-    expect(resposta.status).toBe(422);
+    expect(resposta.status).toBe(303);
+    expect(resposta.headers.get('location')).toBe(
+      '/reports/students?status=ACTIVE&erro=muito-grande',
+    );
     expect(await resposta.text()).toBe('');
   });
 
-  it('API fora do ar: 404, não erro de servidor', async () => {
+  it('outro erro da API (403, 500...): volta para a tela com `erro=falha`', async () => {
+    lerCookie.mockReturnValue({ name: 'arenahub_access', value: 'tok' });
+
+    for (const status of [401, 403, 500]) {
+      globalThis.fetch = (() => Promise.resolve(new Response('x', { status })));
+
+      const resposta = await GET(requisicao('format=pdf'));
+
+      expect(resposta.status).toBe(303);
+      expect(resposta.headers.get('location')).toBe('/reports/students?erro=falha');
+    }
+  });
+
+  it('API fora do ar: volta para a tela com `erro=falha`, não página em branco', async () => {
     lerCookie.mockReturnValue({ name: 'arenahub_access', value: 'tok' });
     globalThis.fetch = (() => Promise.reject(new Error('ECONNREFUSED')));
 
-    expect((await GET(requisicao('format=csv'))).status).toBe(404);
+    const resposta = await GET(requisicao('format=csv'));
+
+    expect(resposta.status).toBe(303);
+    expect(resposta.headers.get('location')).toBe('/reports/students?erro=falha');
   });
 });

@@ -41,23 +41,38 @@ export function formatarTelefone(valor: string | null): string {
   return valor;
 }
 
+const FUSO_PADRAO = 'America/Sao_Paulo';
+
 /**
  * Partes da data no fuso pedido. `formatToParts`, e não `format`: o texto de
  * `format` varia com a versão do ICU do servidor, as partes não.
  */
 function partesDaData(data: Date, fuso: string): (tipo: string) => string {
-  const partes = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: fuso,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(data);
+  const formatar = (timeZone: string) =>
+    new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(data);
+
+  let partes: Intl.DateTimeFormatPart[];
+
+  try {
+    partes = formatar(fuso);
+  } catch {
+    // `Tenant.timezone` é texto livre no cadastro (só `min(1)`): um fuso que o
+    // ICU não conhece lançaria `RangeError` e a exportação inteira cairia em 500.
+    // A hora do cabeçalho vale menos que o arquivo -- cai no fuso padrão do produto.
+    partes = formatar(FUSO_PADRAO);
+  }
 
   return (tipo) => partes.find((p) => p.type === tipo)?.value ?? '';
 }
+
 
 /** `10/10/2026 14:32` no fuso da academia. */
 export function formatarDataHora(data: Date, fuso: string): string {

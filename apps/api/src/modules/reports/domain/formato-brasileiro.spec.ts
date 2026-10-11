@@ -68,6 +68,15 @@ describe('formatarDataHora / dataParaNomeDeArquivo', () => {
   });
 });
 
+describe('fuso inválido no cadastro do tenant', () => {
+  it('cai no fuso de São Paulo em vez de derrubar a exportação com RangeError', () => {
+    const instante = new Date('2026-10-10T17:32:00.000Z');
+
+    expect(formatarDataHora(instante, 'Nao/Existe')).toBe('10/10/2026 14:32');
+    expect(dataParaNomeDeArquivo(instante, '')).toBe('2026-10-10');
+  });
+});
+
 describe('rotuloDoPlano', () => {
   it('o nome do plano vence', () => {
     expect(rotuloDoPlano('Mensal Fit', 'SUBSCRIPTION')).toBe('Mensal Fit');

@@ -40,6 +40,18 @@ const esquemaDoRelatorio = z.object({
 
 const esquemaDeNomes = z.array(z.object({ id: z.string(), name: z.string() }));
 
+/** O que a Route Handler de exportação manda na URL quando o download falha. */
+const AVISO_DE_EXPORTACAO: Readonly<Record<string, { code: string; title: string }>> = {
+  'muito-grande': {
+    code: 'REPORT_TOO_LARGE',
+    title: 'O relatório passa de 20.000 alunos. Refine os filtros e exporte de novo.',
+  },
+  falha: {
+    code: 'REPORT_EXPORT_FAILED',
+    title: 'Não foi possível gerar o arquivo. Tente de novo.',
+  },
+};
+
 /**
  * Relatório de Alunos -- F90. Irmã da Lista de Alunos: mesmo cabeçalho, mesma
  * tabela, filtros na URL. Server Component, sem JavaScript para filtrar.
@@ -60,6 +72,7 @@ export default async function PaginaDoRelatorioDeAlunos({
   };
 
   const filtro = consultaDoFiltro(texto);
+  const aviso = AVISO_DE_EXPORTACAO[texto('erro') ?? ''];
   const cursor = texto('cursor');
 
   const consulta = new URLSearchParams(filtro);
@@ -122,6 +135,13 @@ export default async function PaginaDoRelatorioDeAlunos({
           </>
         }
       />
+
+      {aviso ? (
+        <ProblemDetail
+          testId="erro-de-exportacao"
+          problem={{ type: 'about:blank', status: 0, correlationId: '', ...aviso }}
+        />
+      ) : null}
 
       <FiltroDoRelatorio
         unidades={unidades}

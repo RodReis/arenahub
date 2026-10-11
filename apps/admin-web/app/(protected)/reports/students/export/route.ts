@@ -27,6 +27,27 @@ const CABECALHOS_REPASSADOS = [
   'cache-control',
 ] as const;
 
+/**
+ * O download que falha NÃO vira página em branco: o link de exportação é um
+ * `<a>` comum, e o navegador mostraria "esta página não está funcionando" para
+ * um 422 ou 500 de corpo vazio. Em vez disso a pessoa volta para a tela do
+ * relatório, com o mesmo filtro, e lá a mensagem explica o que houve.
+ *
+ * 422 é só o teto de exportação (`REPORT_TOO_LARGE`): erro de formato é 400 e
+ * morre aqui antes de chamar a API.
+ */
+function voltarParaATela(consulta: URLSearchParams, erro: 'muito-grande' | 'falha'): Response {
+  const volta = new URLSearchParams(consulta);
+
+  volta.delete('format');
+  volta.set('erro', erro);
+
+  return new Response(null, {
+    status: 303,
+    headers: { location: `/reports/students?${volta.toString()}` },
+  });
+}
+
 export async function GET(requisicao: NextRequest): Promise<Response> {
   const acesso = (await cookies()).get('arenahub_access');
 
@@ -48,11 +69,11 @@ export async function GET(requisicao: NextRequest): Promise<Response> {
       headers: { cookie: `${acesso.name}=${acesso.value}` },
     });
   } catch {
-    // API fora do ar: o link não pode pintar a tela de erro. A pessoa tenta de novo.
-    return new Response(null, { status: 404 });
+    // API fora do ar: a pessoa volta para a tela e tenta de novo.
+    return voltarParaATela(consulta, 'falha');
   }
 
-  if (!resposta.ok) return new Response(null, { status: resposta.status });
+  if (!resposta.ok) return voltarParaATela(consulta, resposta.status === 422 ? 'muito-grande' : 'falha');
 
   const cabecalhos = new Headers();
 
