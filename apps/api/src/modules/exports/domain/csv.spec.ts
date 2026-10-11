@@ -171,3 +171,19 @@ describe('linha de evento', () => {
     expect(cabecalho).not.toContain('template');
   });
 });
+
+describe('formatarCelula com separador explícito', () => {
+  it('com ";" entre aspas só quem contém ";"', () => {
+    expect(formatarCelula('a;b', ';')).toBe('"a;b"');
+    expect(formatarCelula('a,b', ';')).toBe('a,b');
+  });
+
+  it('sem o segundo argumento o comportamento antigo (",") não muda', () => {
+    expect(formatarCelula('a,b')).toBe('"a,b"');
+    expect(formatarCelula('a;b')).toBe('a;b');
+  });
+
+  it('neutraliza fórmula antes de escapar, em qualquer separador', () => {
+    expect(formatarCelula('=1+1', ';')).toBe("'=1+1");
+  });
+});
