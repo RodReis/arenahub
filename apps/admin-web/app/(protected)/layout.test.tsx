@@ -248,6 +248,20 @@ describe('seletor de unidade no topbar', () => {
       expect(screen.queryByRole('link', { name: 'Configuração' })).toBeNull();
     });
 
+    /* Relatórios (F90): visível a quem lê aluno, escondido de quem não lê. */
+    it('mostra Relatórios só a quem tem student.read', async () => {
+      responder([unidade('Matriz')], ['student.read']);
+      const { unmount } = await renderizar();
+
+      expect(screen.getByRole('link', { name: 'Relatórios' })).toHaveAttribute('href', '/reports');
+      unmount();
+
+      responder([unidade('Matriz')], ['class.read']);
+      await renderizar();
+
+      expect(screen.queryByRole('link', { name: 'Relatórios' })).toBeNull();
+    });
+
     /* O rótulo aparece UMA vez por grupo, não a cada item dele. */
     it('não repete o rótulo nos demais itens do grupo', async () => {
       responder([unidade('Matriz')], ['billing.dashboard']);

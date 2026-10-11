@@ -49,13 +49,19 @@ export function neutralizarCelula(valor: string): string {
  * Invertido, a aspa simples que acrescentamos poderia ser duplicada junto e
  * apareceria dobrada na planilha.
  */
-export function formatarCelula(valor: string | number | boolean | null | undefined): string {
+export function formatarCelula(
+  valor: string | number | boolean | null | undefined,
+  separador = ',',
+): string {
   if (valor === null || valor === undefined) return '';
 
   const texto = neutralizarCelula(String(valor));
 
   const precisaAspas =
-    texto.includes(',') || texto.includes('"') || texto.includes('\n') || texto.includes('\r');
+    texto.includes(separador) ||
+    texto.includes('"') ||
+    texto.includes('\n') ||
+    texto.includes('\r');
 
   if (!precisaAspas) return texto;
 

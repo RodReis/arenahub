@@ -171,6 +171,9 @@ describe('contrato OpenAPI', () => {
         '/api/v1/exports/{id}',
         '/api/v1/exports/{id}/cancel',
         '/api/v1/exports/{id}/download',
+        // F90 -- relatorio de alunos (tela e exportacao PDF/CSV).
+        '/api/v1/reports/students',
+        '/api/v1/reports/students/export',
         // F12 e F13 -- invoice, pagamento manual, PIX e webhook.
         // NAO ESTAVAM AQUI: a lista parou na F11, e as duas fatias entregaram
         // rota sem declara-la. O snapshot pegava a mudanca, esta lista nao --
