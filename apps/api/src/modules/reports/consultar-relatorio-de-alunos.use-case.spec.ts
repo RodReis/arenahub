@@ -24,8 +24,8 @@ const linha = (n: number): LinhaDoRelatorioDeAlunos => ({
 });
 
 function repoFalso(total: number, linhas: LinhaDoRelatorioDeAlunos[] = []) {
-  const contar = jest.fn(async () => total);
-  const listar = jest.fn(async (..._args: unknown[]) => linhas);
+  const contar = jest.fn(() => Promise.resolve(total));
+  const listar = jest.fn((..._args: unknown[]) => Promise.resolve(linhas));
 
   return { repo: { contar, listar } as unknown as RelatorioDeAlunosRepository, contar, listar };
 }

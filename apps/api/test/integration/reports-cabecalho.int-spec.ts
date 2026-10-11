@@ -23,12 +23,10 @@ import {
 /** Storage em memória: o teste é do cabeçalho, não do S3 (mesmo recurso de `access-query-export`). */
 const objetos = new Map<string, { body: Buffer; contentType: string }>();
 const storageFalso = {
-  getPrivateObject: async (key: string) => {
+  getPrivateObject: (key: string) => {
     const achado = objetos.get(key);
 
-    if (!achado) throw new Error('NoSuchKey');
-
-    return achado;
+    return achado ? Promise.resolve(achado) : Promise.reject(new Error('NoSuchKey'));
   },
 };
 

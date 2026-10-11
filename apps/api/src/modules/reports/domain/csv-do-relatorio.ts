@@ -8,7 +8,7 @@ import {
 } from './formato-brasileiro.js';
 
 const SEPARADOR = ';';
-const BOM = '﻿';
+const BOM = String.fromCharCode(0xfeff);
 const FIM_DE_LINHA = '\r\n';
 
 type Celula = string | number | null;

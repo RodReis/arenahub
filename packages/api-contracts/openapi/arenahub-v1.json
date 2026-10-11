@@ -12031,6 +12031,109 @@
         ]
       }
     },
+    "/api/v1/reports/students": {
+      "get": {
+        "operationId": "ReportsController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "linhas",
+                    "proximoCursor"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "proximoCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "linhas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "studentId",
+                          "deviceIds",
+                          "fullName",
+                          "cpf",
+                          "phone",
+                          "planLabel"
+                        ],
+                        "properties": {
+                          "studentId": {
+                            "type": "string"
+                          },
+                          "deviceIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "cpf": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "phone": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "planLabel": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/students/export": {
+      "get": {
+        "operationId": "ReportsController_exportar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "O arquivo do relatório, em PDF ou CSV conforme `format`.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
     "/api/v1/operations/overview": {
       "get": {
         "operationId": "OperationsController_panorama",

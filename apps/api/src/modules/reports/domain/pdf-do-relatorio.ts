@@ -76,7 +76,7 @@ export function gerarPdfDoRelatorio(dados: DadosDoRelatorioImpresso): Promise<Bu
       desenharRodapes(documento);
       documento.end();
     } catch (erro) {
-      rejeitar(erro);
+      rejeitar(erro instanceof Error ? erro : new Error(String(erro)));
     }
   });
 }

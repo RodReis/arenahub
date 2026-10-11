@@ -37,7 +37,7 @@ const BASE: DadosDoRelatorioImpresso = {
 };
 
 const texto = (dados = BASE): string => montarCsvDoRelatorio(dados).toString('utf8');
-const linhasDe = (dados = BASE): string[] => texto(dados).replace(/^﻿/, '').split('\r\n');
+const linhasDe = (dados = BASE): string[] => texto(dados).slice(1).split('\r\n');
 
 describe('montarCsvDoRelatorio', () => {
   it('começa com BOM UTF-8 (o Excel abre os acentos certos)', () => {
