@@ -91,14 +91,21 @@ describe('F9 -- decisao online de acesso', () => {
       ...sobrescreve,
     });
 
-  /** Direito valido: vale nesta unidade, sem restricao de horario. */
-  const darDireitoVigente = async (studentId: string): Promise<string> => {
+  /**
+   * Direito no periodo: vale nesta unidade, sem restricao de horario.
+   * `SUSPENDED` e o mesmo direito depois do job de vencimento (#634).
+   */
+  const darDireitoVigente = async (
+    studentId: string,
+    status: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE',
+  ): Promise<string> => {
     const entitlement = await db.entitlement.create({
       data: {
         tenantId: ctx.tenantId,
         studentId,
         source: 'SUBSCRIPTION',
-        status: 'ACTIVE',
+        status,
+        suspendedAt: status === 'SUSPENDED' ? new Date() : null,
         startsAt: new Date(Date.now() - 86_400_000),
         endsAt: new Date(Date.now() + 86_400_000 * 30),
         policySnapshot: {},
@@ -520,6 +527,49 @@ describe('F9 -- decisao online de acesso', () => {
         where: { id: ctx.identityId },
         data: { state: 'ACTIVE' },
       });
+      await limparDireitos(ctx.studentId);
+    });
+  });
+
+  /*
+   * #634 -- Arena Positiva, 15/10/2026. A projecao buscava so `ACTIVE`: o
+   * direito suspenso pelo job de vencimento nunca chegava ao motor, a recusa
+   * saia `NO_ENTITLEMENT` ("Sem plano vigente" no painel) e a liberacao
+   * financeira, que so converte `PAYMENT_OVERDUE`, nunca valia na catraca.
+   */
+  describe('divida na decisao online (F15, #634)', () => {
+    it('nega direito suspenso como PAYMENT_OVERDUE, nunca como NO_ENTITLEMENT', async () => {
+      await limparDireitos(ctx.studentId);
+      await darDireitoVigente(ctx.studentId, 'SUSPENDED');
+
+      const resposta = await pedirDecisao();
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ outcome: 'DENY', reason: 'PAYMENT_OVERDUE' });
+
+      await limparDireitos(ctx.studentId);
+    });
+
+    it('libera direito suspenso com liberacao financeira vigente', async () => {
+      await limparDireitos(ctx.studentId);
+      await darDireitoVigente(ctx.studentId, 'SUSPENDED');
+
+      const liberacao = await db.financialAccessOverride.create({
+        data: {
+          tenantId: ctx.tenantId,
+          studentId: ctx.studentId,
+          reason: 'Pagamento prometido para amanha',
+          expiresAt: new Date(Date.now() + 3_600_000),
+          actorId: ctx.actorId,
+        },
+      });
+
+      const resposta = await pedirDecisao();
+
+      expect(resposta.status).toBe(201);
+      expect(resposta.body).toMatchObject({ outcome: 'ALLOW', reason: 'FINANCIAL_OVERRIDE' });
+
+      await db.financialAccessOverride.delete({ where: { id: liberacao.id } });
       await limparDireitos(ctx.studentId);
     });
   });
