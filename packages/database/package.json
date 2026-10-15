@@ -20,7 +20,6 @@
     "import:pacto": "tsx prisma/import-pacto.ts",
     "bootstrap:tenant": "tsx prisma/bootstrap-tenant.ts",
     "fix:188": "tsx prisma/fix-188-snapshot-vazio.ts",
-    "diagnostico:identidade": "tsx prisma/diagnostico-identidade-inativa.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

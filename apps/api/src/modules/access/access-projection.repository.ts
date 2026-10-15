@@ -56,14 +56,20 @@ export class AccessProjectionRepository {
         select: { status: true },
       }),
 
-      // Somente ACTIVE e dentro do periodo -- o motor refaz a checagem, e a
-      // duplicacao e deliberada: aqui ela reduz o volume que trafega; la ela
+      // ACTIVE ou SUSPENDED, dentro do periodo -- o motor refaz a checagem, e
+      // a duplicacao e deliberada: aqui ela reduz o volume que trafega; la ela
       // e a regra. Filtrar so aqui deixaria a regra dependendo do SQL.
+      //
+      // SUSPENDED entra (#634): e com ele que o motor distingue divida
+      // (`PAYMENT_OVERDUE`) de falta de plano. So com ACTIVE a recusa por
+      // fatura vencida saia "Sem plano vigente" e a liberacao financeira,
+      // que so converte `PAYMENT_OVERDUE`, nunca valia na catraca. Nao abre
+      // nada: `estaVigente` so aceita ACTIVE.
       this.db.entitlement.findMany({
         where: {
           tenantId,
           studentId,
-          status: 'ACTIVE',
+          status: { in: ['ACTIVE', 'SUSPENDED'] },
           startsAt: { lte: avaliadoEm },
           endsAt: { gte: avaliadoEm },
         },
