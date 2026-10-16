@@ -80,6 +80,8 @@ describe('Aba Pagantes -- alunos em dia', () => {
     totalMinor: number;
     paidAt: Date;
     telefone?: string;
+    status?: 'ACTIVE' | 'BLOCKED';
+    profile?: 'STUDENT' | 'TRAINER';
   }): Promise<{ studentId: string; invoiceId: string }> {
     const aluno = await db.student.create({
       data: {
@@ -88,7 +90,8 @@ describe('Aba Pagantes -- alunos em dia', () => {
         membershipNumber: opcoes.matricula,
         fullName: opcoes.nome,
         birthDate: new Date('2000-01-01T00:00:00Z'),
-        status: 'ACTIVE',
+        status: opcoes.status ?? 'ACTIVE',
+        profile: opcoes.profile ?? 'STUDENT',
         ...(opcoes.telefone !== undefined
           ? {
               contacts: {
@@ -159,6 +162,28 @@ describe('Aba Pagantes -- alunos em dia', () => {
     expect(linha?.telefone).toBe('41998765432');
     expect(linha?.fusoDaUnidade).toBe('America/Sao_Paulo');
     expect(linha?.paidAt.toISOString()).toBe('2026-08-11T12:00:00.000Z');
+  });
+
+  it('#634: so lista aluno ATIVO de perfil ALUNO -- bloqueado e professor ficam fora', async () => {
+    const pago = new Date('2026-08-11T12:00:00.000Z');
+    const ativo = await alunoComFaturaPaga({
+      tenantId: contexto.tenantId, nome: 'Ativo Aluno Pago', matricula: `AA-${sufixo}`, totalMinor: 9000, paidAt: pago,
+    });
+    const bloqueado = await alunoComFaturaPaga({
+      tenantId: contexto.tenantId, nome: 'Bloqueado Pago', matricula: `BP-${sufixo}`, totalMinor: 9000, paidAt: pago,
+      status: 'BLOCKED',
+    });
+    const professor = await alunoComFaturaPaga({
+      tenantId: contexto.tenantId, nome: 'Professor Pago', matricula: `PP-${sufixo}`, totalMinor: 9000, paidAt: pago,
+      profile: 'TRAINER',
+    });
+
+    const painel = await consultar.executar(contexto);
+    const ids = painel.linhas.map((l) => l.studentId);
+
+    expect(ids).toContain(ativo.studentId);
+    expect(ids).not.toContain(bloqueado.studentId);
+    expect(ids).not.toContain(professor.studentId);
   });
 
   it('NAO lista fatura em aberto -- so PAID entra na aba', async () => {

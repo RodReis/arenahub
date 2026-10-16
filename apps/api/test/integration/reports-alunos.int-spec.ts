@@ -262,10 +262,13 @@ describe('F90 -- consulta do Relatório de Alunos', () => {
     expect(painel.resumo.alunosInadimplentes).toBe(2);
     expect(abaPagantes.total).toBe(1);
 
-    expect(await repo.contar(ctx, com({ financeiro: 'INADIMPLENTES' }), AGORA)).toBe(
-      painel.resumo.alunosInadimplentes,
-    );
-    expect(await repo.contar(ctx, com({ financeiro: 'PAGANTES' }), AGORA)).toBe(abaPagantes.total);
+    // A Cobrança só conta aluno Ativo + perfil Aluno (#634): é esse o filtro do relatório que ela espelha.
+    expect(
+      await repo.contar(ctx, com({ financeiro: 'INADIMPLENTES', status: 'ACTIVE', profile: 'STUDENT' }), AGORA),
+    ).toBe(painel.resumo.alunosInadimplentes);
+    expect(
+      await repo.contar(ctx, com({ financeiro: 'PAGANTES', status: 'ACTIVE', profile: 'STUDENT' }), AGORA),
+    ).toBe(abaPagantes.total);
   });
 
   it('linha completa: catraca, CPF, telefone e nome do plano', async () => {
