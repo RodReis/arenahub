@@ -11,6 +11,8 @@ import { AplicarInadimplenciaSchedulerService } from '../../src/modules/billing/
 import { BillingRepository } from '../../src/modules/billing/billing.repository.js';
 import { ConsultarInadimplenciaUseCase } from '../../src/modules/billing/consultar-inadimplencia.use-case.js';
 import { LiberacaoFinanceiraUseCase } from '../../src/modules/billing/liberacao-financeira.use-case.js';
+import { lerFiltro } from '../../src/modules/reports/domain/filtro-do-relatorio-de-alunos.js';
+import { ondeDoRelatorio } from '../../src/modules/reports/relatorio-de-alunos.repository.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
@@ -794,6 +796,121 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
       expect(painel.resumo.alunosInadimplentes).toBe(1);
     } finally {
       await db.tenant.delete({ where: { id: tenantDoAluno } });
+    }
+  });
+
+  it('#634: so conta aluno ATIVO de perfil ALUNO -- bloqueado e professor com fatura vencida ficam fora', async () => {
+    /**
+     * Decisao do PI (16/10/2026): a Cobranca e o Relatorio de Alunos
+     * (Situacao = Ativo + Perfil = Aluno + Financeiro = Inadimplentes) tem de
+     * dar o MESMO numero. Antes, a Cobranca contava 264 e o relatorio 243: os
+     * 21 de diferenca eram devedores que nao eram ATIVO + ALUNO.
+     */
+    const tenantMisto = await tenantVazio(`so-ativo-aluno-${sufixo}`);
+
+    try {
+      await db.billingSettings.create({ data: { tenantId: tenantMisto, dueDay: 10, graceDays: 3 } });
+
+      const unidade = await db.gymUnit.create({
+        data: {
+          tenantId: tenantMisto,
+          code: 'MTZ',
+          name: 'Matriz',
+          timezone: 'America/Sao_Paulo',
+          openingHours: {},
+        },
+      });
+      const plano = await db.plan.create({ data: { tenantId: tenantMisto, name: `Plano Misto ${sufixo}` } });
+
+      const devedores = [
+        { nome: 'Ativo Aluno', status: 'ACTIVE', profile: 'STUDENT' },
+        { nome: 'Bloqueado Aluno', status: 'BLOCKED', profile: 'STUDENT' },
+        { nome: 'Cancelado Aluno', status: 'CANCELLED', profile: 'STUDENT' },
+        { nome: 'Ativo Professor', status: 'ACTIVE', profile: 'TRAINER' },
+      ] as const;
+
+      for (const [indice, devedor] of devedores.entries()) {
+        const aluno = await db.student.create({
+          data: {
+            tenantId: tenantMisto,
+            gymUnitId: unidade.id,
+            membershipNumber: `MX${indice}-${sufixo}`,
+            fullName: devedor.nome,
+            birthDate: new Date('2000-01-01T00:00:00Z'),
+            status: devedor.status,
+            profile: devedor.profile,
+          },
+          select: { id: true },
+        });
+        const assinatura = await db.subscription.create({
+          data: {
+            tenantId: tenantMisto,
+            studentId: aluno.id,
+            planId: plano.id,
+            status: 'PAST_DUE',
+            startsAt: new Date('2026-07-01T00:00:00Z'),
+          },
+          select: { id: true },
+        });
+        await db.invoice.create({
+          data: {
+            tenantId: tenantMisto,
+            subscriptionId: assinatura.id,
+            studentId: aluno.id,
+            billingPeriod: new Date('2026-08-01T00:00:00Z'),
+            number: indice + 1,
+            status: 'OPEN',
+            currency: 'BRL',
+            subtotalMinor: 12990,
+            totalMinor: 12990,
+            dueAt: VENCIMENTO,
+          },
+        });
+      }
+
+      // Pagante cobravel EM DIA: entra no denominador da taxa (2 cobraveis: 1 devedor + 1 em dia).
+      const emDia = await db.student.create({
+        data: {
+          tenantId: tenantMisto,
+          gymUnitId: unidade.id,
+          membershipNumber: `MXD-${sufixo}`,
+          fullName: 'Ativo Em Dia',
+          birthDate: new Date('2000-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+          profile: 'STUDENT',
+        },
+        select: { id: true },
+      });
+      await db.subscription.create({
+        data: {
+          tenantId: tenantMisto,
+          studentId: emDia.id,
+          planId: plano.id,
+          status: 'ACTIVE',
+          startsAt: new Date('2026-07-01T00:00:00Z'),
+        },
+      });
+
+      const contextoMisto = { ...contexto, tenantId: tenantMisto };
+      const painel = await consultar.executar(contextoMisto, DENTRO_DA_CARENCIA);
+
+      expect(painel.linhas.map((l) => l.studentName)).toEqual(['Ativo Aluno']);
+      expect(painel.resumo.faturasVencidas).toBe(1);
+      expect(painel.resumo.alunosInadimplentes).toBe(1);
+      // Denominador na mesma populacao: 1 devedor / 2 cobraveis = 50%. Sem o filtro seria 4/5 = 80%.
+      expect(painel.resumo.taxaDeInadimplencia).toBe(50);
+
+      // PARIDADE com o Relatorio de Alunos: o mesmo filtro da tela (Ativo + Aluno + Inadimplentes) da o mesmo numero...
+      const contar = (filtro: Record<string, unknown>): Promise<number> =>
+        db.student.count({ where: ondeDoRelatorio(tenantMisto, lerFiltro(filtro), DENTRO_DA_CARENCIA) });
+
+      expect(await contar({ status: 'ACTIVE', profile: 'STUDENT', financeiro: 'INADIMPLENTES' })).toBe(
+        painel.resumo.alunosInadimplentes,
+      );
+      // ...e o cenario discrimina: sem filtro de situacao e perfil o relatorio acharia os 4 devedores.
+      expect(await contar({ financeiro: 'INADIMPLENTES' })).toBe(4);
+    } finally {
+      await db.tenant.delete({ where: { id: tenantMisto } });
     }
   });
 

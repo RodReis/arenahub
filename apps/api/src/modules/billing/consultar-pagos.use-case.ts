@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import { FATURA_PAGA } from './domain/criterios-financeiros.js';
+import { ALUNO_COBRAVEL, FATURA_PAGA } from './domain/criterios-financeiros.js';
 
 /**
  * A aba "Pagantes" da tela de cobranca. Espelho de
@@ -96,6 +96,7 @@ export class ConsultarPagosUseCase {
         where: {
           tenantId: contexto.tenantId,
           ...FATURA_PAGA,
+          student: ALUNO_COBRAVEL,
         },
         select: {
           id: true,

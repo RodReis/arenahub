@@ -18,5 +18,12 @@ export function faturaVencidaEmAberto(agora: Date): Prisma.InvoiceWhereInput {
   return { status: { in: ['OPEN', 'OVERDUE'] }, dueAt: { lt: agora } };
 }
 
+/**
+ * Quem a tela Cobrança considera: aluno em situação Ativo e perfil Aluno --
+ * decisão do PI (16/10/2026, #634). É exatamente o filtro Situação = Ativo +
+ * Perfil = Aluno do Relatório de Alunos; por isso os dois números batem.
+ */
+export const ALUNO_COBRAVEL: Prisma.StudentWhereInput = { status: 'ACTIVE', profile: 'STUDENT' };
+
 /** Fatura paga -- o que a aba Pagantes considera. */
 export const FATURA_PAGA: Prisma.InvoiceWhereInput = { status: 'PAID', paidAt: { not: null } };

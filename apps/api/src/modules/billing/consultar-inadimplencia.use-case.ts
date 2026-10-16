@@ -4,7 +4,7 @@ import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import { deveBloquear } from './domain/bloqueio-por-inadimplencia.js';
-import { faturaVencidaEmAberto } from './domain/criterios-financeiros.js';
+import { ALUNO_COBRAVEL, faturaVencidaEmAberto } from './domain/criterios-financeiros.js';
 
 /**
  * A tela de inadimplencia e cobranca. `MVP-02` 7, Slice 2.4.
@@ -187,6 +187,7 @@ export class ConsultarInadimplenciaUseCase {
         where: {
           tenantId: contexto.tenantId,
           ...faturaVencidaEmAberto(agora),
+          student: ALUNO_COBRAVEL,
         },
         select: {
           id: true,
@@ -520,9 +521,18 @@ export class ConsultarInadimplenciaUseCase {
      * atraso. Contar so as ativas faria a taxa cair quando mais gente ficasse
      * inadimplente, porque o proprio atraso tira a assinatura de `ACTIVE`.
      */
-    const pagantes = await this.db.subscription.count({
-      where: { tenantId: contexto.tenantId, status: { in: ['ACTIVE', 'PAST_DUE'] }, ...ASSINATURA_QUE_NAO_E_DIARIA },
-    });
+    // `comTenant`: o filtro por `student` vira EXISTS em `students` (RLS). Fora da transação o
+    // `set_config` não aplica e, sob o role restrito, o count volta 0 sem erro (issue #306).
+    const pagantes = await this.db.comTenant((tx) =>
+      tx.subscription.count({
+        where: {
+          tenantId: contexto.tenantId,
+          status: { in: ['ACTIVE', 'PAST_DUE'] },
+          student: ALUNO_COBRAVEL,
+          ...ASSINATURA_QUE_NAO_E_DIARIA,
+        },
+      }),
+    );
 
     const inadimplentes = new Set(linhas.map((l) => l.studentId)).size;
 
