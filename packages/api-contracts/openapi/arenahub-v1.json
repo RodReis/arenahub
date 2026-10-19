@@ -3095,10 +3095,64 @@
     "/api/v1/billing/delinquency": {
       "get": {
         "operationId": "BillingController_consultarInadimplencia",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "periodo",
+            "required": false,
+            "in": "query",
+            "description": "atual: so as faturas que venceram no mes corrente. Ausente: todas.",
+            "schema": {
+              "enum": [
+                "atual"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/api/v1/billing/delinquency/previous-months": {
+      "get": {
+        "operationId": "BillingController_consultarMesesAnteriores",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "linhas",
+                    "proximoCursor"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "linhas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "proximoCursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [

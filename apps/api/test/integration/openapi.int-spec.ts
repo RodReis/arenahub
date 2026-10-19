@@ -199,6 +199,7 @@ describe('contrato OpenAPI', () => {
         // F15 -- inadimplencia e acesso.
         '/api/v1/billing/delinquency',
         '/api/v1/billing/delinquency/apply',
+        '/api/v1/billing/delinquency/previous-months',
         '/api/v1/billing/financial-overrides',
         '/api/v1/billing/financial-overrides/{id}/revoke',
         // F88 -- fatura do mes sob demanda (o cron do dia 01 faz o mesmo).

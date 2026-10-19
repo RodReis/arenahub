@@ -62,6 +62,36 @@ export function linkDeCobranca(
 }
 
 /**
+ * Link `wa.me` da aba "Inadimplentes Mes Anterior": o aluno deve varias
+ * faturas, entao a mensagem nao cita numero de fatura. Mesmas regras de
+ * `linkDeCobranca` (sem digito nao ha link; texto curto e sem valor em reais).
+ */
+export function linkDeCobrancaDeMeses(telefone: string, nomeDoAluno: string): string | null {
+  const numero = apenasDigitos(telefone);
+
+  if (numero === '') {
+    return null;
+  }
+  const primeiroNome = nomeDoAluno.trim().split(/\s+/)[0] ?? '';
+
+  const mensagem = `Ola, ${primeiroNome}! Passando para lembrar das faturas que estao em aberto. Qualquer duvida e so chamar.`;
+
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+}
+
+/**
+ * `AAAA-MM` do servidor como `MM/AAAA` na tela.
+ *
+ * Por manipulacao de texto, e nao por `Intl`: a competencia nao tem dia nem
+ * fuso, e a regra 5 do DS reserva a formatacao de data ao `TenantDateTime`.
+ */
+export function competenciaLegivel(competencia: string): string {
+  const [ano, mes] = competencia.split('-');
+
+  return ano && mes ? `${mes}/${ano}` : competencia;
+}
+
+/**
  * Telefone em digitos, com DDI do Brasil quando falta.
  *
  * O `wa.me` exige o numero internacional sem sinal nem pontuacao. Cadastro

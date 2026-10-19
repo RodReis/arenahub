@@ -22,6 +22,7 @@ import {
   situacaoVisivel,
 } from '../../../../src/billing/inadimplencia';
 import { BuscaDeAluno } from './busca-de-aluno';
+import { FilaDeMesesAnteriores, type LinhaAnterior } from './fila-de-meses-anteriores';
 import estilos from './delinquency.module.css';
 
 export const metadata: Metadata = {
@@ -50,6 +51,8 @@ interface Painel {
     emAtrasoMinor: number;
     faturasVencidas: number;
     alunosInadimplentes: number;
+    alunosInadimplentesMesAtual: number;
+    alunosInadimplentesMesesAnteriores: number;
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };
@@ -58,7 +61,13 @@ interface Painel {
   proximoCursor: string | null;
 }
 
-/** Linha da aba "Pagantes" -- espelho de `Linha`, sem os campos de divida. */
+interface PainelDeMesesAnteriores {
+  total: number;
+  linhas: LinhaAnterior[];
+  proximoCursor: string | null;
+}
+
+/** Linha da aba "Pagantes Mes Atual" -- espelho de `Linha`, sem os campos de divida. */
 interface LinhaPaga {
   invoiceId: string;
   invoiceNumber: number;
@@ -109,9 +118,9 @@ function faturasLegivel(quantidade: number): string {
 
 /**
  * Busca e paginacao por aba -- parametros de URL PROPRIOS e prefixados
- * (`qInad`/`cursorInad`, `qPag`/`cursorPag`), pedido do PI. As duas abas
- * ficam montadas ao mesmo tempo (`Tabs` do DS), entao um par de parametros
- * unico faria a URL de uma aba interferir na outra.
+ * (`qInad`/`cursorInad`, `qPag`/`cursorPag`, `qAnt`/`cursorAnt`), pedido do PI.
+ * As tres abas ficam montadas ao mesmo tempo (`Tabs` do DS), entao um par de
+ * parametros unico faria a URL de uma aba interferir na outra.
  */
 export default async function InadimplenciaPage({
   searchParams,
@@ -130,8 +139,12 @@ export default async function InadimplenciaPage({
   const cursorInad = texto('cursorInad');
   const qPag = texto('qPag');
   const cursorPag = texto('cursorPag');
+  const qAnt = texto('qAnt');
+  const cursorAnt = texto('cursorAnt');
 
-  const consultaInad = new URLSearchParams();
+  // `periodo=atual`: a fila so lista o que venceu no mes corrente; os meses
+  // anteriores tem aba propria. O resumo (cartoes do topo) segue sobre o total.
+  const consultaInad = new URLSearchParams({ periodo: 'atual' });
   if (qInad) consultaInad.set('q', qInad);
   if (cursorInad) consultaInad.set('cursor', cursorInad);
 
@@ -139,9 +152,16 @@ export default async function InadimplenciaPage({
   if (qPag) consultaPag.set('q', qPag);
   if (cursorPag) consultaPag.set('cursor', cursorPag);
 
-  const [respostaInadimplencia, respostaPagos] = await Promise.all([
+  const consultaAnt = new URLSearchParams();
+  if (qAnt) consultaAnt.set('q', qAnt);
+  if (cursorAnt) consultaAnt.set('cursor', cursorAnt);
+
+  const [respostaInadimplencia, respostaPagos, respostaAnteriores] = await Promise.all([
     chamarApi<Painel>(`/api/v1/billing/delinquency?${consultaInad.toString()}`),
     chamarApi<PainelDePagos>(`/api/v1/billing/paid-invoices?${consultaPag.toString()}`),
+    chamarApi<PainelDeMesesAnteriores>(
+      `/api/v1/billing/delinquency/previous-months?${consultaAnt.toString()}`,
+    ),
   ]);
 
   if (!respostaInadimplencia.ok || !respostaInadimplencia.dados) {
@@ -174,6 +194,11 @@ export default async function InadimplenciaPage({
   const linhasPagas = respostaPagos.ok ? (respostaPagos.dados?.linhas ?? []) : [];
   const proximoCursorPag = respostaPagos.ok ? (respostaPagos.dados?.proximoCursor ?? null) : null;
   const totalPagos = respostaPagos.ok ? (respostaPagos.dados?.total ?? 0) : 0;
+  // Mesmo tratamento da aba de pagantes: falhar aqui nao derruba a tela.
+  const linhasAnteriores = respostaAnteriores.ok ? (respostaAnteriores.dados?.linhas ?? []) : [];
+  const proximoCursorAnt = respostaAnteriores.ok
+    ? (respostaAnteriores.dados?.proximoCursor ?? null)
+    : null;
 
   /*
    * OS LINKS DE PAGINACAO, um par por aba -- mesma logica de `/students`
@@ -206,6 +231,8 @@ export default async function InadimplenciaPage({
   const primeiraInad = cursorInad ? linkDePagina({ cursorInad: undefined }) : '';
   const proximaPag = proximoCursorPag ? linkDePagina({ cursorPag: proximoCursorPag }) : '';
   const primeiraPag = cursorPag ? linkDePagina({ cursorPag: undefined }) : '';
+  const proximaAnt = proximoCursorAnt ? linkDePagina({ cursorAnt: proximoCursorAnt }) : '';
+  const primeiraAnt = cursorAnt ? linkDePagina({ cursorAnt: undefined }) : '';
 
   return (
     <section aria-labelledby="titulo-inadimplencia">
@@ -275,27 +302,38 @@ export default async function InadimplenciaPage({
       </section>
 
       {/*
-        BLOCO 2 -- A RECEPCAO, em abas.
-
-        "Inadimplentes" e a aba padrao: e a fila que a recepcao trabalha o dia
-        inteiro, "Pagantes" e consulta eventual ("esse aluno ja pagou?"). As
-        duas ficam montadas (ver docblock de `Tabs`), entao a segunda chamada
-        de API acima nao atrasa a primeira renderizacao.
+        BLOCO 2 -- A RECEPCAO, em abas, na ORDEM DEFINIDA PELO PI (19/10/2026):
+        Pagantes Mes Atual, Inadimplentes Mes Atual e Inadimplentes Mes
+        Anterior. As tres ficam montadas (ver docblock de `Tabs`), entao as
+        chamadas de API acima nao atrasam a primeira renderizacao.
       */}
       <Tabs
         testId="abas-de-cobranca"
         label="Situação financeira dos alunos"
         abas={[
           {
+            id: 'pagantes',
+            label: 'Pagantes Mês Atual',
+            contador: totalPagos,
+            content: (
+              <FilaDePagos
+                linhas={linhasPagas}
+                termoDeBusca={qPag ?? ''}
+                prevHref={primeiraPag}
+                nextHref={proximaPag}
+              />
+            ),
+          },
+          {
             id: 'inadimplentes',
-            label: 'Inadimplentes',
+            label: 'Inadimplentes Mês Atual',
             /*
-              ALUNO, nao fatura (issue #416): a aba vizinha conta aluno
-              distinto, e contar fatura aqui fazia as duas medirem unidades
+              ALUNO, nao fatura (issue #416): as abas vizinhas contam aluno
+              distinto, e contar fatura aqui fazia as tres medirem unidades
               diferentes lado a lado. O card do topo continua em
               `faturasVencidas` -- la a pergunta e quantas faturas.
             */
-            contador: resumo.alunosInadimplentes,
+            contador: resumo.alunosInadimplentesMesAtual,
             content: (
               <FilaDeCobranca
                 linhas={linhas}
@@ -306,15 +344,15 @@ export default async function InadimplenciaPage({
             ),
           },
           {
-            id: 'pagantes',
-            label: 'Pagantes',
-            contador: totalPagos,
+            id: 'meses-anteriores',
+            label: 'Inadimplentes Mês Anterior',
+            contador: resumo.alunosInadimplentesMesesAnteriores,
             content: (
-              <FilaDePagos
-                linhas={linhasPagas}
-                termoDeBusca={qPag ?? ''}
-                prevHref={primeiraPag}
-                nextHref={proximaPag}
+              <FilaDeMesesAnteriores
+                linhas={linhasAnteriores}
+                termoDeBusca={qAnt ?? ''}
+                prevHref={primeiraAnt}
+                nextHref={proximaAnt}
               />
             ),
           },
@@ -362,7 +400,7 @@ function FilaDeCobranca({
         rows={linhas}
         rowKey={(linha) => linha.invoiceId}
         rowTestId={(linha) => `fatura-${linha.invoiceId}`}
-        caption="Faturas vencidas em aberto, da mais urgente para a menos urgente"
+        caption="Faturas vencidas em aberto neste mês, da mais urgente para a menos urgente"
         {...(prevHref ? { prevHref, prevLabel: 'Primeira página' } : {})}
         {...(nextHref ? { nextHref } : {})}
         columns={[
@@ -481,7 +519,7 @@ function FilaDeCobranca({
             hint={
               termoDeBusca
                 ? 'Confira a grafia ou limpe a busca.'
-                : 'Nenhuma fatura vencida em aberto neste momento.'
+                : 'Nenhuma fatura vencida em aberto neste mês.'
             }
           />
         }
@@ -491,7 +529,7 @@ function FilaDeCobranca({
 }
 
 /**
- * A aba "Pagantes" -- espelho de `FilaDeCobranca` para o outro lado da mesma
+ * A aba "Pagantes Mês Atual" -- espelho de `FilaDeCobranca` para o outro lado da mesma
  * pergunta. UMA LINHA POR ALUNO, nao por fatura: o backend ja dedupe (ver
  * `ConsultarPagosUseCase`), entao cada linha aqui e um aluno em dia, com o
  * pagamento mais recente dele. Mesmas colunas de Aluno/Fatura/Valor da fila
@@ -513,7 +551,7 @@ function FilaDePagos({
   return (
     <>
       <h2 className={estilos['tituloDaFila']}>
-        Pagantes
+        Pagantes Mês Atual
         <span className={estilos['apoioDoTitulo']}>pagaram neste mês, o mais recente primeiro</span>
       </h2>
 
