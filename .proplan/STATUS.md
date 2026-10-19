@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-15
+updated: 2026-10-19
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -9,6 +9,7 @@ updated: 2026-10-15
 
 ### Sem épico
 
+- [MVP1][FIX] Runbook do Edge: TopFace não configura a catraca e falta o teste com o agente parado (#641)
 - [FIX] notifications-dispatcher.int-spec falha intermitente no CI (marcarPublicado sem registro) (#637)
 - [MVP2][SPEC-087][F87] Diária avulsa no totem (PIX QR) — liga quando a F55 liberar (#617)
 - [MVP1.5][SPEC-010][F10] Operação offline (#10)
@@ -36,6 +37,9 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][FIX] Cobrança e Pagantes contam só aluno Ativo + Aluno (bate com o Relatório de Alunos) (#639, finalizado em: 2026-10-19)
+- [MVP1][FIX] atualizar-edge.cmd garante o TopFace parado e desativado antes de subir o agente (#642, finalizado em: 2026-10-19)
+- [MVP2][FIX] Pagantes = Ativo + Aluno que pagou no mês corrente (soma de Inadimplentes + Pagantes passava dos ativos) (#644, finalizado em: 2026-10-19)
 - [MVP2][SPEC-015][FIX] Recusa por fatura vencida sai como "Sem plano vigente" e ignora liberação financeira (#634, finalizado em: 2026-10-15)
 - [SPEC-090][F90] Relatórios > Alunos (#631, finalizado em: 2026-10-11)
 - [MVP2][SPEC-089][F89] Configuração > Pagamento: dia de gerar, vencimento e bloqueio configuráveis (#624, finalizado em: 2026-10-08)
@@ -188,8 +192,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
+- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
