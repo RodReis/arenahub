@@ -2,15 +2,19 @@ import { Injectable } from '@nestjs/common';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import { ALUNO_COBRAVEL, FATURA_PAGA } from './domain/criterios-financeiros.js';
+import { ALUNO_COBRAVEL, faturaPagaNoMes } from './domain/criterios-financeiros.js';
 
 /**
  * A aba "Pagantes" da tela de cobranca. Espelho de
  * `ConsultarInadimplenciaUseCase`, mas para o outro lado da mesma pergunta:
  * quem ja pagou, nao quem deve.
  *
- * UMA LINHA POR ALUNO, nao por fatura. A pergunta desta aba e "quem esta em
- * dia", e um aluno que pagou doze mensalidades nao e doze respostas -- e uma
+ * PAGANTE = ALUNO ATIVO COM PAGAMENTO NO MES CORRENTE (decisao do PI,
+ * 19/10/2026). Contar qualquer fatura paga em qualquer data colocava 128
+ * inadimplentes tambem aqui, e as duas abas somavam mais que os alunos ativos.
+ *
+ * UMA LINHA POR ALUNO, nao por fatura. A pergunta desta aba e "quem pagou este
+ * mes", e um aluno com duas faturas pagas no mes nao e duas respostas -- e uma
  * so, com o pagamento mais recente dele. Decisao do PI: a versao anterior
  * listava fatura por fatura e o contador da aba (a soma de faturas) nao batia
  * com "quantos alunos estao em dia", que e o numero que interessa ao lado de
@@ -81,6 +85,7 @@ export class ConsultarPagosUseCase {
    */
   async executar(
     contexto: TenantContext,
+    agora: Date,
     opcoes: OpcoesDeConsultaDePagos = {},
   ): Promise<PainelDePagos> {
     /*
@@ -91,11 +96,16 @@ export class ConsultarPagosUseCase {
      * relacao como nao-nula, entao nem o TypeScript nem um teste sem RLS
      * avisam (issue #306, mesmo padrao de `EmitirReciboUseCase`).
      */
-    const invoices = await this.db.comTenant((tx) =>
-      tx.invoice.findMany({
+    const invoices = await this.db.comTenant(async (tx) => {
+      const unidades = await tx.gymUnit.findMany({
+        where: { tenantId: contexto.tenantId },
+        select: { id: true, timezone: true },
+      });
+
+      return tx.invoice.findMany({
         where: {
           tenantId: contexto.tenantId,
-          ...FATURA_PAGA,
+          ...faturaPagaNoMes(agora, unidades),
           student: ALUNO_COBRAVEL,
         },
         select: {
@@ -125,8 +135,8 @@ export class ConsultarPagosUseCase {
          */
         orderBy: [{ paidAt: 'desc' }, { id: 'asc' }],
         take: LIMITE_DE_FATURAS_LIDAS,
-      }),
-    );
+      });
+    });
 
     /*
      * DEDUP POR ALUNO, mantendo a PRIMEIRA ocorrencia -- como a leitura acima

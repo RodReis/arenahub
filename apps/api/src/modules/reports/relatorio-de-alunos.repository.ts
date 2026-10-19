@@ -3,7 +3,11 @@ import type { Prisma } from '@arenahub/database';
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
-import { FATURA_PAGA, faturaVencidaEmAberto } from '../billing/domain/criterios-financeiros.js';
+import {
+  faturaPagaNoMes,
+  faturaVencidaEmAberto,
+  type UnidadeComFuso,
+} from '../billing/domain/criterios-financeiros.js';
 import type {
   FiltroDoRelatorioDeAlunos,
   LinhaDoRelatorioDeAlunos,
@@ -21,11 +25,15 @@ import { rotuloDoPlano } from './domain/formato-brasileiro.js';
  *
  * PLANO = o da assinatura VIGENTE (`ACTIVE`/`PAST_DUE`), o mesmo que a coluna
  * Plano mostra. Acesso por vínculo (cortesia etc.) não tem `planId`.
+ *
+ * PAGANTES = fatura paga no MÊS CORRENTE de cada unidade (mesmo critério da
+ * aba Pagantes da Cobrança), por isso recebe as `unidades` com o fuso.
  */
 export function ondeDoRelatorio(
   tenantId: string,
   filtro: FiltroDoRelatorioDeAlunos,
   agora: Date,
+  unidades: readonly UnidadeComFuso[],
 ): Prisma.StudentWhereInput {
   return {
     tenantId,
@@ -38,7 +46,9 @@ export function ondeDoRelatorio(
     ...(filtro.financeiro === 'INADIMPLENTES'
       ? { invoices: { some: faturaVencidaEmAberto(agora) } }
       : {}),
-    ...(filtro.financeiro === 'PAGANTES' ? { invoices: { some: FATURA_PAGA } } : {}),
+    ...(filtro.financeiro === 'PAGANTES'
+      ? { invoices: { some: faturaPagaNoMes(agora, unidades) } }
+      : {}),
   };
 }
 
@@ -92,14 +102,23 @@ function paraLinha(aluno: AlunoLido): LinhaDoRelatorioDeAlunos {
   };
 }
 
+function unidadesDoTenant(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+): Promise<UnidadeComFuso[]> {
+  return tx.gymUnit.findMany({ where: { tenantId }, select: { id: true, timezone: true } });
+}
+
 @Injectable()
 export class RelatorioDeAlunosRepository {
   constructor(private readonly db: PrismaService) {}
 
   async contar(contexto: TenantContext, filtro: FiltroDoRelatorioDeAlunos, agora: Date): Promise<number> {
-    return this.db.comTenant((tx) =>
-      tx.student.count({ where: ondeDoRelatorio(contexto.tenantId, filtro, agora) }),
-    );
+    return this.db.comTenant(async (tx) => {
+      const unidades = await unidadesDoTenant(tx, contexto.tenantId);
+
+      return tx.student.count({ where: ondeDoRelatorio(contexto.tenantId, filtro, agora, unidades) });
+    });
   }
 
   /**
@@ -112,15 +131,17 @@ export class RelatorioDeAlunosRepository {
     agora: Date,
     janela: { limite: number; cursor?: string | undefined },
   ): Promise<LinhaDoRelatorioDeAlunos[]> {
-    const alunos = await this.db.comTenant((tx) =>
-      tx.student.findMany({
-        where: ondeDoRelatorio(contexto.tenantId, filtro, agora),
+    const alunos = await this.db.comTenant(async (tx) => {
+      const unidades = await unidadesDoTenant(tx, contexto.tenantId);
+
+      return tx.student.findMany({
+        where: ondeDoRelatorio(contexto.tenantId, filtro, agora, unidades),
         orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
         take: janela.limite,
         ...(janela.cursor ? { cursor: { id: janela.cursor }, skip: 1 } : {}),
         select: selecao(agora),
-      }),
-    );
+      });
+    });
 
     return alunos.map(paraLinha);
   }
