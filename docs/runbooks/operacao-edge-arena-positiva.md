@@ -169,9 +169,10 @@ sc.exe config TopFaceService start= disabled
 
 Conferido: `netstat -ano | findstr 7792` passou a mostrar a conexão do leitor no `node.exe`.
 
-**Reaplicado sozinho (#642):** o `atualizar-edge.cmd` chama o `garantir-sem-topface.cmd`, que, se o
-`TopFaceService` estiver rodando ou habilitado, o para e o deixa `Disabled` (pede o "Sim" do Windows
-só nesse caso). Em 19/10/2026 o TopFace tinha voltado a subir (foi religado para teste em 14/10) e
+**Reaplicado sozinho (#642):** o `atualizar-edge.cmd` e o `edge-rodar.cmd` (a cada boot, pela tarefa
+agendada, que já roda como administrador) chamam o `garantir-sem-topface.cmd`, que, se o
+`TopFaceService` estiver rodando ou habilitado, o para e o deixa `Disabled` (no `atualizar-edge.cmd`
+pede o "Sim" do Windows, só nesse caso). Em 19/10/2026 o TopFace tinha voltado a subir (foi religado para teste em 14/10) e
 segurava o leitor: o rosto era reconhecido, a catraca não liberava, e o `netstat` mostrava o
 `ESTABLISHED` num PID que não era o `node.exe`.
 
