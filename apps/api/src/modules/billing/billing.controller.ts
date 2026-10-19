@@ -10,7 +10,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiOkResponse } from '@nestjs/swagger';
+import { ApiOkResponse, ApiQuery } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
 
@@ -1120,6 +1120,12 @@ export class BillingController {
    * aberto.
    */
   @Get('billing/delinquency')
+  @ApiQuery({
+    name: 'periodo',
+    required: false,
+    enum: ['atual'],
+    description: 'atual: so as faturas que venceram no mes corrente. Ausente: todas.',
+  })
   @RequirePermissions('billing.read')
   async consultarInadimplencia(@Query() consulta: unknown): Promise<PainelDeInadimplenciaDto> {
     const filtro = esquemaDaFilaDeCobranca.parse(consulta);

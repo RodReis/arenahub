@@ -3095,7 +3095,20 @@
     "/api/v1/billing/delinquency": {
       "get": {
         "operationId": "BillingController_consultarInadimplencia",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "periodo",
+            "required": false,
+            "in": "query",
+            "description": "atual: so as faturas que venceram no mes corrente. Ausente: todas.",
+            "schema": {
+              "enum": [
+                "atual"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
