@@ -13,6 +13,7 @@ set "PASTA=%~2"
 cd /d "%PASTA%..\..\..\.."
 
 call "%PASTA%parar-edge.cmd"
+if exist "%PASTA%garantir-sem-topface.cmd" call "%PASTA%garantir-sem-topface.cmd"
 
 git pull
 if errorlevel 1 goto erro
