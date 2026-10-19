@@ -1,10 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  competenciaLegivel,
   linkDeCobranca,
+  linkDeCobrancaDeMeses,
   motivosDaLinha,
   situacaoVisivel,
 } from './inadimplencia';
+
+describe('competenciaLegivel', () => {
+  it('AAAA-MM vira MM/AAAA, sem Intl', () => {
+    expect(competenciaLegivel('2026-09')).toBe('09/2026');
+  });
+
+  it('valor fora do formato volta como veio', () => {
+    expect(competenciaLegivel('setembro')).toBe('setembro');
+  });
+});
+
+describe('linkDeCobrancaDeMeses', () => {
+  it('abre o WhatsApp com mensagem sem numero de fatura e sem valor', () => {
+    const link = linkDeCobrancaDeMeses('(41) 99876-5432', 'Marina Souza');
+
+    expect(link).toContain('https://wa.me/5541998765432?text=');
+    const texto = decodeURIComponent(link?.split('text=')[1] ?? '');
+    expect(texto).toContain('Ola, Marina!');
+    expect(texto).toContain('faturas que estao em aberto');
+    expect(texto).not.toMatch(/R\$|fatura \d/);
+  });
+
+  it('sem digito nao ha link', () => {
+    expect(linkDeCobrancaDeMeses('sem telefone', 'Marina')).toBeNull();
+  });
+});
 
 describe('situacaoVisivel', () => {
   it('mostra a situacao real quando nao ha liberacao', () => {

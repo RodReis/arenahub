@@ -176,6 +176,19 @@ const esquemaDeBuscaPaginada = z
   .strict();
 
 /**
+ * Busca da fila de cobranca do mes atual: a busca paginada mais o filtro de
+ * periodo. `atual` lista so as faturas que venceram no mes corrente; ausente,
+ * lista todas (comportamento anterior da rota).
+ */
+const esquemaDaFilaDeCobranca = z
+  .object({
+    q: z.string().trim().min(3).optional(),
+    cursor: z.string().optional(),
+    periodo: z.literal('atual').optional(),
+  })
+  .strict();
+
+/**
  * Janela do resumo financeiro. F54.
  *
  * `de` INCLUSIVO e `ate` EXCLUSIVO -- "agosto" e `[01/08, 01/09)`. Nomes em
@@ -417,6 +430,8 @@ interface PainelDeInadimplenciaDto {
     emAtrasoMinor: number;
     faturasVencidas: number;
     alunosInadimplentes: number;
+    alunosInadimplentesMesAtual: number;
+    alunosInadimplentesMesesAnteriores: number;
     bloqueados: number;
     taxaDeInadimplencia: number | null;
   };
@@ -442,6 +457,24 @@ interface ResultadoDaInadimplenciaDto {
   invoicesVencidas: number;
   assinaturasEmAtraso: number;
   direitosSuspensos: number;
+}
+
+/** A aba "Inadimplentes Mes Anterior": uma linha por aluno, sem valor em R$ (regra desta tela). */
+interface PainelDeMesesAnterioresDto {
+  total: number;
+  linhas: {
+    studentId: string;
+    studentName: string;
+    telefone: string | null;
+    mesesEmAberto: string[];
+    faturas: number;
+    vencimentoMaisAntigo: string;
+    diasEmAtraso: number;
+    situacao: string;
+    liberadoAte: string | null;
+    fusoDaUnidade: string;
+  }[];
+  proximoCursor: string | null;
 }
 
 /** A aba "Pagantes" da tela de cobranca -- espelho de `PainelDeInadimplenciaDto`. */
@@ -1089,11 +1122,12 @@ export class BillingController {
   @Get('billing/delinquency')
   @RequirePermissions('billing.read')
   async consultarInadimplencia(@Query() consulta: unknown): Promise<PainelDeInadimplenciaDto> {
-    const filtro = esquemaDeBuscaPaginada.parse(consulta);
+    const filtro = esquemaDaFilaDeCobranca.parse(consulta);
 
     const painel = await this.inadimplencia.executar(this.contexto.require(), new Date(), {
       ...(filtro.q ? { busca: filtro.q } : {}),
       ...(filtro.cursor ? { cursor: filtro.cursor } : {}),
+      ...(filtro.periodo === 'atual' ? { periodo: 'ATUAL' as const } : {}),
     });
 
     return {
@@ -1103,6 +1137,54 @@ export class BillingController {
         ...linha,
         dueAt: linha.dueAt.toISOString(),
         liberadoAte: linha.liberadoAte?.toISOString() ?? null,
+      })),
+      proximoCursor: painel.proximoCursor,
+    };
+  }
+
+  /**
+   * A aba "Inadimplentes Mes Anterior": alunos com fatura vencida em aberto de
+   * meses anteriores ao corrente, uma linha por aluno. Mesma permissao e mesmo
+   * motivo de `billing/delinquency`; SO LE.
+   */
+  @Get('billing/delinquency/previous-months')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['total', 'linhas', 'proximoCursor'],
+      properties: {
+        total: { type: 'integer' },
+        linhas: { type: 'array', items: { type: 'object' } },
+        proximoCursor: { type: 'string', nullable: true },
+      },
+    },
+  })
+  @RequirePermissions('billing.read')
+  async consultarMesesAnteriores(@Query() consulta: unknown): Promise<PainelDeMesesAnterioresDto> {
+    const filtro = esquemaDeBuscaPaginada.parse(consulta);
+
+    const painel = await this.inadimplencia.executarMesesAnteriores(
+      this.contexto.require(),
+      new Date(),
+      {
+        ...(filtro.q ? { busca: filtro.q } : {}),
+        ...(filtro.cursor ? { cursor: filtro.cursor } : {}),
+      },
+    );
+
+    return {
+      total: painel.total,
+      linhas: painel.linhas.map((linha) => ({
+        studentId: linha.studentId,
+        studentName: linha.studentName,
+        telefone: linha.telefone,
+        mesesEmAberto: [...linha.mesesEmAberto],
+        faturas: linha.faturas,
+        vencimentoMaisAntigo: linha.vencimentoMaisAntigo.toISOString(),
+        diasEmAtraso: linha.diasEmAtraso,
+        situacao: linha.situacao,
+        liberadoAte: linha.liberadoAte?.toISOString() ?? null,
+        fusoDaUnidade: linha.fusoDaUnidade,
       })),
       proximoCursor: painel.proximoCursor,
     };

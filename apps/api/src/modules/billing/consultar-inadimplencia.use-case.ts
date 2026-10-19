@@ -5,6 +5,11 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 import { ASSINATURA_QUE_NAO_E_DIARIA } from '../membership/domain/plan.js';
 import { deveBloquear } from './domain/bloqueio-por-inadimplencia.js';
 import { ALUNO_COBRAVEL, faturaVencidaEmAberto } from './domain/criterios-financeiros.js';
+import {
+  agruparMesesAnteriores,
+  venceuNoMesAtual,
+  type LinhaDeMesesAnteriores,
+} from './domain/meses-anteriores.js';
 
 /**
  * A tela de inadimplencia e cobranca. `MVP-02` 7, Slice 2.4.
@@ -91,6 +96,10 @@ export interface ResumoDaInadimplencia {
    * diferentes lado a lado e a comparacao entre elas nao significava nada.
    */
   readonly alunosInadimplentes: number;
+  /** Alunos com fatura vencida em aberto cujo vencimento e no mes corrente -- aba "Inadimplentes Mes Atual". */
+  readonly alunosInadimplentesMesAtual: number;
+  /** Alunos com fatura vencida em aberto de meses anteriores -- aba "Inadimplentes Mes Anterior". */
+  readonly alunosInadimplentesMesesAnteriores: number;
   readonly bloqueados: number;
   /** Percentual com uma casa. `null` quando nao ha assinatura ativa alguma. */
   readonly taxaDeInadimplencia: number | null;
@@ -110,6 +119,19 @@ export interface OpcoesDeConsulta {
   readonly busca?: string;
   /** `invoiceId` da ultima linha da pagina anterior. */
   readonly cursor?: string;
+  /**
+   * `ATUAL` lista so as faturas que venceram no mes corrente (aba "Inadimplentes
+   * Mes Atual"). Ausente, lista todas. `resumo` e `faixas` ignoram este filtro.
+   */
+  readonly periodo?: 'ATUAL';
+}
+
+/** Pagina da aba "Inadimplentes Mes Anterior": uma linha por aluno. */
+export interface PainelDeMesesAnteriores {
+  readonly total: number;
+  readonly linhas: readonly LinhaDeMesesAnteriores[];
+  /** `studentId` da ultima linha desta pagina; `null` quando nao ha proxima. */
+  readonly proximoCursor: string | null;
 }
 
 const TAMANHO_DA_PAGINA = 10;
@@ -165,6 +187,49 @@ export class ConsultarInadimplenciaUseCase {
     agora: Date,
     opcoes: OpcoesDeConsulta = {},
   ): Promise<PainelDeInadimplencia> {
+    const linhas = await this.carregarLinhas(contexto, agora);
+
+    const daAba =
+      opcoes.periodo === 'ATUAL' ? linhas.filter((l) => venceuNoMesAtual(l, agora)) : linhas;
+    const ordenadas = this.ordenadasPorUrgencia(daAba);
+    const { pagina, proximoCursor } = this.paginar(ordenadas, opcoes, (linha) => linha.invoiceId);
+
+    return {
+      resumo: await this.resumo(contexto, linhas, agora),
+      faixas: this.faixas(linhas),
+      linhas: pagina,
+      proximoCursor,
+    };
+  }
+
+  /**
+   * A aba "Inadimplentes Mes Anterior": os alunos com fatura vencida em aberto
+   * de meses ANTERIORES ao corrente, UMA LINHA POR ALUNO (decisao do PI,
+   * 19/10/2026). Mesma carga e mesma situacao de acesso da fila do mes atual.
+   */
+  async executarMesesAnteriores(
+    contexto: TenantContext,
+    agora: Date,
+    opcoes: Pick<OpcoesDeConsulta, 'busca' | 'cursor'> = {},
+  ): Promise<PainelDeMesesAnteriores> {
+    const linhas = await this.carregarLinhas(contexto, agora);
+    const { pagina, proximoCursor, total } = this.paginar(
+      agruparMesesAnteriores(linhas, agora),
+      opcoes,
+      (linha) => linha.studentId,
+    );
+
+    return { total, linhas: pagina, proximoCursor };
+  }
+
+  /**
+   * Toda fatura vencida em aberto do tenant, com a situacao de acesso -- a base
+   * da fila do mes atual, da aba de meses anteriores e dos cartoes do topo.
+   */
+  private async carregarLinhas(
+    contexto: TenantContext,
+    agora: Date,
+  ): Promise<readonly LinhaDeInadimplencia[]> {
     const configuracao = await this.db.billingSettings.findUnique({
       where: { tenantId: contexto.tenantId },
       select: { graceDays: true, blockAnchor: true },
@@ -278,15 +343,7 @@ export class ConsultarInadimplenciaUseCase {
       fusoDaUnidade: invoice.student.gymUnit.timezone,
     }));
 
-    const ordenadas = this.ordenadasPorUrgencia(linhas);
-    const { pagina, proximoCursor } = this.paginar(ordenadas, opcoes);
-
-    return {
-      resumo: await this.resumo(contexto, linhas),
-      faixas: this.faixas(linhas),
-      linhas: pagina,
-      proximoCursor,
-    };
+    return linhas;
   }
 
   /**
@@ -308,16 +365,17 @@ export class ConsultarInadimplenciaUseCase {
    * o indice do cursor na lista ATUAL, a proxima pagina sempre comeca
    * imediatamente apos a ultima linha que a pessoa viu.
    */
-  private paginar(
-    linhas: readonly LinhaDeInadimplencia[],
-    opcoes: OpcoesDeConsulta,
-  ): { pagina: readonly LinhaDeInadimplencia[]; proximoCursor: string | null } {
+  private paginar<T extends { readonly studentName: string }>(
+    linhas: readonly T[],
+    opcoes: Pick<OpcoesDeConsulta, 'busca' | 'cursor'>,
+    chave: (linha: T) => string,
+  ): { pagina: readonly T[]; proximoCursor: string | null; total: number } {
     const filtradas = opcoes.busca
       ? linhas.filter((linha) => nomeContem(linha.studentName, opcoes.busca!))
       : linhas;
 
     const inicio = opcoes.cursor
-      ? filtradas.findIndex((linha) => linha.invoiceId === opcoes.cursor) + 1
+      ? filtradas.findIndex((linha) => chave(linha) === opcoes.cursor) + 1
       : 0;
 
     /*
@@ -333,7 +391,8 @@ export class ConsultarInadimplenciaUseCase {
 
     return {
       pagina,
-      proximoCursor: haProxima && ultima ? ultima.invoiceId : null,
+      proximoCursor: haProxima && ultima ? chave(ultima) : null,
+      total: filtradas.length,
     };
   }
 
@@ -510,6 +569,7 @@ export class ConsultarInadimplenciaUseCase {
   private async resumo(
     contexto: TenantContext,
     linhas: readonly LinhaDeInadimplencia[],
+    agora: Date,
   ): Promise<ResumoDaInadimplencia> {
     const emAtrasoMinor = linhas.reduce((soma, linha) => soma + linha.amountMinor, 0);
     const bloqueados = new Set(
@@ -535,11 +595,20 @@ export class ConsultarInadimplenciaUseCase {
     );
 
     const inadimplentes = new Set(linhas.map((l) => l.studentId)).size;
+    // Um aluno com fatura no mes atual E em meses anteriores conta nas duas abas.
+    const alunosDoMesAtual = new Set(
+      linhas.filter((l) => venceuNoMesAtual(l, agora)).map((l) => l.studentId),
+    ).size;
+    const alunosDeMesesAnteriores = new Set(
+      linhas.filter((l) => !venceuNoMesAtual(l, agora)).map((l) => l.studentId),
+    ).size;
 
     return {
       emAtrasoMinor,
       faturasVencidas: linhas.length,
       alunosInadimplentes: inadimplentes,
+      alunosInadimplentesMesAtual: alunosDoMesAtual,
+      alunosInadimplentesMesesAnteriores: alunosDeMesesAnteriores,
       bloqueados,
       /**
        * `null` e nao zero quando nao ha pagante: academia sem assinatura nao

@@ -11,20 +11,27 @@ const ATRASO_MS = 300;
 
 interface Props {
   /** Prefixo do parametro de URL -- cada aba tem o proprio, para nao colidir. */
-  readonly prefixo: 'qInad' | 'qPag';
+  readonly prefixo: 'qInad' | 'qPag' | 'qAnt';
   readonly termoInicial: string;
   readonly label: string;
   readonly testId: string;
 }
 
+/** Parametro de cursor de cada aba: trocar o termo de busca volta a aba para a primeira pagina. */
+const CURSOR_DA_ABA = {
+  qInad: 'cursorInad',
+  qPag: 'cursorPag',
+  qAnt: 'cursorAnt',
+} as const;
+
 /**
- * Busca por nome, para as duas abas da tela de cobranca -- pedido do PI.
+ * Busca por nome, para as abas da tela de cobranca -- pedido do PI.
  *
  * MESMO PADRAO de `FiltroDeAlunos` (busca automatica, sem botao, URL como
  * fonte da verdade), reduzido ao que esta tela precisa: so o campo de texto,
  * sem os selects de situacao/unidade/modalidade que `/students` tem.
  *
- * PARAMETRO PROPRIO POR ABA (`qInad`/`qPag`, ver `Props.prefixo`): as duas
+ * PARAMETRO PROPRIO POR ABA (`qInad`/`qPag`/`qAnt`, ver `Props.prefixo`): as tres
  * abas ficam montadas ao mesmo tempo (`Tabs` do DS), e um parametro `q` unico
  * faria buscar em Pagantes tambem mexer na URL que Inadimplentes le --
  * trocar de aba devolveria a outra lista filtrada por engano.
@@ -45,7 +52,7 @@ export function BuscaDeAluno({ prefixo, termoInicial, label, testId }: Props) {
    */
   const ultimoBuscado = useRef(termoInicial);
 
-  const cursorDaAba = prefixo === 'qInad' ? 'cursorInad' : 'cursorPag';
+  const cursorDaAba = CURSOR_DA_ABA[prefixo];
 
   const navegar = (proximoTermo: string): void => {
     const url = new URLSearchParams(searchParams.toString());
