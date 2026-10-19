@@ -1133,7 +1133,7 @@ export class BillingController {
   async consultarPagos(@Query() consulta: unknown): Promise<PainelDePagosDto> {
     const filtro = esquemaDeBuscaPaginada.parse(consulta);
 
-    const painel = await this.pagos.executar(this.contexto.require(), {
+    const painel = await this.pagos.executar(this.contexto.require(), new Date(), {
       ...(filtro.q ? { busca: filtro.q } : {}),
       ...(filtro.cursor ? { cursor: filtro.cursor } : {}),
     });

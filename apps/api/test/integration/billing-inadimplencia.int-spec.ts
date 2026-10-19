@@ -901,8 +901,9 @@ describe('F15 -- linha do tempo da inadimplencia', () => {
       expect(painel.resumo.taxaDeInadimplencia).toBe(50);
 
       // PARIDADE com o Relatorio de Alunos: o mesmo filtro da tela (Ativo + Aluno + Inadimplentes) da o mesmo numero...
+      // `[]` de unidades: so INADIMPLENTES aqui; com PAGANTES, sem unidades, o filtro nao casaria ninguem.
       const contar = (filtro: Record<string, unknown>): Promise<number> =>
-        db.student.count({ where: ondeDoRelatorio(tenantMisto, lerFiltro(filtro), DENTRO_DA_CARENCIA) });
+        db.student.count({ where: ondeDoRelatorio(tenantMisto, lerFiltro(filtro), DENTRO_DA_CARENCIA, []) });
 
       expect(await contar({ status: 'ACTIVE', profile: 'STUDENT', financeiro: 'INADIMPLENTES' })).toBe(
         painel.resumo.alunosInadimplentes,

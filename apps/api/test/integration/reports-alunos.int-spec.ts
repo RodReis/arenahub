@@ -162,7 +162,7 @@ describe('F90 -- consulta do Relatório de Alunos', () => {
     // A: pagante, plano, tudo preenchido -- Matriz
     const a = await aluno({ nome: 'Ana Pagante', cpf: '11144477735', telefone: '41999990000', catraca: '1042' });
     const subA = await assinatura(a);
-    await fatura(a, subA, { status: 'PAID', paidAt: new Date('2026-09-05T12:00:00Z') }, '2026-09-01');
+    await fatura(a, subA, { status: 'PAID', paidAt: new Date('2026-10-05T12:00:00Z') }, '2026-09-01');
 
     // B: inadimplente (assinatura em atraso, fatura vencida em aberto) -- Matriz
     const b = await aluno({ nome: 'Bruno Devedor' });
@@ -243,7 +243,7 @@ describe('F90 -- consulta do Relatório de Alunos', () => {
     expect(await nomes(com({ financeiro: 'INADIMPLENTES' }))).toEqual(['Bruno Devedor', 'Gabi Devedora']);
   });
 
-  it('financeiro=PAGANTES traz só quem tem fatura paga', async () => {
+  it('financeiro=PAGANTES traz só quem pagou no mês corrente', async () => {
     expect(await nomes(com({ financeiro: 'PAGANTES' }))).toEqual(['Ana Pagante']);
   });
 
@@ -256,7 +256,7 @@ describe('F90 -- consulta do Relatório de Alunos', () => {
 
   it('PARIDADE com a Cobrança: mesmo número de inadimplentes e de pagantes que as duas telas', async () => {
     const painel = await inadimplencia.executar(ctx, AGORA);
-    const abaPagantes = await pagos.executar(ctx);
+    const abaPagantes = await pagos.executar(ctx, AGORA);
 
     // Contagens DIFERENTES de propósito (2 x 1): trocar um critério pelo outro derruba a paridade.
     expect(painel.resumo.alunosInadimplentes).toBe(2);

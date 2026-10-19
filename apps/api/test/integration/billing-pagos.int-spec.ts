@@ -9,18 +9,21 @@ import type { TenantContext } from '../../src/common/tenant/tenant-context.js';
 import { ConsultarPagosUseCase } from '../../src/modules/billing/consultar-pagos.use-case.js';
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
+/** 31/08/2026 12:00 em Sao Paulo: o "mes corrente" da aba e agosto. */
+const AGORA = new Date('2026-08-31T15:00:00.000Z');
+
 /**
  * Aba "Pagantes" da tela de cobranca -- espelho de
  * `billing-inadimplencia.int-spec.ts` para o outro lado da mesma pergunta.
  *
  * UMA LINHA POR ALUNO (nao por fatura): o contador da aba precisa responder
- * "quantos alunos estao em dia", nao "quantas faturas foram pagas".
+ * "quantos alunos pagaram neste mes", nao "quantas faturas foram pagas".
  *
  * Contra banco de verdade (`docs/TESTING.md` 3): a ordenacao, o filtro por
  * `status: 'PAID'` e o dedup por aluno sao comportamento real do Prisma e do
  * Postgres, e dublar o banco provaria so a sintaxe do TypeScript.
  */
-describe('Aba Pagantes -- alunos em dia', () => {
+describe('Aba Pagantes -- alunos que pagaram no mes corrente', () => {
   let db: PrismaService;
   let consultar: ConsultarPagosUseCase;
 
@@ -154,7 +157,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       telefone: '41998765432',
     });
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
 
     const linha = painel.linhas.find((l) => l.invoiceId === invoiceId);
     expect(linha).toBeDefined();
@@ -178,12 +181,51 @@ describe('Aba Pagantes -- alunos em dia', () => {
       profile: 'TRAINER',
     });
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
     const ids = painel.linhas.map((l) => l.studentId);
 
     expect(ids).toContain(ativo.studentId);
     expect(ids).not.toContain(bloqueado.studentId);
     expect(ids).not.toContain(professor.studentId);
+  });
+
+  it('so lista quem pagou NO MES CORRENTE -- pagamento de mes anterior fica fora', async () => {
+    const noMes = await alunoComFaturaPaga({
+      tenantId: contexto.tenantId, nome: 'Pagou Agosto', matricula: `PA-${sufixo}`, totalMinor: 9000,
+      paidAt: new Date('2026-08-05T12:00:00.000Z'),
+    });
+    const mesAnterior = await alunoComFaturaPaga({
+      tenantId: contexto.tenantId, nome: 'Pagou Julho', matricula: `PJ-${sufixo}`, totalMinor: 9000,
+      paidAt: new Date('2026-07-20T12:00:00.000Z'),
+    });
+
+    const ids = (await consultar.executar(contexto, AGORA)).linhas.map((l) => l.studentId);
+
+    expect(ids).toContain(noMes.studentId);
+    expect(ids).not.toContain(mesAnterior.studentId);
+  });
+
+  it('o mes e o do FUSO da unidade: 23h do dia 31 em Sao Paulo ainda e agosto, 00h30 do dia 1 ja e setembro', async () => {
+    const aluno = (nome: string, matricula: string, paidAt: string) =>
+      alunoComFaturaPaga({
+        tenantId: contexto.tenantId, nome, matricula: `${matricula}-${sufixo}`, totalMinor: 9000,
+        paidAt: new Date(paidAt),
+      });
+    // 02:00Z de 01/09 = 23:00 de 31/08 em Sao Paulo (UTC-3): ainda agosto.
+    const fimDeAgosto = await aluno('Fim De Agosto', 'FA', '2026-09-01T02:00:00.000Z');
+    // 03:30Z de 01/09 = 00:30 de 01/09: setembro.
+    const inicioDeSetembro = await aluno('Inicio De Setembro', 'IS', '2026-09-01T03:30:00.000Z');
+    // 02:00Z de 01/08 = 23:00 de 31/07: ainda julho.
+    const fimDeJulho = await aluno('Fim De Julho', 'FJ', '2026-08-01T02:00:00.000Z');
+    // 03:00Z de 01/08 = 00:00 de 01/08: agosto, na fronteira exata.
+    const inicioDeAgosto = await aluno('Inicio De Agosto', 'IA', '2026-08-01T03:00:00.000Z');
+
+    const ids = (await consultar.executar(contexto, AGORA)).linhas.map((l) => l.studentId);
+
+    expect(ids).toContain(fimDeAgosto.studentId);
+    expect(ids).toContain(inicioDeAgosto.studentId);
+    expect(ids).not.toContain(inicioDeSetembro.studentId);
+    expect(ids).not.toContain(fimDeJulho.studentId);
   });
 
   it('NAO lista fatura em aberto -- so PAID entra na aba', async () => {
@@ -226,7 +268,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       select: { id: true },
     });
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
 
     expect(painel.linhas.some((l) => l.invoiceId === invoice.id)).toBe(false);
   });
@@ -237,7 +279,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       nome: 'Pago Antigo',
       matricula: `ANT-${sufixo}`,
       totalMinor: 10000,
-      paidAt: new Date('2026-07-01T10:00:00.000Z'),
+      paidAt: new Date('2026-08-02T10:00:00.000Z'),
     });
 
     const recente = await alunoComFaturaPaga({
@@ -248,7 +290,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       paidAt: new Date('2026-08-20T10:00:00.000Z'),
     });
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
 
     const indiceRecente = painel.linhas.findIndex((l) => l.invoiceId === recente.invoiceId);
     const indiceAntiga = painel.linhas.findIndex((l) => l.invoiceId === antiga.invoiceId);
@@ -300,15 +342,15 @@ describe('Aba Pagantes -- alunos em dia', () => {
         select: { id: true },
       });
 
-    await criarFaturaPaga('2026-06-01T00:00:00Z', '2026-06-05T10:00:00.000Z', 10000);
-    await criarFaturaPaga('2026-07-01T00:00:00Z', '2026-07-05T10:00:00.000Z', 10000);
+    await criarFaturaPaga('2026-06-01T00:00:00Z', '2026-08-03T10:00:00.000Z', 10000);
+    await criarFaturaPaga('2026-07-01T00:00:00Z', '2026-08-04T10:00:00.000Z', 10000);
     const maisRecente = await criarFaturaPaga(
       '2026-08-01T00:00:00Z',
       '2026-08-05T10:00:00.000Z',
       12000,
     );
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
 
     const linhasDoAluno = painel.linhas.filter((l) => l.studentId === aluno.id);
     expect(linhasDoAluno).toHaveLength(1);
@@ -326,7 +368,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       paidAt: new Date('2026-08-05T10:00:00.000Z'),
     });
 
-    const painel = await consultar.executar(contexto);
+    const painel = await consultar.executar(contexto, AGORA);
     const linha = painel.linhas.find((l) => l.invoiceId === invoiceId);
 
     expect(linha?.telefone).toBeNull();
@@ -341,11 +383,11 @@ describe('Aba Pagantes -- alunos em dia', () => {
       paidAt: new Date('2026-08-13T10:00:00.000Z'),
     });
 
-    const painel = await consultar.executar(contexto, { busca: 'jose da busca acao' });
+    const painel = await consultar.executar(contexto, AGORA, { busca: 'jose da busca acao' });
 
     expect(painel.linhas.some((l) => l.studentId === studentId)).toBe(true);
 
-    const semResultado = await consultar.executar(contexto, { busca: 'nome que nao existe' });
+    const semResultado = await consultar.executar(contexto, AGORA, { busca: 'nome que nao existe' });
 
     expect(semResultado.linhas.some((l) => l.studentId === studentId)).toBe(false);
   });
@@ -406,19 +448,19 @@ describe('Aba Pagantes -- alunos em dia', () => {
             subtotalMinor: 10000 + indice,
             totalMinor: 10000 + indice,
             dueAt: new Date('2026-08-10T14:00:00.000Z'),
-            paidAt: new Date(2026, 7, 10 + indice, 10, 0, 0),
+            paidAt: new Date(Date.UTC(2026, 7, 1 + indice, 15, 0, 0)),
           },
         });
       }
 
       const contextoDoVolume = { ...contexto, tenantId: tenantComVolume };
 
-      const primeira = await consultar.executar(contextoDoVolume);
+      const primeira = await consultar.executar(contextoDoVolume, AGORA);
       expect(primeira.linhas).toHaveLength(10);
       expect(primeira.proximoCursor).not.toBeNull();
       expect(primeira.total).toBe(25);
 
-      const segunda = await consultar.executar(contextoDoVolume, {
+      const segunda = await consultar.executar(contextoDoVolume, AGORA, {
         cursor: primeira.proximoCursor!,
       });
       expect(segunda.linhas).toHaveLength(10);
@@ -427,7 +469,7 @@ describe('Aba Pagantes -- alunos em dia', () => {
       const idsDaPrimeira = new Set(primeira.linhas.map((l) => l.studentId));
       expect(segunda.linhas.every((l) => !idsDaPrimeira.has(l.studentId))).toBe(true);
 
-      const terceira = await consultar.executar(contextoDoVolume, {
+      const terceira = await consultar.executar(contextoDoVolume, AGORA, {
         cursor: segunda.proximoCursor!,
       });
       expect(terceira.linhas).toHaveLength(5);
@@ -500,13 +542,13 @@ describe('Aba Pagantes -- alunos em dia', () => {
         },
       });
 
-      const painel = await consultar.executar({ ...contexto, tenantId: vizinho });
+      const painel = await consultar.executar({ ...contexto, tenantId: vizinho }, AGORA);
 
       expect(painel.linhas).toHaveLength(1);
       expect(painel.linhas[0]?.studentName).toBe('Aluno Vizinho');
 
       /** E o tenant original nao ve a fatura do vizinho. */
-      const painelOriginal = await consultar.executar(contexto);
+      const painelOriginal = await consultar.executar(contexto, AGORA);
       expect(painelOriginal.linhas.some((l) => l.studentName === 'Aluno Vizinho')).toBe(false);
     } finally {
       await db.tenant.delete({ where: { id: vizinho } });

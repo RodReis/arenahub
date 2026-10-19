@@ -514,7 +514,7 @@ function FilaDePagos({
     <>
       <h2 className={estilos['tituloDaFila']}>
         Pagantes
-        <span className={estilos['apoioDoTitulo']}>pago mais recentemente primeiro</span>
+        <span className={estilos['apoioDoTitulo']}>pagaram neste mês, o mais recente primeiro</span>
       </h2>
 
       <BuscaDeAluno
@@ -529,7 +529,7 @@ function FilaDePagos({
         rows={linhas}
         rowKey={(linha) => linha.studentId}
         rowTestId={(linha) => `pagante-${linha.studentId}`}
-        caption="Alunos em dia, com o pagamento mais recente de cada um"
+        caption="Alunos que pagaram neste mês, com o pagamento mais recente de cada um"
         {...(prevHref ? { prevHref, prevLabel: 'Primeira página' } : {})}
         {...(nextHref ? { nextHref } : {})}
         columns={[
