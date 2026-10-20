@@ -1020,7 +1020,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     }
   });
 
-  describe('vencimento da proxima fatura e cobertura informados no balcao', () => {
+  describe('vencimento da fatura recebida e cobertura informados no balcao', () => {
     const AGORA = new Date('2026-10-07T12:00:00.000Z');
     const PAGO_EM = new Date('2026-10-07T00:00:00.000Z');
 
@@ -1044,16 +1044,21 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
       return { subscriptionId, outId, novId };
     }
 
-    const pagarOut = (subscriptionId: string, extra: { coberturaAte?: Date; proximoVencimento?: Date }) =>
+    const pagar = (
+      subscriptionId: string,
+      competencias: string[],
+      extra: { coberturaAte?: Date; vencimento?: Date },
+      total = 10000,
+    ) =>
       registrarLote.executar(
         contexto,
         {
           subscriptionId,
-          competencias: [new Date('2026-10-01T00:00:00Z')],
+          competencias: competencias.map((c) => new Date(`${c}-01T00:00:00Z`)),
           dispensar: [],
           paidAt: PAGO_EM,
           channel: 'DINHEIRO',
-          expectedTotalMinor: 10000,
+          expectedTotalMinor: total,
           idempotencyKey: randomUUID(),
           agora: AGORA,
           ...extra,
@@ -1061,44 +1066,45 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         'corr-vencimento-balcao',
       );
 
-    it('grava a cobertura digitada e move vencimento e bloqueio da proxima fatura (vencimento + carencia, fuso da unidade)', async () => {
+    it('grava o vencimento e a cobertura digitados na fatura recebida; bloqueio = vencimento + carencia no fuso da unidade', async () => {
       const { subscriptionId, outId, novId } = await aluno10e11();
 
-      await pagarOut(subscriptionId, {
+      await pagar(subscriptionId, ['2026-10'], {
         coberturaAte: new Date('2026-11-10T00:00:00Z'),
-        proximoVencimento: new Date('2026-11-15T00:00:00Z'),
+        vencimento: new Date('2026-10-20T00:00:00Z'),
       });
 
       const paga = await db.invoice.findUniqueOrThrow({ where: { id: outId } });
       expect(paga.status).toBe('PAID');
       expect(paga.coverageEndsAt?.toISOString()).toBe('2026-11-10T00:00:00.000Z');
+      expect(paga.dueAt.toISOString()).toBe('2026-10-20T00:00:00.000Z');
+      // 20/10 + 3 dias de carencia = meia-noite de 23/10 em Sao Paulo (UTC-3).
+      expect(paga.blockAt?.toISOString()).toBe('2026-10-23T03:00:00.000Z');
 
-      const proxima = await db.invoice.findUniqueOrThrow({ where: { id: novId } });
-      expect(proxima.status).toBe('OPEN');
-      expect(proxima.dueAt.toISOString()).toBe('2026-11-15T00:00:00.000Z');
-      // 15/11 + 3 dias de carencia = meia-noite de 18/11 em Sao Paulo (UTC-3).
-      expect(proxima.blockAt?.toISOString()).toBe('2026-11-18T03:00:00.000Z');
-
-      const auditoria = await db.auditLog.findFirst({
-        where: { tenantId: contexto.tenantId, action: 'billing.invoice.due_date_changed', targetId: novId },
-      });
-      expect(auditoria?.metadata).toMatchObject({ from: '2026-11-09', to: '2026-11-15' });
-    });
-
-    it('sem os campos opcionais nada muda: cobertura = data + 30 e proxima fatura intacta', async () => {
-      const { subscriptionId, outId, novId } = await aluno10e11();
-
-      await pagarOut(subscriptionId, {});
-
-      const paga = await db.invoice.findUniqueOrThrow({ where: { id: outId } });
-      expect(paga.coverageEndsAt?.toISOString()).toBe('2026-11-06T00:00:00.000Z');
+      // A fatura seguinte nao e tocada.
       const proxima = await db.invoice.findUniqueOrThrow({ where: { id: novId } });
       expect(proxima.dueAt.toISOString()).toBe('2026-11-09T00:00:00.000Z');
+
+      const auditoria = await db.auditLog.findFirst({
+        where: { tenantId: contexto.tenantId, action: 'billing.invoice.due_date_changed', targetId: outId },
+      });
+      expect(auditoria?.metadata).toMatchObject({ from: '2026-10-09', to: '2026-10-20' });
     });
 
-    it('recusa vencimento quando nao ha proxima fatura em aberto, sem pagar nada', async () => {
+    it('com varios meses o vencimento digitado vale para o ULTIMO; os anteriores ficam como estavam', async () => {
+      const { subscriptionId, outId, novId } = await aluno10e11();
+
+      await pagar(subscriptionId, ['2026-10', '2026-11'], { vencimento: new Date('2026-12-01T00:00:00Z') }, 20000);
+
+      const out = await db.invoice.findUniqueOrThrow({ where: { id: outId } });
+      const nov = await db.invoice.findUniqueOrThrow({ where: { id: novId } });
+      expect(out.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
+      expect(nov.dueAt.toISOString()).toBe('2026-12-01T00:00:00.000Z');
+    });
+
+    it('mes ainda sem fatura: ela nasce ja com o vencimento digitado e o bloqueio da regra', async () => {
       const { studentId, subscriptionId } = await novaAssinatura('2026-09-01T00:00:00Z');
-      const outId = await invoiceEmAberto({
+      await invoiceEmAberto({
         subscriptionId,
         studentId,
         competencia: '2026-10-01T00:00:00Z',
@@ -1106,19 +1112,32 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         status: 'OPEN',
       });
 
-      await expect(
-        pagarOut(subscriptionId, { proximoVencimento: new Date('2026-11-15T00:00:00Z') }),
-      ).rejects.toMatchObject({ code: 'BILLING_NEXT_INVOICE_UNAVAILABLE' });
+      // nov nao tem fatura (NOT_OPENED): paga out + nov, vencimento digitado vale para nov.
+      await pagar(subscriptionId, ['2026-10', '2026-11'], { vencimento: new Date('2026-11-15T00:00:00Z') }, 20000);
 
-      const invoice = await db.invoice.findUniqueOrThrow({ where: { id: outId } });
-      expect(invoice.status).toBe('OPEN');
+      const nov = await db.invoice.findFirstOrThrow({
+        where: { subscriptionId, billingPeriod: new Date('2026-11-01T00:00:00Z') },
+      });
+      expect(nov.status).toBe('PAID');
+      expect(nov.dueAt.toISOString()).toBe('2026-11-15T00:00:00.000Z');
+      expect(nov.blockAt?.toISOString()).toBe('2026-11-18T03:00:00.000Z');
+    });
+
+    it('sem os campos opcionais nada muda: cobertura = data + 30 e vencimento intacto', async () => {
+      const { subscriptionId, outId } = await aluno10e11();
+
+      await pagar(subscriptionId, ['2026-10'], {});
+
+      const paga = await db.invoice.findUniqueOrThrow({ where: { id: outId } });
+      expect(paga.coverageEndsAt?.toISOString()).toBe('2026-11-06T00:00:00.000Z');
+      expect(paga.dueAt.toISOString()).toBe('2026-10-09T00:00:00.000Z');
     });
 
     it('recusa cobertura que termina antes da data do pagamento', async () => {
       const { subscriptionId } = await aluno10e11();
 
       await expect(
-        pagarOut(subscriptionId, { coberturaAte: new Date('2026-10-01T00:00:00Z') }),
+        pagar(subscriptionId, ['2026-10'], { coberturaAte: new Date('2026-10-01T00:00:00Z') }),
       ).rejects.toMatchObject({ code: 'BILLING_COVERAGE_BEFORE_PAYMENT' });
     });
   });

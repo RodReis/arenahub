@@ -128,6 +128,7 @@ describe('FaixaDeMeses', () => {
       channel: 'DINHEIRO',
       expectedTotalMinor: 15000,
       coberturaAte: '2026-10-20',
+      vencimento: '2026-10-20',
     });
     await waitFor(() => expect(onPago).toHaveBeenCalled());
   });
@@ -182,7 +183,13 @@ describe('FaixaDeMeses', () => {
       expect(screen.getByLabelText(/^cobertura até/i)).toHaveValue('2026-11-07');
     });
 
-    it('envia o que a recepcao digitou: novo vencimento da proxima fatura e cobertura', async () => {
+    it('o vencimento esta sempre habilitado, mesmo sem fatura seguinte (mes sem fatura, ultimo da faixa)', () => {
+      renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+      expect(screen.getByLabelText(/^vencimento/i)).toBeEnabled();
+    });
+
+    it('envia o que a recepcao digitou: vencimento e cobertura da fatura recebida', async () => {
       renderComToast(<FaixaDeMeses faixa={COM_PROXIMA} subscriptionId="sub-1" onPago={vi.fn()} />);
 
       fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-10-07' } });
@@ -192,18 +199,8 @@ describe('FaixaDeMeses', () => {
 
       await waitFor(() => expect(receberPagamentoEmLote).toHaveBeenCalledTimes(1));
       expect(receberPagamentoEmLote).toHaveBeenCalledWith(
-        expect.objectContaining({ proximoVencimento: '2026-11-15', coberturaAte: '2026-11-10' }),
+        expect.objectContaining({ vencimento: '2026-11-15', coberturaAte: '2026-11-10' }),
       );
-    });
-
-    it('sem proxima fatura em aberto o vencimento fica desabilitado e nao e enviado', async () => {
-      renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
-
-      expect(screen.getByLabelText(/^vencimento/i)).toBeDisabled();
-      fireEvent.click(screen.getByRole('button', { name: /^receber$/i }));
-
-      await waitFor(() => expect(receberPagamentoEmLote).toHaveBeenCalledTimes(1));
-      expect(vi.mocked(receberPagamentoEmLote).mock.calls[0]![0]).not.toHaveProperty('proximoVencimento');
     });
 
     it('cobertura antes do pagamento e recusada na tela', () => {

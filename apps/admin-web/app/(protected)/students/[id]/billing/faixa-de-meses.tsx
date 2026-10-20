@@ -8,7 +8,6 @@ import { receberPagamentoEmLote } from '../../../../actions/billing';
 import {
   formatarMesAno,
   mesesDispensaveis,
-  proximaFaturaEmAberto,
   selecaoInicial,
   situacoesDosMeses,
   vigenteAte,
@@ -90,14 +89,13 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
   );
   const dataValida = dataPagamento !== '' && dataPagamento <= hojeLocal();
   const situacoes = useMemo(() => situacoesDosMeses(faixa, hoje), [faixa, hoje]);
-  const proximaFatura = useMemo(() => proximaFaturaEmAberto(faixa, selecionados), [faixa, selecionados]);
   const podeCalcular = selecao.length > 0 && dataValida;
   const coberturaCalculada = podeCalcular ? vigenteAte(dataPagamento, selecao.length) : '';
   const cobertura = coberturaEditada ?? coberturaCalculada;
   // O vencimento calculado acompanha o fim da cobertura (data + 30 x N).
   const vencimento = vencimentoEditado ?? coberturaCalculada;
   const coberturaValida = cobertura === '' || cobertura >= dataPagamento;
-  const vencimentoValido = !proximaFatura || vencimento !== '';
+  const vencimentoValido = !podeCalcular || vencimento !== '';
 
   function descartarEdicoes(): void {
     setVencimentoEditado(null);
@@ -146,7 +144,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
         channel: forma,
         expectedTotalMinor: total,
         coberturaAte: cobertura,
-        ...(proximaFatura ? { proximoVencimento: vencimento } : {}),
+        vencimento,
       });
 
       if (resultado.ok) {
@@ -248,18 +246,14 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
 
         <div className={styles['data']}>
           <Field
-            id="vencimento-da-proxima-fatura"
+            id="vencimento-da-fatura"
             type="date"
             label="Vencimento"
-            value={proximaFatura ? vencimento : ''}
-            disabled={!proximaFatura}
-            hint={
-              proximaFatura
-                ? `Da próxima fatura (${formatarMesAno(proximaFatura.competencia)}). O bloqueio segue a regra de sempre.`
-                : 'Sem próxima fatura em aberto.'
-            }
+            value={vencimento}
+            disabled={!podeCalcular}
+            hint="Da fatura recebida (o último mês marcado). O bloqueio segue a regra de sempre."
             onChange={(evento) => setVencimentoEditado(evento.target.value)}
-            {...(proximaFatura && vencimento === '' ? { invalid: true, error: 'Informe o vencimento.' } : {})}
+            {...(podeCalcular && vencimento === '' ? { invalid: true, error: 'Informe o vencimento.' } : {})}
           />
         </div>
 

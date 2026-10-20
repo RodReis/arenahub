@@ -526,8 +526,8 @@ export async function receberPagamentoEmLote(input: {
   receivedAmountMinor?: number;
   /** Fim da cobertura do ultimo mes ('YYYY-MM-DD'). Informativo. */
   coberturaAte?: string;
-  /** Novo vencimento da proxima fatura em aberto ('YYYY-MM-DD'); o bloqueio se recalcula. */
-  proximoVencimento?: string;
+  /** Vencimento da fatura do ultimo mes recebido ('YYYY-MM-DD'); o bloqueio se recalcula. */
+  vencimento?: string;
 }): Promise<{ ok: true; batchId: string } | { ok: false; error: string }> {
   const idempotencyKey = crypto.randomUUID();
 
@@ -546,7 +546,7 @@ export async function receberPagamentoEmLote(input: {
           ? { receivedAmountMinor: input.receivedAmountMinor }
           : {}),
         ...(input.coberturaAte ? { coberturaAte: input.coberturaAte } : {}),
-        ...(input.proximoVencimento ? { proximoVencimento: input.proximoVencimento } : {}),
+        ...(input.vencimento ? { vencimento: input.vencimento } : {}),
       },
     },
   );
