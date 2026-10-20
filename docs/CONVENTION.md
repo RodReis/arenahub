@@ -478,7 +478,7 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   `monthly-invoices/run`) usa como `dueAt` a **`coverageEndsAt` do último pagamento de plano mensal
   do aluno** — maior `paidAt`, empate pela maior cobertura; fatura de diária não conta — e o
   **bloqueio continua `vencimento + carência`** (INV-144). Quem **não tem pagamento** segue o
-  `dueDay` (padrão 10). A cobertura só vale se cair **dentro do mês da competência**; antes dele
+  `dueDay` configurado em Configuração > Pagamento (padrão 10). A cobertura só vale se cair **dentro do mês da competência**; antes dele
   a fatura nasceria vencida, depois dele o vencimento escaparia do mês — nos dois casos vale o
   `dueDay`. Só vale para fatura **nova**: a que já existe não é reescrita pelo job (INV-066). Isso
   supera, para a fatura gerada pelo job, o "todo vencimento é o dia do ciclo" da INV-163.
