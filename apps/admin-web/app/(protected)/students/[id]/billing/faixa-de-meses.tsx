@@ -8,6 +8,7 @@ import { receberPagamentoEmLote } from '../../../../actions/billing';
 import {
   formatarMesAno,
   mesesDispensaveis,
+  proximaFaturaEmAberto,
   selecaoInicial,
   situacoesDosMeses,
   vigenteAte,
@@ -63,6 +64,11 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
   const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(() => selecaoInicial(faixa));
   const [dispensados, setDispensados] = useState<ReadonlySet<string>>(() => new Set());
   const [dataPagamento, setDataPagamento] = useState('');
+  // Valor digitado pela recepcao; `null` = vale o calculado a partir da data
+  // do pagamento. Mexer na data ou nos meses descarta a edicao: ela era para
+  // outra conta, e a responsabilidade pelo que fica e de quem digita.
+  const [vencimentoEditado, setVencimentoEditado] = useState<string | null>(null);
+  const [coberturaEditada, setCoberturaEditada] = useState<string | null>(null);
   const [forma, setForma] = useState<FormaDePagamento>('DINHEIRO');
   const [enviando, setEnviando] = useState(false);
   const [hoje, setHoje] = useState('');
@@ -84,6 +90,19 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
   );
   const dataValida = dataPagamento !== '' && dataPagamento <= hojeLocal();
   const situacoes = useMemo(() => situacoesDosMeses(faixa, hoje), [faixa, hoje]);
+  const proximaFatura = useMemo(() => proximaFaturaEmAberto(faixa, selecionados), [faixa, selecionados]);
+  const podeCalcular = selecao.length > 0 && dataValida;
+  const coberturaCalculada = podeCalcular ? vigenteAte(dataPagamento, selecao.length) : '';
+  const cobertura = coberturaEditada ?? coberturaCalculada;
+  // O vencimento calculado acompanha o fim da cobertura (data + 30 x N).
+  const vencimento = vencimentoEditado ?? coberturaCalculada;
+  const coberturaValida = cobertura === '' || cobertura >= dataPagamento;
+  const vencimentoValido = !proximaFatura || vencimento !== '';
+
+  function descartarEdicoes(): void {
+    setVencimentoEditado(null);
+    setCoberturaEditada(null);
+  }
 
   function alternar(competencia: string): void {
     const proximo = new Set(selecionados);
@@ -93,6 +112,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
       proximo.add(competencia);
     }
     setSelecionados(proximo);
+    descartarEdicoes();
   }
 
   function alternarDispensa(competencia: string): void {
@@ -106,7 +126,7 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
   }
 
   async function handleReceber(): Promise<void> {
-    if (selecao.length === 0 || !dataValida) {
+    if (selecao.length === 0 || !dataValida || !coberturaValida || !vencimentoValido) {
       return;
     }
 
@@ -125,6 +145,8 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
         paidAt: dataPagamento,
         channel: forma,
         expectedTotalMinor: total,
+        coberturaAte: cobertura,
+        ...(proximaFatura ? { proximoVencimento: vencimento } : {}),
       });
 
       if (resultado.ok) {
@@ -205,32 +227,66 @@ export function FaixaDeMeses({ faixa, subscriptionId, onPago }: FaixaDeMesesProp
         </p>
       ) : null}
 
-      <div className={styles['data']}>
-        <Field
-          id="data-do-pagamento"
-          type="date"
-          label="Data do pagamento"
-          value={dataPagamento}
-          max={hojeLocal()}
-          onChange={(evento) => setDataPagamento(evento.target.value)}
-          aria-required="true"
-          {...(dataPagamento !== '' && !dataValida
-            ? { invalid: true, error: 'A data do pagamento não pode ser futura.' }
-            : {})}
-        />
-        {selecao.length > 0 && dataValida ? (
-          <p className={styles['vigencia']}>
-            Vigente até {formatarData(vigenteAte(dataPagamento, selecao.length))}.
-          </p>
-        ) : null}
+      <div className={styles['datas']}>
+        <div className={styles['data']}>
+          <Field
+            id="data-do-pagamento"
+            type="date"
+            label="Data do pagamento"
+            value={dataPagamento}
+            max={hojeLocal()}
+            onChange={(evento) => {
+              setDataPagamento(evento.target.value);
+              descartarEdicoes();
+            }}
+            aria-required="true"
+            {...(dataPagamento !== '' && !dataValida
+              ? { invalid: true, error: 'A data do pagamento não pode ser futura.' }
+              : {})}
+          />
+        </div>
+
+        <div className={styles['data']}>
+          <Field
+            id="vencimento-da-proxima-fatura"
+            type="date"
+            label="Vencimento"
+            value={proximaFatura ? vencimento : ''}
+            disabled={!proximaFatura}
+            hint={
+              proximaFatura
+                ? `Da próxima fatura (${formatarMesAno(proximaFatura.competencia)}). O bloqueio segue a regra de sempre.`
+                : 'Sem próxima fatura em aberto.'
+            }
+            onChange={(evento) => setVencimentoEditado(evento.target.value)}
+            {...(proximaFatura && vencimento === '' ? { invalid: true, error: 'Informe o vencimento.' } : {})}
+          />
+        </div>
+
+        <div className={styles['data']}>
+          <Field
+            id="cobertura-ate"
+            type="date"
+            label="Cobertura até"
+            value={cobertura}
+            min={dataPagamento}
+            disabled={!podeCalcular}
+            onChange={(evento) => setCoberturaEditada(evento.target.value)}
+            {...(!coberturaValida ? { invalid: true, error: 'A cobertura não pode terminar antes do pagamento.' } : {})}
+          />
+        </div>
       </div>
+
+      {podeCalcular ? (
+        <p className={styles['vigencia']}>Vigente até {formatarData(cobertura)}.</p>
+      ) : null}
 
       <SeletorDeForma onEscolher={setForma} escolhida={forma} />
 
       <Button
         variant="solid"
         type="button"
-        disabled={selecao.length === 0 || !dataValida || enviando}
+        disabled={selecao.length === 0 || !dataValida || !coberturaValida || !vencimentoValido || enviando}
         onClick={() => void handleReceber()}
       >
         {enviando ? 'Recebendo…' : 'Receber'}

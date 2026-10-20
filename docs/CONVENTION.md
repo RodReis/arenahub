@@ -447,6 +447,14 @@ Regras verificáveis. **Cada uma deve ter teste.** Citadas por ID em issue `[FIX
   Data de hoje grava o instante real; dia passado grava meio-dia UTC (nunca meia-noite, que o fuso
   mostra como o dia anterior). A restauração de vencimento ao cancelar pagamento (INV-069, F85)
   deixou de existir; cancelar zera `coverageEndsAt`.
+  **Emenda de 20/10/2026 (#650, decisão do PI):** o balcão mostra, ao lado da data do pagamento, o
+  **Vencimento** e a **Cobertura até**, ambos **calculados da data do pagamento** (`data + 30 × N`) e
+  **editáveis pela recepção, que responde pelo valor digitado**. A cobertura digitada vale para o
+  **último mês** do lote e continua **informativa**. O vencimento digitado altera a **próxima fatura
+  `OPEN`** depois do último mês recebido (nunca uma `OVERDUE`; sem próxima fatura o campo fica
+  desabilitado) e o **bloqueio dela é recalculado pela regra de sempre**, `vencimento + carência`
+  (INV-144), no fuso da unidade. A alteração grava `billing.invoice.due_date_changed` na auditoria
+  (de/para).
 - **INV-164** **Fatura mensal automática e inadimplência só para aluno (F88; dias configuráveis
   desde a F89).** (a) A fatura da competência nasce **no dia configurado do tenant**
   (`BillingSettings.invoiceGenerationDay`, padrão 01), às 00:05 (America/Sao_Paulo), com vencimento

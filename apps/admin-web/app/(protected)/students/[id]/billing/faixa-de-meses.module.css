@@ -191,10 +191,18 @@
   cursor: pointer;
 }
 
+.datas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
 .data {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 200px;
   max-width: 260px;
 }
 
