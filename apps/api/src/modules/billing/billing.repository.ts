@@ -117,6 +117,12 @@ export class BillingRepository {
        * so a partir do dia 1o seguinte.
        */
       vencimento?: { dueAt: Date; blockAt: Date };
+      /**
+       * So o VENCIMENTO, com o bloqueio ainda calculado pela regra (`vencimento +
+       * carencia`) e o preco da competencia: e o caso da fatura mensal que vence
+       * na cobertura do ultimo pagamento. Ignorado quando ha `vencimento`.
+       */
+      dueAt?: Date;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<Invoice> {
@@ -154,7 +160,7 @@ export class BillingRepository {
     }
 
     const vencimento =
-      entrada.vencimento?.dueAt ?? proximoVencimento(competencia, configuracao.dueDay);
+      entrada.vencimento?.dueAt ?? entrada.dueAt ?? proximoVencimento(competencia, configuracao.dueDay);
     const totais = abrirInvoice({
       itens: [{ quantity: 1, unitAmountMinor: preco.amountMinor }],
       discountMinor: 0,

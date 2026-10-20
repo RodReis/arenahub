@@ -332,4 +332,96 @@ describe('GerarFaturasDoMesUseCase', () => {
       await db.tenant.deleteMany({ where: { id: alvo.tenantId } });
     }
   });
+
+  describe('vencimento pela cobertura do ultimo pagamento (PI, 20/10/2026)', () => {
+    let numero = 9_000;
+
+    async function pagou(
+      a: { studentId: string; subscriptionId: string },
+      o: { competencia: string; paidAt: string; coverageEndsAt: string },
+    ): Promise<void> {
+      numero += 1;
+      await db.invoice.create({
+        data: {
+          tenantId,
+          subscriptionId: a.subscriptionId,
+          studentId: a.studentId,
+          billingPeriod: new Date(o.competencia),
+          number: numero,
+          status: 'PAID',
+          currency: 'BRL',
+          subtotalMinor: 10000,
+          totalMinor: 10000,
+          dueAt: new Date(o.competencia),
+          paidAt: new Date(o.paidAt),
+          coverageEndsAt: new Date(o.coverageEndsAt),
+        },
+      });
+    }
+
+    const faturaDeMarco = (subscriptionId: string) =>
+      db.invoice.findUniqueOrThrow({
+        where: {
+          tenantId_subscriptionId_billingPeriod: {
+            tenantId,
+            subscriptionId,
+            billingPeriod: new Date('2027-03-01T00:00:00Z'),
+          },
+        },
+      });
+
+    it('quem pagou vence na cobertura; quem nao pagou, pagou fora da janela ou so tem diaria segue o dia 10', async () => {
+      const pagante = await aluno({});
+      await pagou(pagante, {
+        competencia: '2027-02-01T00:00:00Z',
+        paidAt: '2027-02-07T12:00:00Z',
+        coverageEndsAt: '2027-03-06T00:00:00Z',
+      });
+
+      const semPagamento = await aluno({});
+
+      // cobertura em abril: fora de marco -> dueDay
+      const foraDaJanela = await aluno({});
+      await pagou(foraDaJanela, {
+        competencia: '2027-02-01T00:00:00Z',
+        paidAt: '2027-02-01T12:00:00Z',
+        coverageEndsAt: '2027-04-02T00:00:00Z',
+      });
+
+      // a unica fatura paga e de plano DIARIA: a cobertura dela (fim do dia) nao conta
+      const soDiaria = await aluno({});
+      const assinaturaDiaria = await aluno({ billingMode: 'DIARIA' });
+      await pagou(
+        { studentId: soDiaria.studentId, subscriptionId: assinaturaDiaria.subscriptionId },
+        { competencia: '2027-02-01T00:00:00Z', paidAt: '2027-02-02T12:00:00Z', coverageEndsAt: '2027-03-02T00:00:00Z' },
+      );
+
+      // dois pagamentos: vale a cobertura do MAIS RECENTE (paidAt), nao a maior
+      const doisPagamentos = await aluno({});
+      await pagou(doisPagamentos, {
+        competencia: '2027-01-01T00:00:00Z',
+        paidAt: '2027-01-05T12:00:00Z',
+        coverageEndsAt: '2027-03-20T00:00:00Z',
+      });
+      await pagou(doisPagamentos, {
+        competencia: '2027-02-01T00:00:00Z',
+        paidAt: '2027-02-10T12:00:00Z',
+        coverageEndsAt: '2027-03-09T00:00:00Z',
+      });
+
+      await gerar.executar(tenantId, new Date('2027-03-01T03:05:00Z'));
+
+      const dia = async (a: { subscriptionId: string }): Promise<string> =>
+        (await faturaDeMarco(a.subscriptionId)).dueAt.toISOString().slice(0, 10);
+
+      expect(await dia(pagante)).toBe('2027-03-06');
+      expect(await dia(semPagamento)).toBe('2027-03-10');
+      expect(await dia(foraDaJanela)).toBe('2027-03-10');
+      expect(await dia(soDiaria)).toBe('2027-03-10');
+      expect(await dia(doisPagamentos)).toBe('2027-03-09');
+
+      // O bloqueio continua vencimento + carencia (5 dias), meia-noite local de Sao Paulo.
+      expect((await faturaDeMarco(pagante.subscriptionId)).blockAt?.toISOString()).toBe('2027-03-11T03:00:00.000Z');
+    });
+  });
 });

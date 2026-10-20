@@ -6,6 +6,7 @@ import {
   inicioDoProximoCiclo,
   proximoVencimento,
   instanteDeBloqueio,
+  vencimentoPelaCobertura,
 } from './ciclo-de-cobranca.js';
 
 /**
@@ -81,5 +82,28 @@ describe('inicioDoProximoCiclo', () => {
 
   it('vira o ano em dezembro', () => {
     expect(inicioDoProximoCiclo(new Date('2026-12-31T23:59:59Z'))).toEqual(new Date('2027-01-01T00:00:00Z'));
+  });
+});
+
+describe('vencimentoPelaCobertura', () => {
+  const NOV = new Date('2026-11-01T00:00:00Z');
+
+  it('usa o dia da cobertura quando cai dentro do mes da competencia', () => {
+    expect(vencimentoPelaCobertura(new Date('2026-11-06T00:00:00Z'), NOV)).toEqual(new Date('2026-11-06T00:00:00Z'));
+  });
+
+  it('descarta a hora: pega o dia UTC, convencao do dueAt', () => {
+    expect(vencimentoPelaCobertura(new Date('2026-11-06T15:30:00Z'), NOV)).toEqual(new Date('2026-11-06T00:00:00Z'));
+  });
+
+  it('aceita o primeiro e o ultimo dia do mes', () => {
+    expect(vencimentoPelaCobertura(new Date('2026-11-01T00:00:00Z'), NOV)).toEqual(new Date('2026-11-01T00:00:00Z'));
+    expect(vencimentoPelaCobertura(new Date('2026-11-30T23:00:00Z'), NOV)).toEqual(new Date('2026-11-30T00:00:00Z'));
+  });
+
+  it('sem cobertura, ou fora do mes, devolve undefined (vale o dueDay)', () => {
+    expect(vencimentoPelaCobertura(null, NOV)).toBeUndefined();
+    expect(vencimentoPelaCobertura(new Date('2026-10-31T23:59:59Z'), NOV)).toBeUndefined();
+    expect(vencimentoPelaCobertura(new Date('2026-12-01T00:00:00Z'), NOV)).toBeUndefined();
   });
 });

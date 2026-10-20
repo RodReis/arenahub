@@ -4,7 +4,7 @@ import type { Prisma } from '@arenahub/database';
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
 import { BillingRepository } from './billing.repository.js';
-import { competenciaDe, inicioDoProximoCiclo } from './domain/ciclo-de-cobranca.js';
+import { competenciaDe, inicioDoProximoCiclo, vencimentoPelaCobertura } from './domain/ciclo-de-cobranca.js';
 
 export interface ResultadoDaGeracao {
   readonly elegiveis: number;
@@ -75,10 +75,28 @@ export class GerarFaturasDoMesUseCase {
     const assinaturas = await this.db.comTenant((tx) =>
       tx.subscription.findMany({
         where: assinaturasElegiveisParaFaturaMensal(tenantId, agora),
-        select: { id: true },
+        select: { id: true, studentId: true },
         orderBy: { id: 'asc' },
       }),
     );
+
+    // Ultimo pagamento de plano mensal de cada aluno: maior `paidAt`, empate pela
+    // maior cobertura. Diaria fica de fora -- a cobertura dela e o fim do dia.
+    // `invoices` nao tem politica RLS (ver abaixo).
+    const ultimosPagamentos = await this.db.invoice.findMany({
+      where: {
+        tenantId,
+        studentId: { in: assinaturas.map((a) => a.studentId) },
+        status: 'PAID',
+        paidAt: { not: null },
+        coverageEndsAt: { not: null },
+        subscription: { plan: { billingMode: { not: 'DIARIA' } } },
+      },
+      distinct: ['studentId'],
+      orderBy: [{ paidAt: 'desc' }, { coverageEndsAt: 'desc' }],
+      select: { studentId: true, coverageEndsAt: true },
+    });
+    const coberturaPorAluno = new Map(ultimosPagamentos.map((i) => [i.studentId, i.coverageEndsAt]));
 
     // `invoices` nao tem politica RLS (so `students`, `audit_logs` e
     // `tenant_app_distribution` tem): leitura solta, filtrada por `tenantId`.
@@ -94,11 +112,19 @@ export class GerarFaturasDoMesUseCase {
     let criadas = 0;
     let falhas = 0;
 
-    for (const { id } of assinaturas) {
+    for (const { id, studentId } of assinaturas) {
       if (jaExistentes.has(id)) continue;
 
       try {
-        await this.billing.abrirInvoiceDoPeriodo(contexto, { subscriptionId: id, emQue: agora });
+        // Quem pagou vence na cobertura do ultimo pagamento; quem nao tem
+        // pagamento (ou tem fora da janela do mes) segue o `dueDay` (PI, 20/10/2026).
+        const dueAt = vencimentoPelaCobertura(coberturaPorAluno.get(studentId) ?? null, competencia);
+
+        await this.billing.abrirInvoiceDoPeriodo(contexto, {
+          subscriptionId: id,
+          emQue: agora,
+          ...(dueAt ? { dueAt } : {}),
+        });
         criadas += 1;
       } catch (erro: unknown) {
         falhas += 1;

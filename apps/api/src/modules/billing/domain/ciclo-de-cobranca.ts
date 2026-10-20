@@ -53,6 +53,29 @@ export function proximoVencimento(competencia: Date, dueDay: number): Date {
 }
 
 /**
+ * Vencimento da fatura mensal pela COBERTURA do ultimo pagamento (decisao do PI,
+ * 20/10/2026): quem pagou tem a nova fatura vencendo onde a cobertura terminava;
+ * quem nao tem pagamento segue o `dueDay` (`proximoVencimento`).
+ *
+ * So vale se a cobertura cai DENTRO do mes da competencia. Antes dele a fatura
+ * nasceria vencida (e bloqueando) no primeiro dia -- quem deve meses ja tem as
+ * faturas dos meses devidos --; depois dele o vencimento escaparia do mes. Fora
+ * da janela devolve `undefined` e vale o `dueDay`. Devolve DATA (meia-noite UTC,
+ * convencao do `dueAt`), tirada dos campos UTC.
+ */
+export function vencimentoPelaCobertura(coverageEndsAt: Date | null, competencia: Date): Date | undefined {
+  if (!coverageEndsAt) return undefined;
+
+  const dia = new Date(
+    Date.UTC(coverageEndsAt.getUTCFullYear(), coverageEndsAt.getUTCMonth(), coverageEndsAt.getUTCDate()),
+  );
+
+  return dia.getTime() >= competencia.getTime() && dia.getTime() < inicioDoProximoCiclo(competencia).getTime()
+    ? dia
+    : undefined;
+}
+
+/**
  * Primeiro instante em que a inadimplencia bloqueia (ADR-019, INV-144): a
  * meia-noite LOCAL do dia `vencimento + carencia`, no fuso da unidade.
  *
