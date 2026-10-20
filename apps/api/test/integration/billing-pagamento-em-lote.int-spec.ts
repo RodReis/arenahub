@@ -164,6 +164,16 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
     return { studentId: aluno.id, subscriptionId: assinatura.id };
   }
 
+  /**
+   * Numero da invoice criada direto no banco: CONTADOR NEGATIVO, e nao sorteio.
+   * Com `Math.random()` dois numeros iguais no mesmo tenant violavam a
+   * unicidade `(tenant_id, number)` e derrubavam a suite no CI de vez em
+   * quando. Negativo porque a sequencia real (`proximoNumero`) parte de
+   * `MAX(number) + 1` e segue positiva: um contador positivo, mesmo alto,
+   * semeia essa sequencia e colide com ela.
+   */
+  let numeroDeInvoice = 0;
+
   /** Abre uma invoice OVERDUE de um mes especifico (aluno com atraso). */
   async function invoiceEmAberto(opcoes: {
     subscriptionId: string;
@@ -179,7 +189,7 @@ describe('RegistrarPagamentoEmLoteUseCase', () => {
         subscriptionId: opcoes.subscriptionId,
         studentId: opcoes.studentId,
         billingPeriod: new Date(opcoes.competencia),
-        number: Math.floor(Math.random() * 1_000_000),
+        number: (numeroDeInvoice -= 1),
         status: opcoes.status ?? 'OVERDUE',
         currency: 'BRL',
         subtotalMinor: opcoes.totalMinor ?? 10000,

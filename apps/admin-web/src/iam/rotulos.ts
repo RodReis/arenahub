@@ -33,7 +33,7 @@ export const ROTULO_DE_PERFIL: Readonly<Record<string, RotuloDePerfil>> = {
   },
   RECEPTION: {
     label: 'Recepção',
-    descricao: 'Balcão: aluno, biometria, grade de aulas e a fatura de cada um.',
+    descricao: 'Balcão e gestão: tudo, menos o painel financeiro.',
   },
   TRAINER: {
     label: 'Professor',
