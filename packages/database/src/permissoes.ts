@@ -196,55 +196,25 @@ export const PERMISSOES_DO_MANAGER = PERMISSOES_DO_OWNER.filter(
 );
 
 /**
- * Balcao: cadastra aluno, acha a fatura de UM aluno, confere a grade, anexa
- * laudo e inscreve biometria.
+ * Recepcao: TUDO o que o dono tem, MENOS o painel financeiro -- decisao do PI,
+ * 20/10/2026 ("a unica coisa que a recepcao nao tem acesso e o Painel
+ * Financeiro; o resto tudo tem e faz").
  *
- * DUAS AUSENCIAS QUE PARECEM ESQUECIMENTO E NAO SAO:
+ * Deriva do OWNER por SUBTRACAO, como o `MANAGER`: permissao nova entra na
+ * recepcao junto com o dono, que e o comportamento pedido. Ate 20/10/2026 esta
+ * era uma lista propria, recortada de proposito (sem `billing.manage`,
+ * `access.override`, saude, biometria sensivel...); o PI substituiu esse recorte.
  *
- * - SEM `billing.dashboard`: o painel consolida faturamento, ticket medio e
- *   inadimplencia do tenant inteiro. Quem atende na porta precisa achar a
- *   fatura de um aluno -- a separacao entre as duas e decisao do PI de
- *   25/08/2026, registrada no catalogo acima.
- * - SEM `health.read`: ela ANEXA o laudo (`health.upload`) e o sistema
- *   extrai sozinho; ela nunca ve o percentual de gordura de ninguem
- *   (ADR-039). `biometric.enroll` sem `biometric.read`/`revoke` segue a
- *   mesma logica: inscrever a face e trabalho de balcao, ler ou apagar
- *   template e ato sobre dado sensivel do art. 11.
+ * A UNICA AUSENCIA e `billing.dashboard`: o painel consolida faturamento,
+ * ticket medio e inadimplencia do tenant inteiro (decisao do PI de 25/08/2026,
+ * registrada no catalogo acima). A recepcao continua achando a fatura de UM
+ * aluno por `billing.read`.
  */
-export const PERMISSOES_DA_RECEPCAO = [
-  'tenant.read',
-  'unit.read',
-  'student.create',
-  'student.read',
-  'student.update',
-  'plan.read',
-  // MATRICULAR E TROCAR PLANO -- recepcao que cadastra o aluno precisa vincular
-  // o plano (criar assinatura, trocar, cancelar). Sem isto o balcao recebia
-  // "Seu perfil nao tem permissao" ao adicionar/alterar o plano. Cobranca
-  // (`billing.manage`) e estorno continuam fora.
-  'subscription.manage',
-  'billing.read',
-  // RECEBER NO BALCAO -- decisao do PI, 02/10/2026: a recepcao da Arena
-  // Positiva recebia "Seu perfil nao tem permissao" ao registrar o
-  // pagamento (dinheiro, PIX, debito, credito na maquininha). Recebe e emite
-  // o recibo do que recebeu; estorno (`billing.refund`), liberacao
-  // financeira e o painel gerencial continuam fora.
-  'billing.payment.manual',
-  'receipt.read',
-  'receipt.issue',
-  'consent.manage',
-  'consent.read',
-  'biometric.enroll',
-  'device.read',
-  'access.read',
-  'class.read',
-  'health.upload',
-  'engagement.read',
-  // VER O TIME -- decisao do PI, 02/10/2026: a recepcao consulta quem e
-  // professor e funcionario. So leitura: trocar perfil (`team.update`) segue
-  // com dono e gerente.
-  'team.read',
-];
+const NEGADAS_A_RECEPCAO = ['billing.dashboard'];
+
+export const PERMISSOES_DA_RECEPCAO = PERMISSOES_DO_OWNER.filter(
+  (codigo) => !NEGADAS_A_RECEPCAO.includes(codigo),
+);
 
 /**
  * Dinheiro: cobranca, assinatura, plano, conciliacao e o painel gerencial.

@@ -184,7 +184,7 @@ describe('perfis de sistema e revogacao de acesso', () => {
     });
 
     /* AC-3, no banco: a prova das ausencias que sao decisao de produto. */
-    it('a recepcao nao recebe painel financeiro nem leitura de saude', async () => {
+    it('a recepcao nao recebe o painel financeiro e tem o resto (PI, 20/10/2026)', async () => {
       const contexto = await criarSuperAdmin();
       const tenantId = await criarTenantDeTeste(contexto);
 
@@ -199,7 +199,8 @@ describe('perfis de sistema e revogacao de acesso', () => {
 
       expect(codigos).toContain('billing.read');
       expect(codigos).not.toContain('billing.dashboard');
-      expect(codigos).not.toContain('health.read');
+      expect(codigos).toContain('billing.manage');
+      expect(codigos).toContain('health.read');
       expect(codigos).toContain('health.upload');
     });
   });

@@ -74,47 +74,28 @@ describe('perfis de sistema', () => {
   });
 
   describe('recepcao', () => {
+    it('tem TUDO o do OWNER, menos o painel financeiro -- decisao do PI, 20/10/2026', () => {
+      const esperado = PERMISSOES_DO_OWNER.filter((c) => c !== 'billing.dashboard');
+
+      expect(PERMISSOES_DA_RECEPCAO).toEqual(esperado);
+    });
+
     it('acha a fatura de um aluno, mas NAO ve o painel financeiro', () => {
       // Decisao do PI em 25/08/2026, registrada no proprio catalogo.
       expect(PERMISSOES_DA_RECEPCAO).toContain('billing.read');
       expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.dashboard');
     });
 
-    it('ANEXA laudo sem LER dado de saude (ADR-039)', () => {
-      expect(PERMISSOES_DA_RECEPCAO).toContain('health.upload');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('health.read');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('health.assess');
-    });
-
-    it('inscreve biometria sem ler nem revogar template', () => {
-      expect(PERMISSOES_DA_RECEPCAO).toContain('biometric.enroll');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('biometric.read');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('biometric.revoke');
-    });
-
-    it('nao libera catraca a mao nem estorna', () => {
-      // Atos excepcionais: ambos exigem motivo gravado e nao sao de balcao.
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('access.override');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.refund');
-    });
-
-    it('recebe no balcao e emite o recibo -- decisao do PI, 02/10/2026', () => {
+    it('recebe no balcao, emite o recibo e altera a cobranca', () => {
       expect(PERMISSOES_DA_RECEPCAO).toContain('billing.payment.manual');
       expect(PERMISSOES_DA_RECEPCAO).toContain('receipt.issue');
-      // Receber nao e gerenciar cobranca nem liberar quem deve.
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.manage');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.override.financial');
+      expect(PERMISSOES_DA_RECEPCAO).toContain('billing.manage');
+      expect(PERMISSOES_DA_RECEPCAO).toContain('billing.settings.manage');
     });
 
-    it('adiciona e altera o plano do aluno, sem gerenciar cobranca', () => {
+    it('adiciona e altera o plano do aluno e ve o time', () => {
       expect(PERMISSOES_DA_RECEPCAO).toContain('subscription.manage');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('plan.manage');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.manage');
-    });
-
-    it('ve o time sem poder trocar perfil -- decisao do PI, 02/10/2026', () => {
       expect(PERMISSOES_DA_RECEPCAO).toContain('team.read');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('team.update');
     });
   });
 
@@ -162,24 +143,23 @@ describe('perfis de sistema', () => {
   });
 
   describe('separacao entre perfis', () => {
-    it('billing.settings.manage: so o dono tem; gerente, financeiro e recepcao nao', () => {
+    it('billing.settings.manage: dono e recepcao tem; gerente e financeiro nao', () => {
       expect(PERMISSOES_DO_OWNER).toContain('billing.settings.manage');
       expect(PERMISSOES_DO_MANAGER).not.toContain('billing.settings.manage');
       expect(PERMISSOES_DO_FINANCEIRO).not.toContain('billing.settings.manage');
-      expect(PERMISSOES_DA_RECEPCAO).not.toContain('billing.settings.manage');
+      expect(PERMISSOES_DA_RECEPCAO).toContain('billing.settings.manage');
     });
 
-    it('so o OWNER e o MANAGER gerenciam usuarios', () => {
+    it('OWNER, MANAGER e RECEPTION gerenciam usuarios; financeiro e professor nao', () => {
       /*
-       * Era so o OWNER (F79/F80). Decisao do PI, 02/10/2026: a gerente
-       * administra a equipe. Recepcao, financeiro e professor continuam sem
-       * `user.manage` -- convite segue com quem responde pela academia.
+       * Era so o OWNER (F79/F80); em 02/10/2026 o PI deu a gerente. Em
+       * 20/10/2026 deu a recepcao (tudo menos o painel financeiro).
        */
       const comUserManage = PAPEIS_DE_SISTEMA.filter((p) =>
         p.permissoes.includes('user.manage'),
       ).map((p) => p.name);
 
-      expect(comUserManage).toEqual(['OWNER', 'MANAGER']);
+      expect(comUserManage).toEqual(['OWNER', 'MANAGER', 'RECEPTION']);
     });
 
     it('todo perfil enxerga o proprio tenant e as unidades', () => {
@@ -190,9 +170,9 @@ describe('perfis de sistema', () => {
       }
     });
 
-    it('nenhum perfil alem do OWNER altera o cadastro do tenant ou cria unidade', () => {
+    it('so OWNER, MANAGER e RECEPTION alteram o cadastro do tenant ou criam unidade', () => {
       for (const papel of PAPEIS_DE_SISTEMA) {
-        if (papel.name === 'OWNER' || papel.name === 'MANAGER') continue;
+        if (['OWNER', 'MANAGER', 'RECEPTION'].includes(papel.name)) continue;
 
         expect(papel.permissoes, `${papel.name} altera o tenant`).not.toContain('tenant.update');
         expect(papel.permissoes, `${papel.name} cria unidade`).not.toContain('unit.create');
