@@ -261,8 +261,8 @@ const esquemaDePagamentoEmLote = z
     receivedAmountMinor: z.number().int().min(0).max(TETO_DE_CENTAVOS).optional(),
     /** Fim da cobertura do ultimo mes do lote ('YYYY-MM-DD'). Informativo. */
     coberturaAte: z.iso.date().optional(),
-    /** Novo vencimento da proxima fatura em aberto ('YYYY-MM-DD'); o bloqueio se recalcula. */
-    proximoVencimento: z.iso.date().optional(),
+    /** Vencimento da fatura do ultimo mes do lote ('YYYY-MM-DD'); o bloqueio se recalcula. */
+    vencimento: z.iso.date().optional(),
   })
   .strict();
 
@@ -773,7 +773,7 @@ export class BillingController {
         expectedTotalMinor: dados.expectedTotalMinor,
         ...(dados.receivedAmountMinor !== undefined ? { receivedAmountMinor: dados.receivedAmountMinor } : {}),
         ...(dados.coberturaAte ? { coberturaAte: new Date(`${dados.coberturaAte}T00:00:00Z`) } : {}),
-        ...(dados.proximoVencimento ? { proximoVencimento: new Date(`${dados.proximoVencimento}T00:00:00Z`) } : {}),
+        ...(dados.vencimento ? { vencimento: new Date(`${dados.vencimento}T00:00:00Z`) } : {}),
         idempotencyKey,
         agora: new Date(),
       },
