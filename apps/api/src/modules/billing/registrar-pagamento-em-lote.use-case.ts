@@ -9,6 +9,7 @@ import { PrismaService } from '../../persistence/prisma.service.js';
 
 import { AssinaturaNaoEncontradaError, BillingRepository, ConfiguracaoFinanceiraAusenteError } from './billing.repository.js';
 import { diaDoPagamento } from './domain/cancelamento-de-pagamento.js';
+import { instanteDeBloqueio } from './domain/ciclo-de-cobranca.js';
 import {
   instanteDoPagamento,
   mesesPagaveis,
@@ -28,6 +29,18 @@ export class TotalDoLoteDivergenteError extends ErroDeDominio {
 export class IdempotencyKeyComCorpoDiferenteError extends ErroDeDominio {
   constructor() {
     super('BILLING_BATCH_IDEMPOTENCY_MISMATCH', 422, 'esta Idempotency-Key ja foi usada com um pedido diferente');
+  }
+}
+
+export class CoberturaAnteriorAoPagamentoError extends ErroDeDominio {
+  constructor() {
+    super('BILLING_COVERAGE_BEFORE_PAYMENT', 422, 'a cobertura nao pode terminar antes da data do pagamento');
+  }
+}
+
+export class ProximaFaturaIndisponivelError extends ErroDeDominio {
+  constructor() {
+    super('BILLING_NEXT_INVOICE_UNAVAILABLE', 422, 'nao ha proxima fatura em aberto para receber o novo vencimento');
   }
 }
 
@@ -71,6 +84,10 @@ export class RegistrarPagamentoEmLoteUseCase {
       channel: 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO';
       expectedTotalMinor: number;
       receivedAmountMinor?: number;
+      /** Fim da cobertura do ULTIMO mes do lote (informativo). Ausente = `data + 30 x N`. */
+      coberturaAte?: Date;
+      /** Novo vencimento da PROXIMA fatura em aberto; o bloqueio dela e recalculado pela regra de sempre. */
+      proximoVencimento?: Date;
       idempotencyKey: string;
       agora: Date;
     },
@@ -141,6 +158,19 @@ export class RegistrarPagamentoEmLoteUseCase {
     const instanteDoRecebimento = instanteDoPagamento(entrada.paidAt, entrada.agora);
     const totalCalculado = lote.reduce((soma, mes) => soma + mes.totalMinor, 0);
 
+    if (entrada.coberturaAte && entrada.coberturaAte.getTime() < entrada.paidAt.getTime()) {
+      throw new CoberturaAnteriorAoPagamentoError();
+    }
+
+    const ultimaDoLote = Math.max(...lote.map((mes) => mes.competencia.getTime()));
+    const proximaFatura = entrada.proximoVencimento
+      ? faixa.find((mes) => mes.competencia.getTime() > ultimaDoLote && mes.invoiceId !== null)
+      : undefined;
+
+    if (entrada.proximoVencimento && proximaFatura?.status !== 'OPEN') {
+      throw new ProximaFaturaIndisponivelError();
+    }
+
     if (totalCalculado !== entrada.expectedTotalMinor) {
       throw new TotalDoLoteDivergenteError();
     }
@@ -191,7 +221,10 @@ export class RegistrarPagamentoEmLoteUseCase {
             paidAt: instanteDoRecebimento,
             receivedVia: entrada.channel,
             batchId: entrada.idempotencyKey,
-            coverageEndsAt: vencimentoAposPagamento(diaDoRecebimento, posicao.get(mes.competencia.getTime())!),
+            coverageEndsAt:
+              entrada.coberturaAte && mes.competencia.getTime() === ultimaDoLote
+                ? entrada.coberturaAte
+                : vencimentoAposPagamento(diaDoRecebimento, posicao.get(mes.competencia.getTime())!),
           },
           correlationId,
           tx,
@@ -220,6 +253,17 @@ export class RegistrarPagamentoEmLoteUseCase {
         await this.dispensarInvoice(tx, contexto, mes.invoiceId!, correlationId);
       }
 
+      if (entrada.proximoVencimento && proximaFatura) {
+        await this.reagendarVencimento(tx, contexto, {
+          invoiceId: proximaFatura.invoiceId!,
+          vencimentoAnterior: proximaFatura.dueAt,
+          novoVencimento: entrada.proximoVencimento,
+          studentId: assinatura.studentId,
+          graceDays: configuracao.graceDays,
+          correlationId,
+        });
+      }
+
       const excedente = (entrada.receivedAmountMinor ?? totalCalculado) - totalCalculado;
 
       if (excedente > 0 && ultimoPagamentoId && ultimaMoeda) {
@@ -236,6 +280,59 @@ export class RegistrarPagamentoEmLoteUseCase {
     });
 
     return { batchId: entrada.idempotencyKey, invoiceIds, totalMinor: totalCalculado };
+  }
+
+  /**
+   * Novo vencimento da proxima fatura, informado no balcao. O bloqueio NAO e
+   * digitado: sai da regra de sempre (`vencimento + carencia`, INV-144, no
+   * fuso da unidade). So fatura `OPEN` -- uma `OVERDUE` ja foi cobrada.
+   */
+  private async reagendarVencimento(
+    tx: Prisma.TransactionClient,
+    contexto: TenantContext,
+    dados: {
+      invoiceId: string;
+      vencimentoAnterior: Date;
+      novoVencimento: Date;
+      studentId: string;
+      graceDays: number;
+      correlationId: string;
+    },
+  ): Promise<void> {
+    const { gymUnit } = await tx.student.findFirstOrThrow({
+      where: { id: dados.studentId, tenantId: contexto.tenantId },
+      select: { gymUnit: { select: { timezone: true } } },
+    });
+
+    const { count } = await tx.invoice.updateMany({
+      where: { id: dados.invoiceId, tenantId: contexto.tenantId, status: 'OPEN' },
+      data: {
+        dueAt: dados.novoVencimento,
+        blockAt: instanteDeBloqueio(dados.novoVencimento, dados.graceDays, gymUnit.timezone),
+        version: { increment: 1 },
+      },
+    });
+
+    if (count !== 1) {
+      throw new ProximaFaturaIndisponivelError();
+    }
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: contexto.tenantId,
+        actorType: 'USER',
+        actorId: contexto.actorId,
+        action: 'billing.invoice.due_date_changed',
+        target: 'Invoice',
+        targetId: dados.invoiceId,
+        correlationId: dados.correlationId,
+        metadata: {
+          from: dados.vencimentoAnterior.toISOString().slice(0, 10),
+          to: dados.novoVencimento.toISOString().slice(0, 10),
+          reason: 'informado no recebimento em lote (balcao)',
+        },
+      },
+    });
   }
 
   /** Mes nao usado: a fatura sai da inadimplencia e fica no historico como CANCELLED. */
@@ -286,6 +383,8 @@ function hashDoCorpo(entrada: {
   channel: string;
   expectedTotalMinor: number;
   receivedAmountMinor?: number;
+  coberturaAte?: Date;
+  proximoVencimento?: Date;
 }): string {
   const meses = (datas: Date[]): string =>
     datas
@@ -295,7 +394,7 @@ function hashDoCorpo(entrada: {
 
   return createHash('sha256')
     .update(
-      `${entrada.subscriptionId}|${meses(entrada.competencias)}|${meses(entrada.dispensar)}|${entrada.paidAt.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}|${entrada.receivedAmountMinor ?? ''}`,
+      `${entrada.subscriptionId}|${meses(entrada.competencias)}|${meses(entrada.dispensar)}|${entrada.paidAt.toISOString()}|${entrada.channel}|${entrada.expectedTotalMinor}|${entrada.receivedAmountMinor ?? ''}|${entrada.coberturaAte?.toISOString() ?? ''}|${entrada.proximoVencimento?.toISOString() ?? ''}`,
     )
     .digest('hex');
 }

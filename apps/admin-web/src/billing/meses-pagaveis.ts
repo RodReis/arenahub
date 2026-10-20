@@ -71,6 +71,24 @@ export function mesesDispensaveis(
   return faixa.filter((m) => m.invoiceId !== null && !selecionados.has(m.competencia) && m.competencia < ultimo);
 }
 
+/**
+ * A proxima fatura em aberto depois do ultimo mes selecionado: a que recebe o
+ * VENCIMENTO digitado no balcao. So conta fatura que ja existe e esta `OPEN`
+ * (mesma regra do servidor, que valida de novo) -- mes sem fatura nao tem
+ * vencimento a mudar, e uma `OVERDUE` ja foi cobrada.
+ */
+export function proximaFaturaEmAberto(
+  faixa: readonly MesPagavelUI[],
+  selecionados: ReadonlySet<string>,
+): MesPagavelUI | undefined {
+  const ultimo = [...selecionados].sort().at(-1);
+  if (!ultimo) return undefined;
+
+  const proxima = faixa.find((m) => m.competencia > ultimo && m.invoiceId !== null);
+
+  return proxima?.status === 'OPEN' ? proxima : undefined;
+}
+
 /** Fim da vigencia paga: data do pagamento + 30 dias por mes (a carencia vem depois). */
 export function vigenteAte(dataPagamento: string, mesesPagos: number): string {
   const base = new Date(`${dataPagamento}T00:00:00Z`).getTime();

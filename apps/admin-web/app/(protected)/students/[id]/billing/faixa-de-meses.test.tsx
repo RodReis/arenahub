@@ -127,6 +127,7 @@ describe('FaixaDeMeses', () => {
       paidAt: '2026-09-20',
       channel: 'DINHEIRO',
       expectedTotalMinor: 15000,
+      coberturaAte: '2026-10-20',
     });
     await waitFor(() => expect(onPago).toHaveBeenCalled());
   });
@@ -161,6 +162,59 @@ describe('FaixaDeMeses', () => {
     fireEvent.click(screen.getByRole('button', { name: /out\/26/i }));
     expect(screen.getByText(/Vigente até 14\/11\/2026\.?$/i)).toBeInTheDocument();
     expect(screen.queryByText(/mais a carência/i)).not.toBeInTheDocument();
+  });
+
+  describe('Vencimento e Cobertura até editáveis', () => {
+    const COM_PROXIMA = [
+      { competencia: '2026-10', status: 'OPEN' as const, invoiceId: 'out', totalMinor: 15000, dueAt: '2026-10-10' },
+      { competencia: '2026-11', status: 'OPEN' as const, invoiceId: 'nov', totalMinor: 15000, dueAt: '2026-11-10' },
+    ];
+
+    it('nascem calculados da data do pagamento e acompanham quando ela muda', () => {
+      renderComToast(<FaixaDeMeses faixa={COM_PROXIMA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+      fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-10-07' } });
+
+      expect(screen.getByLabelText(/^cobertura até/i)).toHaveValue('2026-11-06');
+      expect(screen.getByLabelText(/^vencimento/i)).toHaveValue('2026-11-06');
+
+      fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-10-08' } });
+      expect(screen.getByLabelText(/^cobertura até/i)).toHaveValue('2026-11-07');
+    });
+
+    it('envia o que a recepcao digitou: novo vencimento da proxima fatura e cobertura', async () => {
+      renderComToast(<FaixaDeMeses faixa={COM_PROXIMA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+      fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-10-07' } });
+      fireEvent.change(screen.getByLabelText(/^vencimento/i), { target: { value: '2026-11-15' } });
+      fireEvent.change(screen.getByLabelText(/^cobertura até/i), { target: { value: '2026-11-10' } });
+      fireEvent.click(screen.getByRole('button', { name: /^receber$/i }));
+
+      await waitFor(() => expect(receberPagamentoEmLote).toHaveBeenCalledTimes(1));
+      expect(receberPagamentoEmLote).toHaveBeenCalledWith(
+        expect.objectContaining({ proximoVencimento: '2026-11-15', coberturaAte: '2026-11-10' }),
+      );
+    });
+
+    it('sem proxima fatura em aberto o vencimento fica desabilitado e nao e enviado', async () => {
+      renderComToast(<FaixaDeMeses faixa={FAIXA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+      expect(screen.getByLabelText(/^vencimento/i)).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: /^receber$/i }));
+
+      await waitFor(() => expect(receberPagamentoEmLote).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(receberPagamentoEmLote).mock.calls[0]![0]).not.toHaveProperty('proximoVencimento');
+    });
+
+    it('cobertura antes do pagamento e recusada na tela', () => {
+      renderComToast(<FaixaDeMeses faixa={COM_PROXIMA} subscriptionId="sub-1" onPago={vi.fn()} />);
+
+      fireEvent.change(screen.getByLabelText(/data do pagamento/i), { target: { value: '2026-10-07' } });
+      fireEvent.change(screen.getByLabelText(/^cobertura até/i), { target: { value: '2026-10-01' } });
+
+      expect(screen.getByText(/não pode terminar antes do pagamento/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^receber$/i })).toBeDisabled();
+    });
   });
 
   it('data de pagamento futura e recusada: erro na tela e botao desabilitado', () => {
