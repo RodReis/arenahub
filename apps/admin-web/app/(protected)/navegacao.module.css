@@ -43,17 +43,13 @@
 
     A opacidade compõe a cor com o fundo antes de a régua medir: o token vale
     #A6AEB9 (8.24 sobre o #121417 da sidebar), e a 60% ele degrada para
-    #6b7078. Quem precisa de menos peso usa tamanho e `letter-spacing`, que
+    #6b7078. Quem precisa de menos peso usa tamanho, que
     não mexem no contraste.
   */
-  text-transform: uppercase;
   /*
-    0.08em, e não os 0.04em de antes. Caixa alta em 12px pede mais tracking
-    para não empastar, e o espaçamento maior é justamente o que separa o
-    rótulo do link sem tocar na cor: à distância de balcão, "FINANCEIRO"
-    espaçado lê como *categoria*, e "Cobrança" lê como *destino*.
+    Sentence case, como o resto da interface (decisão do PI, 22/10/2026): o rótulo
+    se separa do link pelo tamanho e pela cor, não pela caixa.
   */
-  letter-spacing: 0.08em;
 }
 
 /**

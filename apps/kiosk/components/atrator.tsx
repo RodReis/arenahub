@@ -289,9 +289,9 @@ export function Atrator({
  * PURA: entra texto, sai texto -- sem DOM, sem config, sem relogio. E o que a
  * torna testavel sem montar a tela.
  *
- * Duas frases ou mais: a primeira e o kicker (maiuscula, tracking largo do
- * §2.2) e o resto e a headline. Uma frase so: headline sem kicker -- forcar um
- * kicker exigiria inventar texto que a academia nao escreveu.
+ * Duas frases ou mais: a primeira e o kicker (na caixa em que o slogan foi
+ * escrito, §2.2) e o resto e a headline. Uma frase so: headline sem kicker --
+ * forcar um kicker exigiria inventar texto que a academia nao escreveu.
  *
  * Slogan vazio cai no nome da academia: o §4 diz que a tela nao quebra sem os
  * blocos opcionais, e um hero em branco e exatamente quebrar.
@@ -308,5 +308,5 @@ export function partirSlogan(
   if (frases.length === 0) return { kicker: null, headline: [nomeDaAcademia] };
   if (frases.length === 1) return { kicker: null, headline: frases };
 
-  return { kicker: frases[0]?.toUpperCase() ?? null, headline: frases.slice(1) };
+  return { kicker: frases[0] ?? null, headline: frases.slice(1) };
 }

@@ -157,9 +157,9 @@ const METRICAS_DO_TOPO: readonly { rotulo: string; tipos: readonly string[] }[] 
 
 /** As tres linhas de fase do cartao 3D, na ordem do prototipo. */
 const FASES_DO_CARTAO: readonly { titulo: string; tipos: readonly string[] }[] = [
-  { titulo: 'EVOLUÇÃO CORPORAL', tipos: ['WEIGHT'] },
-  { titulo: 'EVOLUÇÃO MUSCULAR', tipos: ['SKELETAL_MUSCLE_MASS', 'MUSCLE_MASS'] },
-  { titulo: 'EVOLUÇÃO GORDURA', tipos: ['BODY_FAT_PERCENT', 'BODY_FAT_MASS'] },
+  { titulo: 'Evolução corporal', tipos: ['WEIGHT'] },
+  { titulo: 'Evolução muscular', tipos: ['SKELETAL_MUSCLE_MASS', 'MUSCLE_MASS'] },
+  { titulo: 'Evolução gordura', tipos: ['BODY_FAT_PERCENT', 'BODY_FAT_MASS'] },
 ];
 
 /** Peso, gordura e musculo antes das demais -- a ordem das metricas do topo. */
@@ -339,8 +339,8 @@ function CartaoDaAvaliacao({
           style={StyleSheet.absoluteFill}
         />
         <View style={[estilos.seloDoCartao, { backgroundColor: rgba(t.cor.bg.app, 0.72) }]}>
-          <Text style={{ color: t.cor.accent.text, fontSize: 11, letterSpacing: 0.9, fontFamily: t.fonte(700) }}>
-            {`AVALIAÇÃO · ${mes.toUpperCase()}`}
+          <Text style={{ color: t.cor.accent.text, fontSize: 11, fontFamily: t.fonte(700) }}>
+            {`Avaliação · ${mes}`}
           </Text>
         </View>
         <View style={estilos.legendaDoCartao}>
@@ -375,7 +375,7 @@ function CartaoDaAvaliacao({
           return (
             <View key={titulo} style={estilos.fase} testID={`${testID}-fase-${serie.tipo}`}>
               <View style={estilos.linhaBase}>
-                <Text style={{ color: t.cor.accent.text, fontSize: 12, letterSpacing: 0.7, fontFamily: t.fonte(700) }}>{titulo}</Text>
+                <Text style={{ color: t.cor.accent.text, fontSize: 12, fontFamily: t.fonte(700) }}>{titulo}</Text>
                 {delta !== null ? (
                   <Text
                     style={{

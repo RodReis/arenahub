@@ -313,7 +313,7 @@ export default async function InadimplenciaPage({
         abas={[
           {
             id: 'pagantes',
-            label: 'Pagantes Mês Atual',
+            label: 'Pagantes mês atual',
             contador: totalPagos,
             content: (
               <FilaDePagos
@@ -326,7 +326,7 @@ export default async function InadimplenciaPage({
           },
           {
             id: 'inadimplentes',
-            label: 'Inadimplentes Mês Atual',
+            label: 'Inadimplentes mês atual',
             /*
               ALUNO, nao fatura (issue #416): as abas vizinhas contam aluno
               distinto, e contar fatura aqui fazia as tres medirem unidades
@@ -345,7 +345,7 @@ export default async function InadimplenciaPage({
           },
           {
             id: 'meses-anteriores',
-            label: 'Inadimplentes Mês Anterior',
+            label: 'Inadimplentes mês anterior',
             contador: resumo.alunosInadimplentesMesesAnteriores,
             content: (
               <FilaDeMesesAnteriores
@@ -529,7 +529,7 @@ function FilaDeCobranca({
 }
 
 /**
- * A aba "Pagantes Mês Atual" -- espelho de `FilaDeCobranca` para o outro lado da mesma
+ * A aba "Pagantes mês atual" -- espelho de `FilaDeCobranca` para o outro lado da mesma
  * pergunta. UMA LINHA POR ALUNO, nao por fatura: o backend ja dedupe (ver
  * `ConsultarPagosUseCase`), entao cada linha aqui e um aluno em dia, com o
  * pagamento mais recente dele. Mesmas colunas de Aluno/Fatura/Valor da fila
@@ -551,7 +551,7 @@ function FilaDePagos({
   return (
     <>
       <h2 className={estilos['tituloDaFila']}>
-        Pagantes Mês Atual
+        Pagantes mês atual
         <span className={estilos['apoioDoTitulo']}>pagaram neste mês, o mais recente primeiro</span>
       </h2>
 

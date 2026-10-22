@@ -26,8 +26,6 @@
   line-height: var(--ah-type-caption-lh);
   font-weight: var(--ah-type-body-strong-weight);
   color: var(--ah-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .cartaoDeAula {

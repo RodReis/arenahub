@@ -4,9 +4,9 @@ import { partirSlogan } from './atrator.js';
 
 /** ADR-042, Decisao 0: o hero vem da config, nunca literal. */
 describe('slogan configurado vira kicker + headline', () => {
-  it('duas frases: a primeira vira kicker em maiuscula', () => {
+  it('duas frases: a primeira vira kicker, sem alterar a caixa', () => {
     expect(partirSlogan('Disciplina hoje. Resultados sempre.', 'ArenaHub')).toEqual({
-      kicker: 'DISCIPLINA HOJE.',
+      kicker: 'Disciplina hoje.',
       headline: ['Resultados sempre.'],
     });
   });
@@ -14,7 +14,7 @@ describe('slogan configurado vira kicker + headline', () => {
   it('tres frases: kicker + duas linhas de headline', () => {
     const { kicker, headline } = partirSlogan('Treine. Evolua. Conquiste.', 'ArenaHub');
 
-    expect(kicker).toBe('TREINE.');
+    expect(kicker).toBe('Treine.');
     expect(headline).toEqual(['Evolua.', 'Conquiste.']);
   });
 

@@ -308,8 +308,6 @@
   margin: 0 0 4px;
   color: var(--ah-text-secondary);
   font-size: var(--ah-type-caption-size);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .rodapeDaAnalise {

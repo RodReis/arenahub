@@ -218,7 +218,7 @@ function CartaoDoPlano({ dados }: { dados: DadosDoPlano }) {
       />
 
       <View style={estilos.linhaEntre}>
-        <Text style={{ color: t.cor.accent.text, fontSize: 11, letterSpacing: 1.3, fontFamily: t.fonte(700) }}>PLANO ATUAL</Text>
+        <Text style={{ color: t.cor.accent.text, fontSize: 11, fontFamily: t.fonte(700) }}>Plano atual</Text>
         <Badge tom={aparencia.tom} texto={aparencia.texto} icone={<Icone tom={aparencia.tom} />} testID="plano-situacao" />
       </View>
 

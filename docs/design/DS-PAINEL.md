@@ -1,5 +1,7 @@
 # DS-PAINEL — Design System do Painel Administrativo
 
+> **Caixa do texto (decisão do PI, 22/10/2026, #664):** sentence case em toda a interface — inicial maiúscula, resto minúsculo; sigla (CPF, PIX) e nome próprio mantêm a grafia. **Nada de `text-transform: uppercase`, `.toUpperCase()` nem literal em CAIXA ALTA**; a guarda `scripts/check-caixa.mjs` (`pnpm test:guardas`) reprova. Onde este documento disser "uppercase" ou "tracking" para rótulo/overline, vale o texto em sentence case sem tracking.
+
 Academia ArenaHub · plataforma ArenaHub
 Arquivo de referência: `Painel Admin.dc.html`
 Versão 1.0 — sistema completo: tokens, grids, componentes, formulários, feedback
@@ -141,7 +143,7 @@ de 18 px na cor do canal (glifo em `--ah-action-on-solid`), rótulo 600 na cor d
 | Rótulo de botão | 13 px | 600 | conforme variante |
 | Label de campo | 12 px | 600 | `text/label` |
 | Metadado, breadcrumb, hint | 12 px | 400 | `text/muted` |
-| Overline / label de KPI | 11 px, tracking .06em, uppercase | 600 | `text/muted` |
+| Overline / label de KPI | 11 px, sentence case | 600 | `text/muted` |
 | Hint de campo em duas linhas | 11 / 15 px | 400 | `text/muted` |
 | Mono técnico | 11–12 px | 400 | `text/muted` |
 
@@ -306,7 +308,7 @@ o acesso, o pedido e a entrega — as colunas de cada uma ficam sob um **cabeça
 - `DataTable` recebe `group: 'Cobrança'` por coluna. Colunas **consecutivas** com o mesmo grupo ganham
   uma linha de cabeçalho acima (`<th scope="colgroup" colSpan>`), e a primeira coluna de cada grupo uma
   **divisória vertical** de 1 px (`border/default`) que atravessa cabeçalho e corpo.
-- O rótulo do grupo é 700, `text/strong`, tracking 0,08em — um degrau acima do cabeçalho de coluna.
+- O rótulo do grupo é 700, `text/strong`, sem tracking — um degrau acima do cabeçalho de coluna.
 - Coluna sem grupo (ex.: Ação) fica fora, sem divisória.
 - Sem nenhum `group` declarado a tabela fica como sempre foi — é opt-in.
 - Exemplo de referência: financeiro do aluno — **Cobrança** (Nº, Competência, Situação, Valor, Vence em)
@@ -412,7 +414,7 @@ Ordem fixa, do que muda a cada minuto para o que muda por semana:
 
 ### 4.6 Card de KPI
 
-Overline 11 px uppercase → valor 26/32 px 700 tabular (margem `6px 0 8px`) → badge ou sublinha 12 px. Valor pode assumir cor semântica quando o próprio número é o alerta.
+Overline 11 px sentence case → valor 26/32 px 700 tabular (margem `6px 0 8px`) → badge ou sublinha 12 px. Valor pode assumir cor semântica quando o próprio número é o alerta.
 
 **Tom do indicador (emenda de 28/09/2026, decisão do PI — "não quero card branco simples").** Todo card de KPI carrega o tom do que mede, pela tabela da §2.3: pago → `ok`, fato informativo → `info`, pendente → `warn`, dívida → `err`, risco → `risk`, sem movimento → `neu`. O tom aparece em três lugares: aresta superior de 3 px, degradê de 165° que parte do tom a 9% e some aos 55% do card, e um selo de 32 px (raio 8 px, fundo do tom a 13%, ícone lucide 16 px na cor cheia) à direita do rótulo.
 

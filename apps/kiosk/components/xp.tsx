@@ -101,7 +101,7 @@ export function Xp({
 function SaldoDoMes({ dados }: { readonly dados: ExtratoDeXp }) {
   return (
     <div className="cardDeMetrica" data-testid="saldo-de-xp">
-      <span className="metadado">Pontos em {mesDaMedicao(`${dados.mes}-01`) ?? dados.mes}</span>
+      <span className="metadado">Pontos em {mesDaMedicao(`${dados.mes}-01`)?.toLowerCase() ?? dados.mes}</span>
       <span className="valorDaMetrica">{dados.saldoDoMes}</span>
 
       {/*

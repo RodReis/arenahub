@@ -115,9 +115,9 @@ describe('Cobranca em tres abas', () => {
     const abas = screen.getAllByRole('tab');
 
     expect(abas.map((aba) => aba.textContent)).toEqual([
-      expect.stringMatching(/^Pagantes Mês Atual\s*1$/),
-      expect.stringMatching(/^Inadimplentes Mês Atual\s*2$/),
-      expect.stringMatching(/^Inadimplentes Mês Anterior\s*3$/),
+      expect.stringMatching(/^Pagantes mês atual\s*1$/),
+      expect.stringMatching(/^Inadimplentes mês atual\s*2$/),
+      expect.stringMatching(/^Inadimplentes mês anterior\s*3$/),
     ]);
   });
 

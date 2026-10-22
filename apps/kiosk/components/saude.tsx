@@ -163,7 +163,7 @@ function BlocoDeComposicao({ medidaEm }: { readonly medidaEm: string | null }) {
 
   return (
     <div className="blocoDeComposicao" data-testid="bloco-de-composicao">
-      <span className="seloDoMes">{mes === null ? 'COMPOSIÇÃO' : `COMPOSIÇÃO DE ${mes}`}</span>
+      <span className="seloDoMes">{mes === null ? 'Composição' : `Composição de ${mes.toLowerCase()}`}</span>
       <p className="metadado">A visualização do corpo estará disponível em breve.</p>
     </div>
   );

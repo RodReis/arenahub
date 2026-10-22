@@ -1,8 +1,8 @@
 import { dataLocalDe } from './bloqueio-por-inadimplencia.js';
 
 /**
- * Inadimplência por mês: o que separa "Inadimplentes Mês Atual" de
- * "Inadimplentes Mês Anterior" na tela de Cobrança (decisão do PI, 19/10/2026).
+ * Inadimplência por mês: o que separa "Inadimplentes mês atual" de
+ * "Inadimplentes mês anterior" na tela de Cobrança (decisão do PI, 19/10/2026).
  *
  * O corte é o MÊS DO VENCIMENTO no fuso da unidade do aluno (ADR-019, sem
  * fallback): uma fatura que vence às 22h do último dia do mês em Manaus já é o

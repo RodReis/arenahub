@@ -27,7 +27,7 @@
  * logo depois, em vez de a 200px de distância.
  */
 /*
- * Cada par rotulo/valor e um bloco: o rotulo em caixa alta pequena por cima,
+ * Cada par rotulo/valor e um bloco: o rotulo em fonte pequena por cima,
  * o valor em corpo forte embaixo. Em `auto-fit` os cinco dados cabem numa
  * faixa so no monitor do balcao, em vez de uma coluna estreita a esquerda com
  * 1000px vazios ao lado.
@@ -50,8 +50,6 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--ah-text-label);
 }
 

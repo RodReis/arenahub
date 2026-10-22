@@ -125,10 +125,10 @@ export function FormularioDePrimeiroAcesso({
   if (encontrado) {
     const linhas: readonly { rotulo: string; valor: string }[] = [
       { rotulo: 'CPF', valor: encontrado.cpfFormatado },
-      { rotulo: 'DATA DE NASCIMENTO', valor: paraExibicao(encontrado.dataNascimento) },
-      { rotulo: 'PLANO', valor: encontrado.plano },
-      { rotulo: 'LOCAL', valor: encontrado.local },
-      { rotulo: 'DATA DE INÍCIO', valor: paraExibicao(encontrado.dataInicio) },
+      { rotulo: 'Data de nascimento', valor: paraExibicao(encontrado.dataNascimento) },
+      { rotulo: 'Plano', valor: encontrado.plano },
+      { rotulo: 'Local', valor: encontrado.local },
+      { rotulo: 'Data de início', valor: paraExibicao(encontrado.dataInicio) },
     ];
 
     return (
@@ -149,7 +149,7 @@ export function FormularioDePrimeiroAcesso({
               key={linha.rotulo}
               style={{ flexDirection: 'row', justifyContent: 'space-between' }}
             >
-              <Text style={{ color: t.cor.text.muted, fontSize: 11, letterSpacing: 0.5, fontFamily: t.fonte(600) }}>
+              <Text style={{ color: t.cor.text.muted, fontSize: 11, fontFamily: t.fonte(600) }}>
                 {linha.rotulo}
               </Text>
               <Text

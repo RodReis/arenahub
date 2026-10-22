@@ -1176,8 +1176,6 @@ button {
   flex-shrink: 0;
   font-size: var(--tt-minimo);
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--ah-totem-text-secondary);
 }
 

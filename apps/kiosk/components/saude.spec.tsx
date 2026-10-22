@@ -139,7 +139,7 @@ describe('AvaliacaoDoMes', () => {
   it('reserva a moldura do bloco de composição com o selo do mês', async () => {
     render(<AvaliacaoDoMes sessao={SESSAO} aoVoltar={vi.fn()} />);
 
-    expect(await screen.findByTestId('bloco-de-composicao')).toHaveTextContent('COMPOSIÇÃO DE AGOSTO');
+    expect(await screen.findByTestId('bloco-de-composicao')).toHaveTextContent('Composição de agosto');
   });
 });
 
@@ -195,7 +195,7 @@ describe('HistoricoDeAvaliacoes', () => {
 
     render(<HistoricoDeAvaliacoes sessao={SESSAO} aoVoltar={vi.fn()} />);
 
-    expect(await screen.findByTestId('lista-de-avaliacoes')).toHaveTextContent('AGOSTO');
+    expect(await screen.findByTestId('lista-de-avaliacoes')).toHaveTextContent('Agosto');
     expect(screen.getByTestId('lista-de-avaliacoes')).toHaveTextContent('82,4 kg');
   });
 });

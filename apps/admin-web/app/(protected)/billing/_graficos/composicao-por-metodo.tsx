@@ -107,7 +107,7 @@ export function ComposicaoPorMetodo({ segmentos, testId }: Props) {
         <div className="relative size-40">
           {/* Total no miolo da rosca: a pergunta "quanto entrou" se responde sem ler a legenda. */}
           <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
-            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <span className="text-[11px] font-semibold text-muted-foreground">
               Recebido
             </span>
             <span className="text-sm font-semibold tabular-nums">{formatarDinheiro(total)}</span>

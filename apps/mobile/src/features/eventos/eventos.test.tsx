@@ -41,7 +41,7 @@ describe('Eventos', () => {
   it('mostra o XP do mes com milhar de pt-BR e sem inventar nivel', () => {
     renderizar();
     expect(screen.getByTestId('xp-saldo')).toHaveTextContent('1.240 XP');
-    expect(screen.getByText('XP DE SETEMBRO')).toBeTruthy();
+    expect(screen.getByText('XP de setembro')).toBeTruthy();
     // O dominio nao tem nivel -- a tela nao cria um.
     expect(screen.queryByText(/nível/i)).toBeNull();
   });

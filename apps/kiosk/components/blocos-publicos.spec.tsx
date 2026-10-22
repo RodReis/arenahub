@@ -434,24 +434,24 @@ describe('haAlgoNaGradePublica', () => {
 
 describe('rotuloDoPeriodo', () => {
   it('formata mes e metrica fixa', () => {
-    expect(rotuloDoPeriodo(new Date('2026-08-15T12:00:00.000Z'))).toBe('AGOSTO · TREINOS');
+    expect(rotuloDoPeriodo(new Date('2026-08-15T12:00:00.000Z'))).toBe('Agosto · treinos');
   });
 
   it('primeiro e ultimo mes do ano', () => {
-    expect(rotuloDoPeriodo(new Date('2026-01-15T12:00:00.000Z'))).toBe('JANEIRO · TREINOS');
-    expect(rotuloDoPeriodo(new Date('2026-12-15T12:00:00.000Z'))).toBe('DEZEMBRO · TREINOS');
+    expect(rotuloDoPeriodo(new Date('2026-01-15T12:00:00.000Z'))).toBe('Janeiro · treinos');
+    expect(rotuloDoPeriodo(new Date('2026-12-15T12:00:00.000Z'))).toBe('Dezembro · treinos');
   });
 });
 
 describe('formatarData', () => {
   it('a data digitada nao anda um dia para tras', () => {
     // `new Date('2026-08-30')` seria UTC: num fuso negativo, dia 30 vira 29.
-    expect(formatarData('2026-08-30')).toBe('30 AGO');
+    expect(formatarData('2026-08-30')).toBe('30 Ago');
   });
 
   it('primeiro e ultimo mes', () => {
-    expect(formatarData('2026-01-05')).toBe('05 JAN');
-    expect(formatarData('2026-12-31')).toBe('31 DEZ');
+    expect(formatarData('2026-01-05')).toBe('05 Jan');
+    expect(formatarData('2026-12-31')).toBe('31 Dez');
   });
 
   it('string fora do formato volta como veio, sem quebrar a tela', () => {
