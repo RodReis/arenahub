@@ -35,8 +35,8 @@ de `easyinner-ponte.ts`. Comandos:
 | comando | efeito | perigo |
 |---|---|---|
 | `{"cmd":"conectar","porta":3570,"tempo":10}` | setup: tipo de conexão, abre porta, modo online | conecta, não gira |
-| `{"cmd":"gravar-configuracao","inner":1}` | `EnviarConfiguracoes`: grava no equipamento o modo de acesso montado pelo `conectar` (`configuracao`). Bloco inteiro, pode sobrescrever o que o modo offline usa (#507) | ⚠️ escreve na catraca |
-| `{"cmd":"testar-conexao"}` | `ConfigurarInnerOnLine` (0 = catraca respondeu) | leitura |
+| `{"cmd":"enviar-config-online","inner":1,"tempoLiberadaS":10,"configuracao":{"acionamento1":7,"leitor1":2,"leitor2":0}}` | Monta **e** grava o bloco online numa chamada só (`DefinirPadraoCartao` → `ConfigurarInnerOnLine` → `ConfigurarAcionamento1` → `ConfigurarLeitor1/2` → `EnviarConfiguracoes`); o envio limpa o buffer da DLL, então nunca se reenvia sem remontar. Para no primeiro retorno ≠ 0 e devolve `funcao` (#507, #658) | ⚠️ escreve na catraca |
+| `{"cmd":"testar-conexao","inner":1}` | `ReceberRelogio`, como o `testaConexaoInner` oficial (0 = catraca discou e respondeu) — #658 | leitura |
 | `{"cmd":"ping","inner":1}` | `PingOnLine` (keep-alive) | leitura |
 | `{"cmd":"receber-evento","inner":1,"timeoutMs":2000}` | lê evento (origem 6 = giro, 5 = timeout) | leitura |
 | `{"cmd":"liberar","inner":1,"sentido":"entrada","invertido":false}` | **GIRA A CATRACA** | ⚠️ físico |

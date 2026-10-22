@@ -3,7 +3,12 @@ import { isAbsolute, join, resolve, sep } from 'node:path';
 
 import { describe, expect, it } from '@jest/globals';
 
-import { CAMINHO_PONTE, montarDispositivos } from './montar-dispositivos.js';
+import {
+  CAMINHO_PONTE,
+  configuracaoDeAcesso,
+  configuracaoOffline,
+  montarDispositivos,
+} from './montar-dispositivos.js';
 import { carregarConfig } from '../config/env.js';
 import { criarLogger } from '../observability/logger.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
@@ -78,5 +83,35 @@ describe('montarDispositivos', () => {
 
     await montado.encerrar();
     await expect(montado.encerrar()).resolves.not.toThrow();
+  });
+});
+
+/** #658 -- Arena Positiva: entrada bloqueada / saida livre online; agente fora, libera tudo. */
+describe('configuracaoDeAcesso / configuracaoOffline', () => {
+  const BASE = {
+    EDGE_AGENT_ID: 'bancada-01',
+    TENANT_ID: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+    GYM_UNIT_ID: '9c858901-8a57-4791-81fe-4c455b099bc9',
+  };
+
+  it('saida-liberada invertida: online 7/2, offline dois sentidos 8/3', () => {
+    const config = carregarConfig({
+      ...BASE,
+      CATRACA_MODO: 'saida-liberada',
+      CATRACA_INVERTIDA: 'true',
+    });
+    expect(configuracaoDeAcesso(config)).toEqual({ acionamento1: 7, leitor1: 2, leitor2: 0 });
+    expect(configuracaoOffline(config)).toEqual({ acionamento1: 8, leitor1: 3, leitor2: 0 });
+  });
+
+  it('sem CATRACA_MODO nao grava bloco offline', () => {
+    const config = carregarConfig({
+      ...BASE,
+      CATRACA_LEITOR1: '2',
+      CATRACA_LEITOR2: '0',
+      CATRACA_ACIONAMENTO1: '7',
+    });
+    expect(configuracaoDeAcesso(config)).toEqual({ acionamento1: 7, leitor1: 2, leitor2: 0 });
+    expect(configuracaoOffline(config)).toBeUndefined();
   });
 });
