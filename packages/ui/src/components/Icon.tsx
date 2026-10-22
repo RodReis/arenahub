@@ -61,6 +61,15 @@ export const ICON_NAMES = [
   'qr-code',
   'credit-card',
   'wallet',
+  // Ficha de avaliacao fisica (F91): um glifo por familia de indicador --
+  // composicao (balanca), medidas (regua), cardiovascular (coracao e
+  // atividade), capacidade (medidor) e a aba de historico.
+  'weight',
+  'ruler',
+  'heart-pulse',
+  'activity',
+  'gauge',
+  'history',
 ] as const;
 
 /**
@@ -193,6 +202,24 @@ const PATHS: Record<IconName, readonly string[]> = {
   'credit-card': ['M2 5h20v14H2z', 'M2 10h20'],
   // Carteira com fecho: o agrupador do bloco de recebimento.
   wallet: ['M19 7V5a1 1 0 0 0-1-1H4a2 2 0 0 0 0 4h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V6', 'M17 13h.01'],
+  weight: [
+    'M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+    'M6.5 8a2 2 0 0 0-1.9 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.93-2.54L19.4 9.5A2 2 0 0 0 17.48 8z',
+  ],
+  ruler: [
+    'M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0z',
+    'm14.5 12.5 2-2',
+    'm11.5 9.5 2-2',
+    'm8.5 6.5 2-2',
+    'm17.5 15.5 2-2',
+  ],
+  'heart-pulse': [
+    'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z',
+    'M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27',
+  ],
+  activity: ['M22 12h-4l-3 9L9 3l-3 9H2'],
+  gauge: ['m12 14 4-4', 'M3.34 19a10 10 0 1 1 17.32 0'],
+  history: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5', 'M12 7v5l4 2'],
 };
 
 export function Icon({ name }: { name: IconName }) {

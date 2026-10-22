@@ -1,39 +1,39 @@
 {
   "apps/api#test": {
-    "testes": 2256,
-    "pass": 2256,
+    "testes": 2262,
+    "pass": 2262,
     "falha": 0,
-    "coberturaPct": 63.21
+    "coberturaPct": 62.96
   },
   "apps/api#test:integration": {
-    "testes": 1639,
-    "pass": 1639,
+    "testes": 1653,
+    "pass": 1653,
     "falha": 0,
-    "coberturaPct": 82.39
+    "coberturaPct": 82.41
   },
   "apps/admin-web#test": {
-    "testes": 1046,
-    "pass": 1046,
+    "testes": 1113,
+    "pass": 1113,
     "falha": 0,
-    "coberturaPct": 78.44
+    "coberturaPct": 78.52
   },
   "packages/ui#test": {
-    "testes": 270,
-    "pass": 270,
+    "testes": 276,
+    "pass": 276,
     "falha": 0,
     "coberturaPct": 94.78
   },
   "packages/database#test": {
-    "testes": 78,
-    "pass": 78,
+    "testes": 75,
+    "pass": 75,
     "falha": 0,
-    "coberturaPct": 38.12
+    "coberturaPct": 38.57
   },
   "packages/database#test:integration": {
     "testes": 82,
     "pass": 82,
     "falha": 0,
-    "coberturaPct": 93.96
+    "coberturaPct": 93.98
   },
   "packages/access-policy#test": {
     "testes": 77,
@@ -42,10 +42,10 @@
     "coberturaPct": 86.44
   },
   "apps/edge-agent#test": {
-    "testes": 353,
-    "pass": 353,
+    "testes": 381,
+    "pass": 381,
     "falha": 0,
-    "coberturaPct": 91.02
+    "coberturaPct": 91.47
   },
   "apps/kiosk#test": {
     "testes": 261,

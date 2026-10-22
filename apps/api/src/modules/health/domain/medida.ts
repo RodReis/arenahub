@@ -66,7 +66,10 @@ export type TipoDeMedida =
   | 'PROTEIN_PERCENT'
   | 'WAIST_HIP_RATIO'
   // Cardiaco. NUNCA interpretado (ADR-035).
-  | 'HEART_RATE';
+  | 'HEART_RATE'
+  | 'BLOOD_PRESSURE_SYSTOLIC'
+  | 'BLOOD_PRESSURE_DIASTOLIC'
+  | 'VO2_MAX';
 
 /**
  * As mesmas listas, em RUNTIME.
@@ -113,6 +116,9 @@ export const TIPOS_DE_MEDIDA: readonly TipoDeMedida[] = [
   'PROTEIN_PERCENT',
   'WAIST_HIP_RATIO',
   'HEART_RATE',
+  'BLOOD_PRESSURE_SYSTOLIC',
+  'BLOOD_PRESSURE_DIASTOLIC',
+  'VO2_MAX',
 ];
 
 export const UNIDADES_DE_MEDIDA: readonly UnidadeDeMedida[] = [
@@ -172,6 +178,9 @@ export const UNIDADE_CANONICA: Readonly<Record<TipoDeMedida, UnidadeDeMedida | n
   PROTEIN_PERCENT: 'percent',
   WAIST_HIP_RATIO: null,
   HEART_RATE: null,
+  BLOOD_PRESSURE_SYSTOLIC: null,
+  BLOOD_PRESSURE_DIASTOLIC: null,
+  VO2_MAX: null,
 };
 
 /**
@@ -209,7 +218,8 @@ const EQUIVALENTES: Readonly<Record<string, readonly UnidadeDeMedida[]>> = {
  *
  * - `VISCERAL_FAT_LEVEL` e indice adimensional do aparelho (1 a 59);
  * - `WAIST_HIP_RATIO` e razao entre dois comprimentos -- a unidade se cancela;
- * - `HEART_RATE` e contagem por minuto, grandeza que o enum nao modela.
+ * - `HEART_RATE` e contagem por minuto, grandeza que o enum nao modela;
+ * - pressao (mmHg) e VO2max (ml/kg/min) tambem ficam fora do enum (F91).
  *
  * O que os tres tem em comum e so o efeito: `converterParaCanonica` nao
  * multiplica por fator nenhum e guarda o valor como veio.
@@ -218,6 +228,9 @@ const TIPOS_ADIMENSIONAIS: ReadonlySet<TipoDeMedida> = new Set([
   'VISCERAL_FAT_LEVEL',
   'WAIST_HIP_RATIO',
   'HEART_RATE',
+  'BLOOD_PRESSURE_SYSTOLIC',
+  'BLOOD_PRESSURE_DIASTOLIC',
+  'VO2_MAX',
 ]);
 
 /**
@@ -225,7 +238,7 @@ const TIPOS_ADIMENSIONAIS: ReadonlySet<TipoDeMedida> = new Set([
  *
  * Isto NAO E faixa de referencia clinica -- e limite de digitacao. A
  * distincao importa: faixa de referencia diz se a pessoa esta bem, e ler
- * isso e ato clinico que o produto nao pratica (ADR-035). O que estas faixas
+ * isso e outra coisa (a ficha do professor faz pela tabela do PI, ADR-066). O que estas faixas
  * pegam e `750` digitado no lugar de `75,0`.
  */
 const FAIXA_PLAUSIVEL: Readonly<Record<TipoDeMedida, { min: number; max: number }>> = {
@@ -263,6 +276,9 @@ const FAIXA_PLAUSIVEL: Readonly<Record<TipoDeMedida, { min: number; max: number 
   PROTEIN_PERCENT: { min: 5, max: 40 },
   WAIST_HIP_RATIO: { min: 0.5, max: 1.5 },
   HEART_RATE: { min: 30, max: 220 },
+  BLOOD_PRESSURE_SYSTOLIC: { min: 50, max: 300 },
+  BLOOD_PRESSURE_DIASTOLIC: { min: 20, max: 200 },
+  VO2_MAX: { min: 5, max: 100 },
 };
 
 export class MedidaInvalidaError extends ErroDeDominio {
@@ -465,7 +481,8 @@ export const REGIAO_DO_TIPO: Readonly<Record<TipoDeMedida, RegiaoCorporal | null
   BONE_MASS: null, BODY_CELL_MASS: null, SUBCUTANEOUS_FAT_MASS: null,
   SUBCUTANEOUS_FAT_PERCENT: null, SKELETAL_MUSCLE_PERCENT: null,
   MUSCLE_MASS: null, PROTEIN_PERCENT: null, WAIST_HIP_RATIO: null,
-  HEART_RATE: null,
+  HEART_RATE: null, BLOOD_PRESSURE_SYSTOLIC: null, BLOOD_PRESSURE_DIASTOLIC: null,
+  VO2_MAX: null,
   SEGMENTAL_FAT_MASS_ARM_LEFT: 'ARM_LEFT',
   SEGMENTAL_FAT_MASS_ARM_RIGHT: 'ARM_RIGHT',
   SEGMENTAL_FAT_MASS_TRUNK: 'TRUNK',

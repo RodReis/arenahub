@@ -209,6 +209,27 @@ describe('F17 -- avaliacao fisica manual', () => {
       expect(gravada.canonicalValue.toNumber()).toBeCloseTo(69.853, 3);
     });
 
+    it('ficha do professor (F91): pressao e VO2max publicam junto da avaliacao', async () => {
+      const aluno = await criarAluno(contas.a);
+      const id = await publicada(contas.a, aluno, [
+        { type: 'WEIGHT', value: 86.4, unit: 'kg' },
+        { type: 'BLOOD_PRESSURE_SYSTOLIC', value: 132, unit: null },
+        { type: 'BLOOD_PRESSURE_DIASTOLIC', value: 84, unit: null },
+        { type: 'HEART_RATE', value: 68, unit: null },
+        { type: 'VO2_MAX', value: 38.2, unit: null },
+      ]);
+
+      const linhas = await db.bodyMeasurement.findMany({ where: { assessmentId: id } });
+      const porTipo = Object.fromEntries(linhas.map((l) => [l.type, l.originalValue.toNumber()]));
+
+      expect(porTipo).toMatchObject({
+        BLOOD_PRESSURE_SYSTOLIC: 132,
+        BLOOD_PRESSURE_DIASTOLIC: 84,
+        HEART_RATE: 68,
+        VO2_MAX: 38.2,
+      });
+    });
+
     it('campo ausente nao vira linha nem zero (INV-104)', async () => {
       const aluno = await criarAluno(contas.a);
       const id = await publicada(contas.a, aluno, [

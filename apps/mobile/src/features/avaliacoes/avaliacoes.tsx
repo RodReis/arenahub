@@ -50,6 +50,10 @@ export const NOME_DO_TIPO: Record<string, string> = {
   CHEST: 'Tórax',
   ARM: 'Braço',
   THIGH: 'Coxa',
+  // Ficha do professor (F91).
+  BLOOD_PRESSURE_SYSTOLIC: 'Pressão sistólica',
+  BLOOD_PRESSURE_DIASTOLIC: 'Pressão diastólica',
+  VO2_MAX: 'VO₂máx',
 };
 
 /** Como a unidade aparece ao lado do numero. */
@@ -134,7 +138,7 @@ export function formatarValor(valor: number, unidade: string | null, casas = 1):
  * (peso, gordura) cair e o que o aluno costuma buscar. Quem treina para ganhar
  * massa ve o proprio alvo no campo `meta`. O sinal esta sempre no texto.
  */
-const SOBE_E_BOM = new Set(['MUSCLE_MASS', 'SKELETAL_MUSCLE_MASS', 'LEAN_BODY_MASS']);
+const SOBE_E_BOM = new Set(['MUSCLE_MASS', 'SKELETAL_MUSCLE_MASS', 'LEAN_BODY_MASS', 'VO2_MAX']);
 
 function tomDoDelta(tipo: string, delta: number): 'ok' | 'warn' | null {
   if (delta === 0) return null;

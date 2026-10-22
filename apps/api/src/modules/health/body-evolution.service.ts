@@ -340,6 +340,12 @@ function montarMetricas(
   return medidas
     .filter((medida) => REGIAO_DO_TIPO[medida.type] === null)
     .filter((medida) => medida.type !== 'HEART_RATE')
+    // F91: pressão é par e a leitura dela é a da ficha (ADR-066); solta no
+    // laudo viraria dois números sem unidade e sem faixa.
+    .filter(
+      (medida) =>
+        medida.type !== 'BLOOD_PRESSURE_SYSTOLIC' && medida.type !== 'BLOOD_PRESSURE_DIASTOLIC',
+    )
     .map((medida) => ({
       type: medida.type,
       value: medida.canonicalValue.toNumber(),

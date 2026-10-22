@@ -1,0 +1,619 @@
+/*
+ * Ficha de avaliação física — F91 (SPEC-091).
+ *
+ * Mundo do painel (DS-PAINEL): carbono é estrutura, accent é ação, semântico
+ * é estado. A cor que esta tela adiciona é a da LEITURA da tabela — e ela
+ * some quando não há valor (emenda de 30/09/2026: tom é do estado, nunca
+ * enfeite).
+ */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resumo {
+  margin: -20px 0 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  line-height: var(--ah-type-body-lh);
+}
+
+/* ------------------------------------------------------------------ ficha */
+
+.ficha {
+  display: grid;
+  grid-template-columns: minmax(300px, 368px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding-block-start: 8px;
+}
+
+/*
+ * A coluna de medidas acompanha a rolagem: o professor digita embaixo e
+ * confere a leitura em cima sem perder o campo de vista. Rola por dentro
+ * quando a janela é mais baixa que o formulário.
+ */
+.medidas {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  box-shadow: var(--ah-card-shadow);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ah-border-strong) transparent;
+}
+
+.rascunhos {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--ah-radius-control);
+  background-color: color-mix(in srgb, var(--ah-state-info) 8%, var(--ah-surface-raised));
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.rascunhos a {
+  color: var(--ah-action-text);
+  text-underline-offset: 3px;
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+.legenda {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  float: left;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-strong-size);
+  font-weight: var(--ah-type-body-strong-weight);
+  line-height: var(--ah-type-body-strong-lh);
+}
+
+.legenda svg {
+  color: var(--ah-text-icon);
+}
+
+.campos {
+  clear: both;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.campos input {
+  font-variant-numeric: tabular-nums;
+}
+
+.acoes {
+  position: sticky;
+  bottom: -20px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 -20px -20px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--ah-border-subtle);
+  background-color: var(--ah-surface-raised);
+  /* Sombra para cima: diz que há campo embaixo do rodapé fixo. */
+  box-shadow: 0 -12px 16px -12px color-mix(in srgb, var(--ah-text-strong) 22%, transparent);
+}
+
+.progresso {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.aviso-publicar {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/* --------------------------------------------------------------- leituras */
+
+.leituras {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-width: 0;
+}
+
+.familia {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cabeca-familia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.titulo-familia {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-heading-size);
+  font-weight: var(--ah-type-heading-weight);
+  line-height: var(--ah-type-heading-lh);
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 12px;
+}
+
+/* Composição: IMC e %GC lado a lado; MG e MLG moram dentro do %GC. */
+@media (min-width: 1180px) {
+  .grade[data-itens='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grade[data-itens='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.valor[data-vazio] {
+  color: var(--ah-text-placeholder);
+  font-weight: 400;
+}
+
+.apoio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.classe {
+  margin: 0;
+  color: var(--ah-text-strong);
+  font-size: var(--ah-type-body-strong-size);
+  font-weight: var(--ah-type-body-strong-weight);
+  line-height: var(--ah-type-body-strong-lh);
+  text-wrap: balance;
+}
+
+.classe[data-vazio] {
+  color: var(--ah-text-secondary);
+  font-weight: 400;
+}
+
+.apoio-numeros {
+  display: grid;
+  align-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--ah-border-subtle);
+}
+
+/* Rótulo que quebra em duas linhas não desce o número: os dois ficam na mesma base. */
+.apoio-numeros div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.apoio-numeros dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.apoio-numeros dd {
+  margin: 2px 0 0;
+  color: var(--ah-text-strong);
+  font-size: 1.25rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.apoio-numeros dd span {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 500;
+}
+
+.ressalva {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/* Equação da FCmáx: controle segmentado. Accent porque é AÇÃO. */
+.alternador {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-control);
+  background-color: var(--ah-surface-sunken);
+}
+
+.alternador button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: calc(var(--ah-radius-control) - 2px);
+  background: transparent;
+  color: var(--ah-text-secondary);
+  font: inherit;
+  font-size: var(--ah-type-caption-size);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ah-motion-easing),
+    color 160ms var(--ah-motion-easing);
+}
+
+.alternador button:hover {
+  color: var(--ah-text-strong);
+}
+
+.alternador button[aria-pressed='true'] {
+  background-color: var(--ah-action-solid);
+  color: var(--ah-action-on-solid);
+}
+
+.alternador button:focus-visible {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+.capacidade {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  box-shadow: var(--ah-card-shadow);
+}
+
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.numeros dt {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.numeros dd {
+  margin: 2px 0 0;
+  color: var(--ah-text-strong);
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.numeros dd span {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-body-size);
+  font-weight: 500;
+}
+
+.titulo-zonas {
+  margin: 0 0 -8px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 600;
+  line-height: var(--ah-type-caption-lh);
+}
+
+/*
+ * Karvonen: rampa MONOCROMÁTICA de intensidade. Zona de treino não é estado
+ * (ninguém está "em perigo" na zona alta), então o semântico fica de fora: a
+ * cor só sobe de carga junto com o esforço.
+ */
+.zonas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zona {
+  --carga: 14%;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 12px;
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--ah-text-strong) 3%, var(--ah-surface-raised));
+}
+
+/* A carga da zona é uma barra própria, não borda: a borda brigaria com o canto. */
+.zona::before {
+  content: '';
+  height: 6px;
+  margin-bottom: 6px;
+  border-radius: 3px;
+  background-color: color-mix(in srgb, var(--ah-text-strong) var(--carga), var(--ah-surface-raised));
+}
+
+.zona[data-nivel='2'] { --carga: 30%; }
+.zona[data-nivel='3'] { --carga: 48%; }
+.zona[data-nivel='4'] { --carga: 68%; }
+.zona[data-nivel='5'] { --carga: 90%; }
+
+.zona-faixa,
+.zona-nome {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.zona-bpm {
+  color: var(--ah-text-strong);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.zona-bpm span {
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 500;
+}
+
+.zonas-vazio,
+.nota {
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+.rodape {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+}
+
+/* -------------------------------------------------------------- histórico */
+
+.historico {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-block-start: 8px;
+}
+
+.rolagem {
+  /* Largura do conteúdo: com poucos meses, sem moldura vazia à direita. */
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--ah-border-default);
+  border-radius: var(--ah-radius-card);
+  background-color: var(--ah-surface-raised);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ah-border-strong) transparent;
+}
+
+.rolagem:focus-visible {
+  outline: var(--ah-focus-ring-width) solid var(--ah-focus-ring);
+  outline-offset: var(--ah-focus-ring-offset);
+}
+
+/* Largura do conteúdo: com um mês só, 100% esticaria a coluna até a borda. */
+.matriz {
+  width: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--ah-type-body-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.legenda-tabela {
+  padding: 12px 16px;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  text-align: start;
+}
+
+.matriz th,
+.matriz td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ah-border-subtle);
+  text-align: end;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.matriz thead th {
+  border-top: 1px solid var(--ah-border-subtle);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 600;
+}
+
+.matriz tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* Coluna do indicador presa à esquerda: rolar os meses não perde a linha. */
+.matriz th[scope='row'],
+.matriz .canto {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--ah-surface-raised);
+  color: var(--ah-text-strong);
+  font-weight: 600;
+  text-align: start;
+  box-shadow: 1px 0 0 var(--ah-border-subtle);
+}
+
+.unidade-linha {
+  display: block;
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  font-weight: 400;
+}
+
+/* A ficha mais recente é a que a conversa do mês discute. */
+.matriz thead th[data-atual] {
+  color: var(--ah-text-strong);
+}
+
+.matriz td[data-atual] {
+  background-color: color-mix(in srgb, var(--ah-text-strong) 3%, var(--ah-surface-raised));
+}
+
+.matriz td {
+  --tom: transparent;
+
+  min-width: 168px;
+}
+
+.matriz td[data-tom='success'] { --tom: var(--ah-state-success); }
+.matriz td[data-tom='warning'] { --tom: var(--ah-state-warning); }
+.matriz td[data-tom='danger']  { --tom: var(--ah-state-danger); }
+.matriz td[data-tom='info']    { --tom: var(--ah-state-info); }
+.matriz td[data-tom='neutral'] { --tom: var(--ah-state-neutral); }
+
+.matriz td[data-tom] {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--tom) 9%, transparent),
+    color-mix(in srgb, var(--tom) 9%, transparent)
+  );
+}
+
+.linha-valor {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.celula-valor {
+  color: var(--ah-text-strong);
+  font-weight: 600;
+}
+
+/*
+ * Variação como selo neutro: o sinal diz a direção, não o juízo — perder
+ * peso e perder massa magra têm o mesmo sinal. Quem julga é a classificação.
+ */
+.delta {
+  padding: 1px 6px;
+  border-radius: var(--ah-radius-badge);
+  background-color: var(--ah-surface-sunken);
+  color: var(--ah-text-secondary);
+  font-size: var(--ah-type-caption-size);
+  line-height: var(--ah-type-caption-lh);
+  font-weight: 600;
+}
+
+.celula-classe {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: flex-end;
+  margin-top: 6px;
+  margin-inline-start: auto;
+  color: var(--ah-text-default);
+  font-size: var(--ah-type-caption-size);
+  white-space: normal;
+  max-width: 24ch;
+  text-align: start;
+}
+
+/* O ponto repete o tom; o texto ao lado é quem informa. */
+.celula-classe::before {
+  content: '';
+  flex: none;
+  /* Na altura da primeira linha, também quando o rótulo quebra em duas. */
+  transform: translateY(-1px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--tom);
+}
+
+.ausente {
+  color: var(--ah-text-placeholder);
+}
+
+/* ------------------------------------------------------------- responsivo */
+
+@media (max-width: 1024px) {
+  .ficha {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .medidas {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .acoes {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zonas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alternador button {
+    transition: none;
+  }
+}
