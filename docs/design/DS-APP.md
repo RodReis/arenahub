@@ -1,5 +1,7 @@
 # DS-APP — Design System do Aplicativo do Aluno
 
+> **Caixa do texto (decisão do PI, 22/10/2026, #664):** sentence case em toda a interface — inicial maiúscula, resto minúsculo; sigla (CPF, PIX) e nome próprio mantêm a grafia. **Nada de `text-transform: uppercase`, `.toUpperCase()` nem literal em CAIXA ALTA**; a guarda `scripts/check-caixa.mjs` (`pnpm test:guardas`) reprova. Onde este documento disser "uppercase" ou "tracking" para rótulo/overline, vale o texto em sentence case sem tracking.
+
 Academia ArenaHub · plataforma ArenaHub
 Arquivos de referência: `App Mobile.dc.html` (escuro) · `App Mobile Claro.dc.html` (claro)
 Versão 2.1 — dois temas: escuro alinhado ao totem, claro alinhado ao painel web

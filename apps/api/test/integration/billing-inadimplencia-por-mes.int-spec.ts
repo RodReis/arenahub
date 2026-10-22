@@ -10,7 +10,7 @@ import { ConsultarInadimplenciaUseCase } from '../../src/modules/billing/consult
 import { PrismaService } from '../../src/persistence/prisma.service.js';
 
 /**
- * Cobranca por mes -- abas "Inadimplentes Mes Atual" e "Inadimplentes Mes
+ * Cobranca por mes -- abas "Inadimplentes mês atual" e "Inadimplentes Mes
  * Anterior" (decisao do PI, 19/10/2026, issue #647).
  *
  * O corte e o MES DO VENCIMENTO no fuso da unidade. Contra banco de verdade

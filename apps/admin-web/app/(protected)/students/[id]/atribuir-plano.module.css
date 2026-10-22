@@ -71,8 +71,6 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   color: var(--ah-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .nomeDoPlano {

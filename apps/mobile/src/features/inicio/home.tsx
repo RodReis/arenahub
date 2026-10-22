@@ -236,8 +236,8 @@ function BannerDoDesafio({ desafio, onPress }: { desafio: DesafioEmDestaque; onP
             { backgroundColor: rgba(t.cor.accent.gradientFrom, 0.22), borderColor: rgba(t.cor.accent.text, 0.4) },
           ]}
         >
-          <Text style={{ color: t.cor.accent.soft, fontSize: 10, letterSpacing: 1, fontFamily: t.fonte(700) }}>
-            {desafio.inscrito ? 'SEU DESAFIO' : 'DESAFIO DA ACADEMIA'}
+          <Text style={{ color: t.cor.accent.soft, fontSize: 10, fontFamily: t.fonte(700) }}>
+            {desafio.inscrito ? 'Seu desafio' : 'Desafio da academia'}
           </Text>
         </View>
         <Text style={{ color: t.cor.text.onImage, fontSize: 17, lineHeight: 22, fontFamily: t.fonte(700) }}>

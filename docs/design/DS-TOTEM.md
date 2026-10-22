@@ -1,5 +1,7 @@
 # DS-TOTEM — Design System do Totem de Autoatendimento
 
+> **Caixa do texto (decisão do PI, 22/10/2026, #664):** sentence case em toda a interface — inicial maiúscula, resto minúsculo; sigla (CPF, PIX) e nome próprio mantêm a grafia. **Nada de `text-transform: uppercase`, `.toUpperCase()` nem literal em CAIXA ALTA**; a guarda `scripts/check-caixa.mjs` (`pnpm test:guardas`) reprova. Onde este documento disser "uppercase" ou "tracking" para rótulo/overline, vale o texto em sentence case sem tracking.
+
 Clínica de Musculação · plataforma ArenaHub
 Arquivo de referência: `Totem.dc.html`
 Versão 2.1 — rebrand azul, totem somente leitura, evolução 3D, home pública em grade densa
@@ -90,13 +92,13 @@ Cada estado semântico usa a mesma receita: borda `2px solid rgba(cor,.4)`, fund
 | Hero | 72 / 78 px | 900 | Headline da tela pública |
 | Título de tela | 64 / 68 px | 800 | "Minha área", "Pagamentos", "Avaliações" |
 | Título de tela médio | 56 / 62 px | 800 | Telas com muito conteúdo (avaliação, evolução 3D) |
-| Kicker | 22 px, tracking .16em | 800 | "MUSCULAÇÃO · SAÚDE · PERFORMANCE" |
+| Kicker | 22 px | 800 | "Musculação · saúde · performance" |
 | Valor grande | 44–56 px | 800 | Pontuação, valor de fatura, métrica principal |
 | Título de card | 28 px | 700 | Nome do módulo, mês da fatura |
 | Rótulo de botão | 26–30 px | 700 | Todos os botões |
 | Corpo | 23–26 px | 400–500 | Descrições e avisos |
 | Metadado | 19–21 px | 500–600 | Legendas, sub-rótulos, status |
-| Cabeçalho de tabela | 20 px, tracking .06em | 700 | DATA, PESO, GORDURA |
+| Cabeçalho de tabela | 20 px | 700 | Data, Peso, Gordura |
 
 Regras: mínimo absoluto **19 px** (nada menor é legível a 80 cm). Números sempre com `font-variant-numeric: tabular-nums`. Títulos com `letter-spacing: -0.02em`. Texto corrido com `text-wrap: pretty`.
 
@@ -165,7 +167,7 @@ Contêiner de 1080 × 1920 px com borda metálica de 2 px (`linear-gradient(145d
 
 ### 3.2 Cabeçalho de marca (externo)
 
-Logo em bloco de 84 px (moldura em gradiente azul, símbolo halter + batimento), nome da academia em 32 px/800, slogan em 20 px/600 azul com tracking .04em, e à direita o botão de alto contraste. Altura total 84 px.
+Logo em bloco de 84 px (moldura em gradiente azul, símbolo halter + batimento), nome da academia em 32 px/800, slogan em 20 px/600 azul, e à direita o botão de alto contraste. Altura total 84 px.
 
 ### 3.3 Bloco hero
 
@@ -189,7 +191,7 @@ Card com título "Ranking do mês" 26 px/800 + chip de período/métrica ("AGOST
 
 ### 3.5 Card de evento
 
-Linha horizontal com bloco de data (64 px, `brand/tint`, dia em 24 px/800 + mês em 15 px/700 tracking .08em) seguido de título 24 px/700 e info 19 px.
+Linha horizontal com bloco de data (64 px, `brand/tint`, dia em 24 px/800 + mês em 15 px/700) seguido de título 24 px/700 e info 19 px.
 
 ### 3.6 Card de informação ao vivo
 
@@ -197,7 +199,7 @@ Rótulo 19 px/600 secundário → valor 44 px/800 tabular → delta 18 px/700 na
 
 ### 3.7 Faixa de patrocínio
 
-Separada por `border-top` de 2 px. Rótulo "ESPAÇO PATROCINADO" 17 px/700 tracking .14em à esquerda, atribuição "tecnologia arenahub" à direita. Abaixo, até 5 blocos de 64 px de altura, `flex: 1`, com nome do patrocinador em 18 px/600. Quando houver logotipo, ele substitui o texto respeitando 64 px de altura e o mesmo raio de 14 px.
+Separada por `border-top` de 2 px. Rótulo "Espaço patrocinado" 17 px/700 à esquerda, atribuição "tecnologia arenahub" à direita. Abaixo, até 5 blocos de 64 px de altura, `flex: 1`, com nome do patrocinador em 18 px/600. Quando houver logotipo, ele substitui o texto respeitando 64 px de altura e o mesmo raio de 14 px.
 
 ### 3.8 CTA primário
 
@@ -219,7 +221,7 @@ Borda 2 px `rgba(cor,.4)`, fundo `rgba(cor,.10)`, raio 28 px, padding 32×36 px.
 
 ### 3.12 Anel de pontuação
 
-`<svg>` 140 px: trilho `border/hairline` de 14 px, arco `brand/500` de 14 px com `stroke-linecap: round`, `stroke-dasharray` proporcional (perímetro 364), rotação −90°. Centro: valor 44 px/800 e rótulo "PONTOS" 17 px/700 tracking .1em. Ao lado: veredito na cor semântica e explicação secundária.
+`<svg>` 140 px: trilho `border/hairline` de 14 px, arco `brand/500` de 14 px com `stroke-linecap: round`, `stroke-dasharray` proporcional (perímetro 364), rotação −90°. Centro: valor 44 px/800 e rótulo "Pontos" 17 px/700. Ao lado: veredito na cor semântica e explicação secundária.
 
 ### 3.13 Card de métrica
 
@@ -239,7 +241,7 @@ Sigla de 2 letras em quadrado tonal de 56 px, região em 24 px/700 e valores de 
 
 Card com `overflow: hidden`. Linhas de 100–112 px separadas por `border-top` de 2 px `border/hairline`. Valores monetários e chips com `white-space: nowrap; flex-shrink: 0` — obrigatório, sem isso quebram em duas linhas. Linha do registro mais recente com fundo `brand/tint` e peso 800.
 
-Cabeçalho de tabela: 20 px/700 tracking .06em em `text/tertiary`, mesmas larguras de coluna das linhas.
+Cabeçalho de tabela: 20 px/700 em `text/tertiary`, mesmas larguras de coluna das linhas.
 
 ### 3.17 Chip de status
 

@@ -96,9 +96,9 @@ export interface ResumoDaInadimplencia {
    * diferentes lado a lado e a comparacao entre elas nao significava nada.
    */
   readonly alunosInadimplentes: number;
-  /** Alunos com fatura vencida em aberto cujo vencimento e no mes corrente -- aba "Inadimplentes Mes Atual". */
+  /** Alunos com fatura vencida em aberto cujo vencimento e no mes corrente -- aba "Inadimplentes mês atual". */
   readonly alunosInadimplentesMesAtual: number;
-  /** Alunos com fatura vencida em aberto de meses anteriores -- aba "Inadimplentes Mes Anterior". */
+  /** Alunos com fatura vencida em aberto de meses anteriores -- aba "Inadimplentes mês anterior". */
   readonly alunosInadimplentesMesesAnteriores: number;
   readonly bloqueados: number;
   /** Percentual com uma casa. `null` quando nao ha assinatura ativa alguma. */
@@ -126,7 +126,7 @@ export interface OpcoesDeConsulta {
   readonly periodo?: 'ATUAL';
 }
 
-/** Pagina da aba "Inadimplentes Mes Anterior": uma linha por aluno. */
+/** Pagina da aba "Inadimplentes mês anterior": uma linha por aluno. */
 export interface PainelDeMesesAnteriores {
   readonly total: number;
   readonly linhas: readonly LinhaDeMesesAnteriores[];
@@ -203,7 +203,7 @@ export class ConsultarInadimplenciaUseCase {
   }
 
   /**
-   * A aba "Inadimplentes Mes Anterior": os alunos com fatura vencida em aberto
+   * A aba "Inadimplentes mês anterior": os alunos com fatura vencida em aberto
    * de meses ANTERIORES ao corrente, UMA LINHA POR ALUNO (decisao do PI,
    * 19/10/2026). Mesma carga e mesma situacao de acesso da fila do mes atual.
    */

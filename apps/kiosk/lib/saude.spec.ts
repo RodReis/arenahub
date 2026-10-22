@@ -75,7 +75,7 @@ describe('rotuloDeSegmento', () => {
 
 describe('mesDaMedicao', () => {
   it('devolve o mês em maiúsculas para o selo do bloco', () => {
-    expect(mesDaMedicao('2026-08-03T10:00:00.000Z')).toBe('AGOSTO');
+    expect(mesDaMedicao('2026-08-03T10:00:00.000Z')).toBe('Agosto');
   });
 
   it('devolve nulo quando não há medição', () => {

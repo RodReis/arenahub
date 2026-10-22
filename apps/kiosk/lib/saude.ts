@@ -107,8 +107,8 @@ export function mesDaMedicao(iso: string | null): string | null {
   if (Number.isNaN(data.getTime())) return null;
 
   const MESES = [
-    'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
-    'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO',
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
   ];
 
   return MESES[data.getUTCMonth()] ?? null;

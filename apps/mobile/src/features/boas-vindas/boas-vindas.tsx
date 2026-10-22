@@ -87,8 +87,8 @@ export function BoasVindas({ onEntrar, testID }: { onEntrar: () => void; testID?
               <Text style={{ color: t.cor.text.primary, fontSize: 13, fontFamily: t.fonte(700) }}>
                 Clínica de Musculação
               </Text>
-              <Text style={{ color: t.cor.accent.text, fontSize: 10, letterSpacing: 1, fontFamily: t.fonte(600) }}>
-                APP DO ALUNO
+              <Text style={{ color: t.cor.accent.text, fontSize: 10, fontFamily: t.fonte(600) }}>
+                App do aluno
               </Text>
             </View>
           </View>
@@ -111,8 +111,8 @@ export function BoasVindas({ onEntrar, testID }: { onEntrar: () => void; testID?
         <View style={estilos.respiro} />
 
         <Animated.View style={[estilos.chamada, entrada(0)]}>
-          <Text style={{ color: t.cor.accent.text, fontSize: 11, letterSpacing: 1.5, fontFamily: t.fonte(700) }}>
-            MUSCULAÇÃO · SAÚDE · PERFORMANCE
+          <Text style={{ color: t.cor.accent.text, fontSize: 11, fontFamily: t.fonte(700) }}>
+            Musculação · saúde · performance
           </Text>
           <Text
             accessibilityRole="header"

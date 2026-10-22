@@ -84,12 +84,7 @@
   font-size: var(--ah-type-caption-size);
   line-height: var(--ah-type-caption-lh);
   font-weight: 600;
-  /*
-    Caixa alta com tracking, como o cabecalho da tabela: e a mesma classe de
-    rotulo, e diferenciar as duas faria a pagina ter dois vocabularios.
-  */
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  /* Sentence case, como o cabecalho da tabela: e a mesma classe de rotulo. */
 }
 
 /*

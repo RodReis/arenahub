@@ -16,7 +16,7 @@ import InadimplenciaPage from './page';
 
 /**
  * Cobranca em tres abas -- decisao do PI, 19/10/2026 (issue #647):
- * "Pagantes Mes Atual", "Inadimplentes Mes Atual" e "Inadimplentes Mes
+ * "Pagantes mês atual", "Inadimplentes mês atual" e "Inadimplentes Mes
  * Anterior", NESTA ORDEM. O que estes testes guardam e a ordem, o contador de
  * cada aba (aluno distinto, nao fatura) e que a aba de meses anteriores lista
  * um aluno por linha, sem valor em R$.
@@ -115,9 +115,9 @@ describe('Cobranca em tres abas', () => {
     const abas = screen.getAllByRole('tab');
 
     expect(abas.map((aba) => aba.textContent)).toEqual([
-      expect.stringMatching(/^Pagantes Mês Atual\s*1$/),
-      expect.stringMatching(/^Inadimplentes Mês Atual\s*2$/),
-      expect.stringMatching(/^Inadimplentes Mês Anterior\s*3$/),
+      expect.stringMatching(/^Pagantes mês atual\s*1$/),
+      expect.stringMatching(/^Inadimplentes mês atual\s*2$/),
+      expect.stringMatching(/^Inadimplentes mês anterior\s*3$/),
     ]);
   });
 

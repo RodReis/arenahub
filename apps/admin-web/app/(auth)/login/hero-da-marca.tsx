@@ -162,12 +162,12 @@ export function HeroDaMarca({ marca, estatisticas }: Props) {
             <p className={estilos['heroWordmark']}>
               arenahub<span>.</span>
             </p>
-            <p className={estilos['heroSelo']}>PAINEL DA ACADEMIA</p>
+            <p className={estilos['heroSelo']}>Painel da academia</p>
           </div>
         </div>
 
         <div className={estilos['heroPitch']}>
-          <p className={estilos['heroKicker']}>CADASTRO · ACESSO · RECEITA · EVOLUÇÃO</p>
+          <p className={estilos['heroKicker']}>Cadastro · acesso · receita · evolução</p>
           <p className={estilos['heroHeadline']}>Da matrícula ao resultado físico do aluno.</p>
           <p className={estilos['heroApoio']}>
             Pagamento, reconhecimento facial, acesso, frequência e evolução em uma única

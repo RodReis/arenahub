@@ -17,7 +17,7 @@ import {
 import { BuscaDeAluno } from './busca-de-aluno';
 import estilos from './delinquency.module.css';
 
-/** Linha da aba "Inadimplentes Mes Anterior": UM ALUNO por linha, sem valor em R$. */
+/** Linha da aba "Inadimplentes mês anterior": UM ALUNO por linha, sem valor em R$. */
 export interface LinhaAnterior {
   studentId: string;
   studentName: string;
@@ -33,7 +33,7 @@ export interface LinhaAnterior {
 }
 
 /**
- * A aba "Inadimplentes Mês Anterior": quem tem fatura vencida em aberto de
+ * A aba "Inadimplentes mês anterior": quem tem fatura vencida em aberto de
  * meses ANTERIORES ao corrente. UMA LINHA POR ALUNO (decisão do PI,
  * 19/10/2026), com os meses em aberto e o vencimento mais antigo -- sem valor
  * em R$, como o resto desta tela. Mesmas ações da fila do mês atual; o link de
@@ -53,7 +53,7 @@ export function FilaDeMesesAnteriores({
   return (
     <>
       <h2 className={estilos['tituloDaFila']}>
-        Inadimplentes Mês Anterior
+        Inadimplentes mês anterior
         <span className={estilos['apoioDoTitulo']}>atraso mais antigo primeiro</span>
       </h2>
 

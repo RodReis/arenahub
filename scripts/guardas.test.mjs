@@ -12,6 +12,9 @@
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const PORTA_LIVRE = 39901;
 const PORTA_OCUPADA = 39902;
@@ -118,6 +121,56 @@ casos.push([
     }
   },
 ]);
+
+// --- check-caixa.mjs -------------------------------------------------------
+
+const GUARDA_DE_CAIXA = resolve('scripts', 'check-caixa.mjs');
+
+/** Roda a guarda numa arvore descartavel com UM arquivo em `apps/admin-web`. */
+function rodarGuardaDeCaixa(arquivo, conteudo) {
+  const raiz = mkdtempSync(join(tmpdir(), 'caixa-'));
+  try {
+    const dir = join(raiz, 'apps', 'admin-web', 'app');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, arquivo), conteudo);
+    return spawnSync('node', [GUARDA_DE_CAIXA], { encoding: 'utf8', cwd: raiz });
+  } finally {
+    rmSync(raiz, { recursive: true, force: true });
+  }
+}
+
+for (const [nome, arquivo, conteudo] of [
+  ['uppercase em CSS', 'a.module.css', '.rotulo {\n  text-transform: uppercase;\n}\n'],
+  ['uppercase do Tailwind', 'a.tsx', 'export const A = () => <span className="text-xs uppercase">x</span>;\n'],
+  ['uppercase com prefixo de variante do Tailwind', 'a.tsx', 'export const A = () => <span className="md:uppercase">x</span>;\n'],
+  ['texto JSX em caixa alta em linha propria', 'a.tsx', 'export const A = () => (\n  <p>\n    PLANO ATUAL\n  </p>\n);\n'],
+  ['textTransform em estilo', 'a.tsx', "export const e = { textTransform: 'uppercase' };\n"],
+  ['toUpperCase em texto', 'a.ts', 'export const t = (m: string) => `XP ${m.toUpperCase()}`;\n'],
+  ['literal com varias palavras em caixa alta', 'a.tsx', "export const t = 'PLANO ATUAL';\n"],
+  ['literal em caixa alta dentro de JSX', 'a.tsx', 'export const A = () => <p>PAINEL DA ACADEMIA</p>;\n'],
+]) {
+  casos.push([
+    `caixa: ${nome} e reprovado (canario)`,
+    () => {
+      const r = rodarGuardaDeCaixa(arquivo, conteudo);
+      assert.equal(r.status, 1, `guarda deixou passar: ${nome}`);
+    },
+  ]);
+}
+
+for (const [nome, arquivo, conteudo] of [
+  ['sentence case', 'a.tsx', "export const t = 'Plano atual';\n"],
+  ['sigla e enum de palavra solta', 'a.tsx', "export const t = ['CPF', 'ACTIVE', 'SKELETAL_MUSCLE_MASS'];\n"],
+  ['comentario que cita o texto antigo', 'a.tsx', "// era 'PLANO ATUAL'\n/* text-transform: uppercase */\nexport const t = 1;\n"],
+]) {
+  casos.push([
+    `caixa: ${nome} passa`,
+    () => {
+      const r = rodarGuardaDeCaixa(arquivo, conteudo);
+      assert.equal(r.status, 0, r.stderr);
+    },
+  ]);
+}
 
 // --- execucao --------------------------------------------------------------
 

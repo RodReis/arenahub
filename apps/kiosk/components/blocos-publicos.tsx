@@ -572,24 +572,24 @@ function faixaDoMedalhao(position: number): 'ouro' | 'prata' | 'bronze' {
 }
 
 const MESES_DO_PERIODO = [
-  'JANEIRO',
-  'FEVEREIRO',
-  'MARÇO',
-  'ABRIL',
-  'MAIO',
-  'JUNHO',
-  'JULHO',
-  'AGOSTO',
-  'SETEMBRO',
-  'OUTUBRO',
-  'NOVEMBRO',
-  'DEZEMBRO',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ] as const;
 
 /**
- * O chip "AGOSTO · TREINOS" do §3.4c.
+ * O chip "Agosto · treinos" do §3.4c.
  *
- * "TREINOS" e fixo: a metrica do placar publico e sempre sessao confirmada
+ * "treinos" e fixo: a metrica do placar publico e sempre sessao confirmada
  * (ADR-047, Decisao 3 -- catalogo de XP v1, `treino-diario`), entao nao ha
  * hoje um segundo tipo de metrica para escolher. `agora` opcional e nao
  * injetado por prop: e texto de vitrine (mes corrente), nao decisao de
@@ -599,7 +599,7 @@ const MESES_DO_PERIODO = [
 export function rotuloDoPeriodo(agora: Date = new Date()): string {
   const mes = MESES_DO_PERIODO[agora.getMonth()];
 
-  return `${mes ?? ''} · TREINOS`;
+  return `${mes ?? ''} · treinos`;
 }
 
 /**
@@ -695,13 +695,13 @@ export function FaixaDePatrocinio({
 }
 
 /**
- * `2026-08-30` vira `30 AGO`.
+ * `2026-08-30` vira `30 ago`.
  *
  * Sem `Intl` e sem `Date`: a string ja e a data local que o gerente digitou,
  * e `new Date('2026-08-30')` a interpretaria como UTC -- num fuso negativo,
  * o dia 30 vira 29 na tela. Fatiar a string nao tem esse problema.
  */
-const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 export function formatarData(iso: string): string {
   const [, mes, dia] = iso.split('-');

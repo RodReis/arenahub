@@ -53,7 +53,7 @@ export interface DadosDoEngajamento {
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-const MESES_CURTOS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 /** `2026-09` -> `setembro`. Sem `Intl`: a lint barra, e o celular em ingles erraria o idioma. */
 function nomeDoMes(mes: string): string {
@@ -65,7 +65,7 @@ function milhar(valor: number): string {
   return Math.trunc(valor).toString().replace(/\B(?=(\d{3})+(?!\d))/gu, '.');
 }
 
-/** `2026-09-27` -> `{ dia: '27', mes: 'SET' }`. Data civil, sem fuso. */
+/** `2026-09-27` -> `{ dia: '27', mes: 'Set' }`. Data civil, sem fuso. */
 function diaEMes(dataCivil: string): { dia: string; mes: string } {
   return { dia: dataCivil.slice(8, 10), mes: MESES_CURTOS[Number(dataCivil.slice(5, 7)) - 1] ?? '' };
 }
@@ -183,7 +183,7 @@ export function Eventos({
                       <Text style={{ color: t.cor.text.primary, fontSize: 15, lineHeight: 16, fontVariant: ['tabular-nums'], fontFamily: t.fonte(800) }}>
                         {dia}
                       </Text>
-                      <Text style={{ color: t.cor.accent.text, fontSize: 9, letterSpacing: 0.7, fontFamily: t.fonte(700) }}>{mes}</Text>
+                      <Text style={{ color: t.cor.accent.text, fontSize: 9, fontFamily: t.fonte(700) }}>{mes}</Text>
                     </View>
                     <View style={estilos.flex}>
                       <Text style={{ color: t.cor.text.primary, fontSize: 14, fontFamily: t.fonte(600) }}>{desafio.titulo}</Text>
@@ -270,8 +270,8 @@ function CartaoDeXp({ dados }: { dados: DadosDoEngajamento }) {
       />
 
       <View style={estilos.xpTexto}>
-        <Text style={{ color: t.cor.accent.text, fontSize: 11, letterSpacing: 1.1, fontFamily: t.fonte(700) }}>
-          {`XP DE ${nomeDoMes(dados.mes).toUpperCase()}`}
+        <Text style={{ color: t.cor.accent.text, fontSize: 11, fontFamily: t.fonte(700) }}>
+          {`XP de ${nomeDoMes(dados.mes)}`}
         </Text>
         <Text
           testID="xp-saldo"

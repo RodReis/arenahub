@@ -62,7 +62,7 @@ export function linkDeCobranca(
 }
 
 /**
- * Link `wa.me` da aba "Inadimplentes Mes Anterior": o aluno deve varias
+ * Link `wa.me` da aba "Inadimplentes mês anterior": o aluno deve varias
  * faturas, entao a mensagem nao cita numero de fatura. Mesmas regras de
  * `linkDeCobranca` (sem digito nao ha link; texto curto e sem valor em reais).
  */
