@@ -631,6 +631,46 @@ describe('F7 -- aluno, plano e entitlement', () => {
       expect(resposta.status).toBe(409);
       expect((resposta.body as { code: string }).code).toBe('STUDENT_NOT_ELIGIBLE');
     });
+
+    /**
+     * #676 -- plano EM ATRASO: o indice "uma assinatura vigente por aluno"
+     * conta ACTIVE e PAST_DUE, e atribuir outro plano por cima dava 500
+     * `INTERNAL_ERROR` (violacao do indice) em vez de um 409 legivel.
+     */
+    it.each(['ACTIVE', 'PAST_DUE'] as const)(
+      'recusa nova assinatura (409) para aluno com assinatura %s, sem criar nada',
+      async (status) => {
+        const criado = await criarAluno(contas.a, { fullName: `Assinatura ${status} Existente` });
+        const id = (criado.body as { id: string }).id;
+        const planId = await criarPlano(contas.a);
+
+        await db.subscription.create({
+          data: {
+            tenantId: contas.a.tenantId,
+            studentId: id,
+            planId,
+            status,
+            startsAt: new Date('2026-08-01T00:00:00.000Z'),
+            endsAt: new Date('2027-08-01T00:00:00.000Z'),
+          },
+        });
+
+        const resposta = await request(servidor())
+          .post('/api/v1/subscriptions')
+          .set('Cookie', contas.a.cookie)
+          .send({
+            studentId: id,
+            planId,
+            startsAt: '2026-10-01T00:00:00.000Z',
+            endsAt: '2027-10-01T00:00:00.000Z',
+            reason: 'nao deveria passar: ja ha plano vigente',
+          });
+
+        expect(resposta.status).toBe(409);
+        expect((resposta.body as { code: string }).code).toBe('STUDENT_HAS_ACTIVE_SUBSCRIPTION');
+        expect(await db.subscription.count({ where: { studentId: id } })).toBe(1);
+      },
+    );
   });
 
   describe('coluna PLANO da listagem', () => {

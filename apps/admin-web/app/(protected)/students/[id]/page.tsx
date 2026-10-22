@@ -903,6 +903,7 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                   planos={planosAtribuiveis}
                   impedido={bloqueado}
                   vigente={assinaturaVigente}
+                  emAtraso={temPlanoSuspenso}
                   timezone={timezoneDaUnidade ?? FUSO_PROVISORIO}
                 />
               )}

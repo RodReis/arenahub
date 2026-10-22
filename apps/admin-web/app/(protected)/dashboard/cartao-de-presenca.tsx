@@ -35,7 +35,11 @@ export function CartaoDePresenca({ evento, agora, timeZone, vezes = 1 }: Props) 
   const tom = rotulo?.tone ?? (liberado ? 'success' : 'danger');
   const nome = evento.student
     ? doisNomes(evento.student.fullName)
-    : (evento.externalUserId ?? 'Não identificado');
+    : (evento.externalUserId ??
+      // Liberação manual sem aluno (botão "Liberar giro", #660): o evento é
+      // verdadeiro e auditado, mas "Não identificado" parecia uma pessoa
+      // desconhecida que passou.
+      (evento.reason === 'MANUAL_OVERRIDE' ? 'Giro avulso' : 'Não identificado'));
   const recente = agora - Date.parse(evento.occurredAt) < RECENTE_MS;
   const razao = rotulo?.label ?? (liberado ? 'Liberado' : 'Recusado');
   const avatar = (

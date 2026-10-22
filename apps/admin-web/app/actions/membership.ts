@@ -132,7 +132,7 @@ const MENSAGEM: Record<string, string> = {
   DAY_PASS_PLAN_NOT_ASSIGNABLE:
     'Plano de diária só se vende em "Vender diária": ele não pode ser atribuído com datas.',
   STUDENT_HAS_ACTIVE_SUBSCRIPTION:
-    'Este aluno já tem plano vigente (ou em atraso). Diária é só para quem está sem plano.',
+    'Este aluno já tem plano vigente ou em atraso. Regularize a cobrança do plano atual antes de atribuir outro; diária é só para quem está sem plano.',
   PRICE_CHANGED: 'O preço da diária mudou. Recarregue a ficha e confira o valor.',
   BILLING_SETTINGS_MISSING:
     'A academia ainda não configurou vencimento e carência. Configure em Financeiro antes de cobrar.',
