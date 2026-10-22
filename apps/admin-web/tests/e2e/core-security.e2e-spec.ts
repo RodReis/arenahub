@@ -64,7 +64,8 @@ test.describe('acesso ao painel', () => {
     // `Operacao` continua no menu, como tela de investigacao.
     await expect(page).toHaveURL(/\/dashboard/);
 
-    // As unidades continuam a um clique, agora sob "Administracao".
+    // As unidades ficam sob "Administração", grupo recolhível: abre e clica.
+    await page.getByRole('button', { name: /Administração/ }).click();
     await page.getByRole('link', { name: 'Unidades' }).click();
     await expect(page).toHaveURL(/\/units/);
     await expect(page.getByRole('heading', { name: 'Unidades' })).toBeVisible();
@@ -122,6 +123,7 @@ test.describe('acesso ao painel', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
 
+    await page.getByRole('button', { name: /Administração/ }).click();
     await page.getByRole('link', { name: 'Unidades' }).click();
     await expect(page).toHaveURL(/\/units/);
 

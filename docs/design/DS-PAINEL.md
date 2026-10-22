@@ -343,6 +343,8 @@ Aparece só em sessão de Super Admin. Fundo `risk`, `border-top: 4px solid #7A2
 
 204 px, `chrome`, padding `12px 10px`, gap 2 px. Item: 34 px, raio 6 px, ícone 15 px + label 13 px. Ativo: fundo `chrome/raised`, texto branco. Inativo: transparente, texto `chrome/text-muted`, hover para `chrome/text`. "Sair" separado por `border-top: 1px solid chrome/border` com margem `8px 2px`, sempre no fim (`flex: 1` no espaçador).
 
+**Grupos recolhíveis — decisão do PI, 22/10/2026 (#674).** Dashboard, Operação e Eventos de acesso ficam soltos no topo; o resto vive em grupos (**Academia**, Financeiro, Administração, Totem). O cabeçalho do grupo é `<h2>` com botão de disclosure (`aria-expanded`/`aria-controls`), caption 600 com marcador de accent na calha e seta que gira 90° ao abrir. Abre o grupo da tela atual; a escolha de abrir/fechar fica no `localStorage` (`arenahub.menu.grupos`); grupo fechado com a tela atual dentro mostra ponto de accent + "(tela atual)" para leitor de tela. O painel se desdobra por `grid-template-rows` 0fr → 1fr (220 ms, ease-out), links em cascata de 25 ms com teto de 120 ms; fechado fica `inert`. Abaixo de 1280 px (faixa horizontal) os grupos ficam sempre abertos e sem botão.
+
 ### 4.4 Cabeçalho de tela
 
 Breadcrumb 12 px `text/muted` → linha com `h1` 20 px/600 à esquerda e indicador de atualidade à direita (ícone 13 px + texto 12 px na cor do tom; `ah-pulse` quando ao vivo). Margem `2px 0 16px`.

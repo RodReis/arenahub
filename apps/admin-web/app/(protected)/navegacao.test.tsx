@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const rotaAtual = vi.fn(() => '/students');
 
@@ -110,15 +111,78 @@ describe('navegação principal', () => {
   });
 
   /*
-   * O rótulo NÃO é um link. Um cabeçalho que parece item de menu e não navega
-   * é a pior espécie de elemento: a recepção clica e nada acontece.
+   * O rótulo NÃO é um link: desde os grupos recolhíveis ele é um BOTÃO que
+   * abre e fecha o grupo -- clicar faz algo visível, nunca navega.
    */
-  it('rótulo de grupo não é clicável', () => {
+  it('rótulo de grupo não é link', () => {
     render(<Navegacao itens={ITENS} />);
 
     const financeiro = screen.getByRole('heading', { level: 2, name: 'Financeiro' });
 
     expect(within(financeiro).queryByRole('link')).toBeNull();
     expect(financeiro.closest('a')).toBeNull();
+  });
+
+  describe('grupos recolhíveis (pedido do PI, 22/10/2026)', () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it('o grupo da tela atual abre sozinho; os outros ficam fechados', () => {
+      rotaAtual.mockReturnValue('/billing/reconciliation');
+      render(<Navegacao itens={ITENS} />);
+
+      expect(screen.getByRole('button', { name: /Financeiro/ })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: /Administração/ })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
+
+    it('itens soltos do topo ficam sempre à vista, sem cabeçalho', () => {
+      rotaAtual.mockReturnValue('/units');
+      render(<Navegacao itens={ITENS} />);
+
+      expect(screen.getByRole('link', { name: 'Operação' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: /Operação/ })).toBeNull();
+    });
+
+    it('clicar abre e fecha, e a escolha fica lembrada no navegador', async () => {
+      const user = userEvent.setup();
+      rotaAtual.mockReturnValue('/operations');
+      const { unmount } = render(<Navegacao itens={ITENS} />);
+      const financeiro = screen.getByRole('button', { name: /Financeiro/ });
+
+      await user.click(financeiro);
+      expect(financeiro).toHaveAttribute('aria-expanded', 'true');
+
+      unmount();
+      render(<Navegacao itens={ITENS} />);
+
+      expect(screen.getByRole('button', { name: /Financeiro/ })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('grupo fechado com a tela atual dentro diz "tela atual"', async () => {
+      const user = userEvent.setup();
+      rotaAtual.mockReturnValue('/units');
+      render(<Navegacao itens={ITENS} />);
+      const administracao = screen.getByRole('button', { name: /Administração/ });
+
+      await user.click(administracao);
+
+      expect(administracao).toHaveAttribute('aria-expanded', 'false');
+      expect(administracao).toHaveTextContent('(tela atual)');
+    });
+
+    it('grupo fechado tira os links da tabulação (inert)', () => {
+      rotaAtual.mockReturnValue('/operations');
+      render(<Navegacao itens={ITENS} />);
+
+      const painel = document.getElementById(
+        screen.getByRole('button', { name: /Administração/ }).getAttribute('aria-controls') ?? '',
+      );
+
+      expect(painel).toHaveAttribute('inert');
+    });
   });
 });

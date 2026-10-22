@@ -201,7 +201,7 @@ describe('seletor de unidade no topbar', () => {
       responder([unidade('Matriz')], ['billing.dashboard']);
       await renderizar();
 
-      expect(rotulos()).toEqual(['Financeiro', 'Administração']);
+      expect(rotulos()).toEqual(['Academia', 'Financeiro', 'Administração']);
 
       for (const nome of ['Cobrança', 'Conciliação', 'Painel financeiro']) {
         expect(screen.getByRole('link', { name: nome })).toBeInTheDocument();
@@ -229,7 +229,7 @@ describe('seletor de unidade no topbar', () => {
       responder([unidade('Matriz')], []);
       await renderizar();
 
-      expect(rotulos()).toEqual(['Financeiro', 'Administração']);
+      expect(rotulos()).toEqual(['Academia', 'Financeiro', 'Administração']);
       expect(screen.queryByRole('link', { name: 'Painel financeiro' })).toBeNull();
       expect(screen.getByRole('link', { name: 'Cobrança' })).toBeInTheDocument();
     });
