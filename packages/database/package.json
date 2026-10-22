@@ -21,6 +21,7 @@
     "bootstrap:tenant": "tsx prisma/bootstrap-tenant.ts",
     "fix:188": "tsx prisma/fix-188-snapshot-vazio.ts",
     "backfill:vinculo": "tsx prisma/backfill-vinculo.ts",
+    "fix:nomes": "tsx prisma/normalizar-nomes.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

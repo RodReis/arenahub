@@ -142,7 +142,7 @@ describe('F18 -- historico e comparativos', () => {
       .post('/api/v1/students')
       .set('Cookie', conta.cookie)
       .send({
-        fullName: 'Aluno De Teste',
+        fullName: 'Aluno de Teste',
         birthDate: '1990-05-10',
         gymUnitId: conta.gymUnitId,
         // Obrigatorio desde o ADR-043 Decisao 3; este arquivo nao testa CPF,
@@ -632,7 +632,7 @@ describe('F18 -- historico e comparativos', () => {
       expect(csv).toContain('assessment_id');
       expect(csv).toContain('WEIGHT');
       expect(csv).toContain('BODY_FAT_PERCENT');
-      expect(csv).toContain('Aluno De Teste');
+      expect(csv).toContain('Aluno de Teste');
       // Origem e datas, exigidas pelo `M3-AC-010`.
       expect(csv).toContain('MANUAL');
       expect(csv).toContain('2026-06-10T12:00:00.000Z');

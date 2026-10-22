@@ -6,6 +6,7 @@
  * Regras do ADR-033 aplicadas aqui: ver `prisma/import-pacto.ts`.
  */
 import type { PrismaClientArenaHub } from '../client.js';
+import { nomeProprio } from '../nome-proprio.js';
 import { converterRegistro, type RegistroPacto, type RegistroRejeitado } from './parser.js';
 
 /** Maior matricula do Pacto e 2240 -- o sequencial local fecha acima disso. */
@@ -62,7 +63,7 @@ export async function importarRegistros(
         create: {
           tenantId: alvo.tenantId,
           membershipNumber: aluno.membershipNumber,
-          fullName: aluno.fullName,
+          fullName: nomeProprio(aluno.fullName),
           birthDate: aluno.birthDate,
           registeredSex: aluno.registeredSex,
           cpf: aluno.cpf,
@@ -72,7 +73,7 @@ export async function importarRegistros(
           gymUnitId: alvo.gymUnitId,
         },
         update: {
-          fullName: aluno.fullName,
+          fullName: nomeProprio(aluno.fullName),
           birthDate: aluno.birthDate,
           registeredSex: aluno.registeredSex,
           cpf: aluno.cpf,
