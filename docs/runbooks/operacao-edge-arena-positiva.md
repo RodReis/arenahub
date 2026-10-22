@@ -237,3 +237,17 @@ parado depois da gravação, que a catraca ainda libera pela lista própria. Par
 
 **O que estava de fábrica** (lido em 02/10/2026, para voltar se precisar): Acionamento 1 = **GIRO DE
 ENTRADA LIBERADO**, tempo **5**, demais iguais.
+
+## 9. Liberar um giro pelo painel (#660)
+
+No painel **Operação → Dispositivos**, a linha da **catraca** tem o botão **Liberar giro**: libera
+**um** giro, sem regra de acesso (decisão do PI, 22/10/2026). Cada clique é um giro, registrado como
+liberação manual (`MANUAL_OVERRIDE`, com quem clicou) — aparece nos eventos de acesso. Exige a
+permissão `access.override`.
+
+O giro sai quando o agente busca o comando na nuvem: até `SYNC_POLL_INTERVAL_MS` (padrão **15 s**).
+Para a recepção não esperar, no `.env` do PC: `SYNC_POLL_INTERVAL_MS=3000`.
+
+**Se o botão não girar:** a catraca precisa estar ligada ao Edge na nuvem. O heartbeat faz isso
+sozinho (precisa de `CATRACA_SERIAL` no `.env`); depois de atualizar o agente, espere 1 min. No log
+do agente: `comandos de sincronismo executados` com `executados: 1`.

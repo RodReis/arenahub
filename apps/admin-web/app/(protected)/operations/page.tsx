@@ -21,6 +21,7 @@ import {
 import { chamarApi } from '../../../lib/api/server-client';
 import { SeletorDeUnidade } from '../seletor-de-unidade';
 import { AtualizarAoVivo } from './atualizar-ao-vivo';
+import { LiberarGiro } from './liberar-giro';
 import estilos from './operations.module.css';
 import { PareaEdge } from './parear-edge';
 import { ReconhecerAlerta } from './reconhecer-alerta';
@@ -602,6 +603,20 @@ export default async function PaginaDeOperacao({
             header: 'Última sincronização',
             role: 'moment',
             render: (d) => <SinalDeVida iso={d.ultimoSync} agora={agora} />,
+          },
+          {
+            key: 'acao',
+            header: 'Ação',
+            role: 'actions',
+            // Um giro, sem regra -- só a catraca tem (#660).
+            render: (d) =>
+              d.kind === 'TURNSTILE' ? (
+                <AcoesDaLinha>
+                  <LiberarGiro gymUnitId={d.gymUnitId} deviceId={d.id} />
+                </AcoesDaLinha>
+              ) : (
+                <AusenteDeAcao />
+              ),
           },
         ]}
         empty={<EmptyState testId="sem-dispositivo" title="Nenhum leitor ou catraca cadastrado." />}

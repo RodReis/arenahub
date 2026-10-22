@@ -1,4 +1,6 @@
 import type { FacialDeviceAdapter } from '../domain/facial-device.js';
+import type { TurnstileAdapter } from '../domain/turnstile.js';
+import type { DepsAcessoOnline } from './orquestrar-acesso-online.js';
 import type { DeviceUserRepository } from '../persistence/device-user-repository.js';
 import { cadastrarIdentidade, removerIdentidade } from './sincronizar-identidade.js';
 
@@ -31,6 +33,8 @@ export interface ComandoDaNuvem {
     externalUserId?: string;
     identityId?: string;
     enrollmentObjectKey?: string | null;
+    /** `ACCESS_OVERRIDE_GRANT`: o evento de acesso da liberacao manual (#660). */
+    accessEventId?: string;
   };
   correlationId: string;
 }
@@ -51,6 +55,16 @@ export interface DependenciasDoWorker {
   registrarExecucao: (commandId: string, sucesso: boolean) => void;
   /** Ja executamos este comando? Sobrevive a reinicio do processo. */
   jaExecutado: (commandId: string) => boolean;
+  /**
+   * Liberacao manual (`ACCESS_OVERRIDE_GRANT`, #660). Sem ela, o comando e
+   * recusado como nao suportado -- modo bancada sem catraca.
+   */
+  liberacaoManual?: {
+    catraca: TurnstileAdapter;
+    reportarPassagem: DepsAcessoOnline['reportarPassagem'];
+    /** Teto da espera pelo giro -- maior que o tempo destravado da catraca. */
+    timeoutGiroMs: number;
+  };
 }
 
 /**
@@ -79,6 +93,10 @@ export async function executarComando(
   // envio porque o resultado dela nao chegou.
   if (deps.jaExecutado(comando.id)) {
     return { commandId: comando.id, success: true, deviceTimestamp: carimbo };
+  }
+
+  if (comando.type === 'ACCESS_OVERRIDE_GRANT') {
+    return liberarGiroManual(deps, comando, agora);
   }
 
   const { externalUserId, identityId } = comando.payload;
@@ -150,6 +168,62 @@ export async function executarComando(
     errorCode: 'DEVICE_OPERATION_UNSUPPORTED',
     deviceTimestamp: carimbo,
   };
+}
+
+/**
+ * Liberacao manual da recepcao: UM giro, sem regra -- a nuvem ja decidiu e
+ * auditou (`MANUAL_OVERRIDE`). #660.
+ *
+ * ⚠️ AO CONTRARIO do cadastro facial, girar NAO e idempotente: rodar de novo
+ * gira de novo. Por isso o comando e registrado como executado ANTES de
+ * acionar a catraca -- se o processo morrer no meio, o giro se perde (a
+ * recepcao clica de novo), mas nunca acontece duas vezes.
+ */
+async function liberarGiroManual(
+  deps: DependenciasDoWorker,
+  comando: ComandoDaNuvem,
+  agora: Date,
+): Promise<ResultadoDeComando> {
+  const carimbo = agora.toISOString();
+  const { accessEventId } = comando.payload;
+
+  if (!accessEventId || !deps.liberacaoManual) {
+    deps.registrarExecucao(comando.id, false);
+    return {
+      commandId: comando.id,
+      success: false,
+      errorCode: 'DEVICE_OPERATION_UNSUPPORTED',
+      deviceTimestamp: carimbo,
+    };
+  }
+
+  const { catraca, reportarPassagem, timeoutGiroMs } = deps.liberacaoManual;
+
+  deps.registrarExecucao(comando.id, true);
+
+  // `accessEventId` como id do comando na catraca: o mesmo evento nunca gira
+  // duas vezes, nem chegando por dois comandos.
+  const resultado = await catraca.liberar(accessEventId, timeoutGiroMs);
+
+  if (resultado.desfecho === 'desconhecido') {
+    return {
+      commandId: comando.id,
+      success: false,
+      errorCode: 'DEVICE_UNREACHABLE',
+      deviceTimestamp: carimbo,
+    };
+  }
+
+  // Falha ao reportar nao desfaz o giro -- a passagem fica sem desfecho na
+  // nuvem, mas o comando foi cumprido.
+  await reportarPassagem(
+    accessEventId,
+    resultado.desfecho === 'girou' ? 'CONFIRMED' : 'TIMED_OUT',
+    accessEventId,
+    agora,
+  ).catch(() => false);
+
+  return { commandId: comando.id, success: true, deviceTimestamp: carimbo };
 }
 
 /**

@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { DeviceRepository } from '../devices/device.repository.js';
 import { EdgeRoute } from './edge-route.decorator.js';
 
 /**
@@ -46,7 +47,10 @@ interface RespostaDeHeartbeat {
 
 @Controller('api/v1/edge')
 export class EdgeController {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly dispositivos: DeviceRepository,
+  ) {}
 
   /**
    * Sinal de vida do Edge, com estado dos dispositivos (INV-028).
@@ -102,6 +106,13 @@ export class EdgeController {
       });
 
       reconhecidos += alterados.count;
+
+      // Reivindica o dispositivo SEM DONO pela regra do #488. A catraca so
+      // aparece no heartbeat (#522) -- nunca passa por reconhecimento -- e
+      // sem `edgeNodeId` a liberacao manual nao vira comando para o Edge (#660).
+      if (alterados.count > 0) {
+        await this.dispositivos.resolverDoEdgePorSerial(edge, dispositivo.serial);
+      }
     }
 
     return {
