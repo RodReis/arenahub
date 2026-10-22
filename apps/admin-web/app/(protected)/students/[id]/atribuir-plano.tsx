@@ -74,6 +74,11 @@ interface Props {
    */
   vigente?: AssinaturaVigente | undefined;
   /**
+   * O aluno tem plano suspenso por atraso e ainda no prazo (#676): nao ha o que
+   * substituir nem o que atribuir -- o formulario da lugar a um aviso.
+   */
+  emAtraso?: boolean | undefined;
+  /**
    * Fuso da UNIDADE, para formatar `vigente.endsAt` (regra 5 do DS §11 --
    * `TenantDateTime` é a única formatação de data autorizada). Mesmo valor
    * que o `page.tsx` já usa (`FUSO_PROVISORIO`/`timezoneDaUnidade`).
@@ -125,7 +130,7 @@ function BotaoDeAtribuicao({ troca }: { troca: boolean }) {
  * humana registrada, e não de um pagamento. No MVP 2 a mesma cadeia passa a
  * ser alimentada por invoice — mas a catraca continua lendo só o entitlement.
  */
-export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }: Props) {
+export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone, emAtraso }: Props) {
   /*
    * FECHADO POR PADRÃO (decisão do PI, 24/08/2026).
    *
@@ -161,6 +166,22 @@ export function AtribuirPlano({ studentId, planos, impedido, vigente, timezone }
   }
 
   const troca = vigente !== undefined;
+
+  /*
+   * PLANO EM ATRASO (#676). A assinatura segue "vigente" para o banco (`ACTIVE`
+   * ou `PAST_DUE`: uma por aluno), mas o direito esta suspenso e a ficha nao a
+   * mostra como plano. Oferecer "Atribuir plano" aqui so levava a um erro
+   * interno -- o banco recusa a segunda assinatura. Troca de plano nao perdoa
+   * atraso, entao o caminho e regularizar o plano atual.
+   */
+  if (emAtraso === true && !troca) {
+    return (
+      <p data-testid="plano-em-atraso">
+        Este aluno tem um plano em atraso (suspenso por inadimplência). Regularize a cobrança do plano
+        atual antes de atribuir ou alterar o plano.
+      </p>
+    );
+  }
 
   if (estado.sucesso) {
     const reabertas = estado.sucesso.parcelasReabertas ?? 0;

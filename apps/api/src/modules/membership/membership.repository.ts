@@ -106,7 +106,7 @@ export class AlunoJaTemAssinaturaVigenteError extends ErroDeDominio {
     super(
       'STUDENT_HAS_ACTIVE_SUBSCRIPTION',
       409,
-      'Aluno ja tem assinatura vigente; diaria so se vende a quem esta sem plano',
+      'Aluno ja tem assinatura vigente ou em atraso',
     );
   }
 }
@@ -826,6 +826,21 @@ export class MembershipRepository {
 
     return this.db.$transaction(async (tx) => {
       await this.travarAlunoElegivel(tx, contexto, entrada.studentId);
+
+      // O indice "uma assinatura vigente por aluno" conta ACTIVE e PAST_DUE.
+      // Sem esta checagem, quem tem plano EM ATRASO (direito suspenso, que a
+      // ficha nao mostra como vigente) violava o indice e recebia 500
+      // `INTERNAL_ERROR` em vez de um conflito legivel (#676).
+      const vigente = await tx.subscription.findFirst({
+        where: {
+          tenantId: contexto.tenantId,
+          studentId: entrada.studentId,
+          status: { in: ['ACTIVE', 'PAST_DUE'] },
+        },
+        select: { id: true },
+      });
+
+      if (vigente) throw new AlunoJaTemAssinaturaVigenteError();
 
       const assinatura = await tx.subscription.create({
         data: {
