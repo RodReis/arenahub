@@ -326,6 +326,14 @@ export class AuthController {
         ...(await this.auth.perfil(claims.sub)),
         permissions: contexto ? [...contexto.permissions].sort() : [],
         /*
+         * PAPEIS -- issue #666. O menu esconde da recepcao telas que ela tem
+         * permissao de abrir (decisao do PI). A primeira versao lia `roles`
+         * daqui sem que o campo existisse: em producao ele chegava ausente e
+         * nada sumia, enquanto o teste do layout passava com o campo no mock.
+         * Sai do mesmo conjunto que o `AuthGuard` ja montou -- sem consulta.
+         */
+        roles: contexto?.roles ? [...contexto.roles].sort() : [],
+        /*
          * SESSAO DE PLATAFORMA -- o painel precisa disto para escolher a area.
          *
          * Sem este sinal o front nao tinha como distinguir "dono do SaaS" de

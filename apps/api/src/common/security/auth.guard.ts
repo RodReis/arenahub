@@ -135,10 +135,13 @@ export class AuthGuard implements CanActivate {
     });
 
     const permissions = new Set<string>();
+    const roles = new Set<string>();
     const unidades = new Set<string>();
     let valeNoTenantInteiro = false;
 
     for (const atribuicao of papeis) {
+      roles.add(atribuicao.role.name);
+
       for (const ligacao of atribuicao.role.permissions) {
         permissions.add(ligacao.permission.code);
       }
@@ -153,6 +156,7 @@ export class AuthGuard implements CanActivate {
       actorId: userId,
       sessionId: claims.sessionId,
       permissions,
+      roles,
       allowedUnitIds: valeNoTenantInteiro ? 'ALL' : unidades,
     };
   }
