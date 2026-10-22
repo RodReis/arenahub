@@ -97,6 +97,17 @@ orientação física da catraca"*. **Isso se verifica na bancada, não se adivin
 > deixa o aluno travado. O agente espera o giro por `tempo + 3 s`, porque quem decide o fim é a
 > Origem 5 da catraca. **Mudar o `.cs` exige `pnpm --filter @arenahub/edge-agent bridge:build` no PC.**
 >
+> **Atualização de 22/10/2026 (#658), substitui o trecho abaixo onde conflitar:** `gravar-configuracao`
+> foi trocado por **`enviar-config-online`**, que monta **e** envia o bloco na mesma chamada
+> (`DefinirPadraoCartao` → `ConfigurarInnerOnLine` → `ConfigurarAcionamento1` → `ConfigurarLeitor1/2`
+> → `EnviarConfiguracoes`), porque o manual diz que `EnviarConfiguracoes` **limpa o buffer** depois de
+> enviar. Antes, cada reenvio depois de uma queda de ping mandava o buffer vazio. Os valores saem de
+> **`CATRACA_MODO` + `CATRACA_INVERTIDA`**, pela tabela do `MontaConfiguracaoInner` do exemplo oficial
+> (SDK 6.0.2.0): "saída liberada" numa catraca invertida = **acionamento 7 + leitor 2** (o `4/0/6`
+> abaixo veio da página web da catraca, cuja numeração não é a da DLL, e deixava a catraca livre nos
+> dois sentidos). `ConfigurarLeitor` só aceita 0–4. `testar-conexao` agora é `ReceberRelogio` (o
+> `testaConexaoInner` oficial). Gravar e liberar o giro não se intercalam.
+>
 > ⚠️ **Achado de 02/10/2026 (#507): `Configurar*` sozinho NÃO chega ao equipamento.** Só monta a
 > configuração na memória da DLL; quem grava na catraca é `EnviarConfiguracoes`. A ponte agora tem o
 > comando `gravar-configuracao`, que o agente chama depois que a catraca disca (primeiro ping com

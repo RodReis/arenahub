@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MODOS_CATRACA } from '../adapters/topdata/configuracao-catraca.js';
+
 /**
  * Configuracao do edge-agent, validada no boundary.
  *
@@ -106,20 +108,35 @@ export const esquemaConfig = z.object({
   CATRACA_SERIAL: z.string().min(1).max(64).optional(),
 
   /**
-   * Modo de acesso gravado NA CATRACA a cada conexao -- #507. Os tres juntos
-   * ou nenhum (`carregarConfig` recusa parcial). Sem eles o agente nao grava
-   * nada e a catraca segue com o que tem: ela perde a configuracao quando e
-   * desligada da tomada (o TopFace regravava; foi desativado em #504).
+   * Modo de operacao gravado NA CATRACA a cada conexao (#658). O agente
+   * deriva acionamento e leitor do modo + `CATRACA_INVERTIDA` pela tabela
+   * oficial do SDK (`derivarConfiguracao`), como o TopAcademia faz.
    *
-   * Arena Positiva: 4 / 0 / 6. Leitor: 0 desabilitado, 1 so entrada, 2 so
-   * saida, 3 entrada e saida, 4 entrada e saida invertido, 5 so entrada
-   * invertido, 6 so saida invertido. Acionamento: 0 desabilitado, 1 libera
-   * entrada e saida, 2 entrada, 3 saida, 4 sirene, 5 revista, 6 giro de
-   * saida livre, 7 giro de entrada livre, 8 ambos livres. O tempo do
-   * acionamento vem de `CATRACA_TEMPO_LIBERADA_S`.
+   * Arena Positiva: `saida-liberada` com `CATRACA_INVERTIDA=true` (entrada
+   * bloqueada, saida livre) -- grava acionamento 7, leitor 2.
+   *
+   * Sem ele (nem os tres numeros abaixo) o agente nao grava nada e a catraca
+   * segue com o que tem -- e perde tudo quando e desligada da tomada.
    */
-  CATRACA_LEITOR1: numeroOpcional(6),
-  CATRACA_LEITOR2: numeroOpcional(6),
+  CATRACA_MODO: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(MODOS_CATRACA).optional(),
+  ),
+
+  /**
+   * Numeros crus da DLL -- #507. Prefira `CATRACA_MODO`: estes vao para a
+   * placa como estao, sem a troca que a catraca invertida exige. Os tres
+   * juntos ou nenhum, e nunca junto com `CATRACA_MODO`.
+   *
+   * Leitor (`ConfigurarLeitor1/2`, so 0 a 4): 0 desativado, 1 so entrada,
+   * 2 so saida, 3 entrada e saida, 4 entrada e saida invertidas. Acionamento:
+   * 0 nao utilizado, 1 entrada e saida controladas, 2 entrada, 3 saida,
+   * 4 sirene, 5 revista, 6 saida liberada, 7 entrada liberada, 8 dois
+   * sentidos liberados. A numeracao da pagina web da catraca NAO e esta. O
+   * tempo do acionamento vem de `CATRACA_TEMPO_LIBERADA_S`.
+   */
+  CATRACA_LEITOR1: numeroOpcional(4),
+  CATRACA_LEITOR2: numeroOpcional(4),
   CATRACA_ACIONAMENTO1: numeroOpcional(8),
 });
 
@@ -167,6 +184,11 @@ export function carregarConfig(bruto: unknown = process.env): Config {
   if (definidos !== 0 && definidos !== 3) {
     throw new ConfigInvalidaError([
       'CATRACA_LEITOR1, CATRACA_LEITOR2 e CATRACA_ACIONAMENTO1: defina os tres ou nenhum',
+    ]);
+  }
+  if (definidos === 3 && config.CATRACA_MODO !== undefined) {
+    throw new ConfigInvalidaError([
+      'CATRACA_MODO e CATRACA_LEITOR1/LEITOR2/ACIONAMENTO1: use um ou outro, nao os dois',
     ]);
   }
 

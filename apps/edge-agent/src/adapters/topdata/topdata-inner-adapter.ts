@@ -63,6 +63,22 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
 
   private gravando = false;
 
+  /** Segundos destravada, do `conectar` -- vai junto a cada gravacao (#658). */
+  private tempoLiberadaS = 5;
+
+  /**
+   * Fila que impede gravar a configuracao no meio de um giro e vice-versa
+   * (#658): a ponte e FIFO, mas os comandos de uma liberacao e os de uma
+   * gravacao se intercalariam.
+   */
+  private exclusao: Promise<unknown> = Promise.resolve();
+
+  private emExclusao<T>(tarefa: () => Promise<T>): Promise<T> {
+    const vez = this.exclusao.then(tarefa, tarefa);
+    this.exclusao = vez.catch(() => undefined);
+    return vez;
+  }
+
   get respondendo(): boolean {
     return this.ultimoPingOk;
   }
@@ -103,6 +119,7 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
    * para discar de volta. Confirme com `testarConexao()` antes de liberar.
    */
   async conectar(porta: number, tempo = 10, tempoLiberadaS = 5): Promise<boolean> {
+    this.tempoLiberadaS = tempoLiberadaS;
     const r = await this.ponte.executar({
       cmd: 'conectar',
       porta,
@@ -118,6 +135,9 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
    * Espera a catraca discar (primeiro ping com retorno 0) e tenta de novo
    * se ela ainda nao aceitou. Sem `configuracao`, nao faz nada.
    *
+   * Cada tentativa remonta o buffer da DLL antes de enviar (#658): o envio
+   * limpa o buffer, e reenviar sem remontar gravava um bloco vazio.
+   *
    * ⚠️ Grava o bloco inteiro de configuracao do equipamento, nao so os tres
    * campos. Confira o plano B (modo offline) depois de ligar isto numa
    * instalacao nova.
@@ -126,16 +146,30 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
     tentativas = TENTATIVAS_GRAVAR,
     esperaMs = ESPERA_GRAVAR_MS,
   ): Promise<boolean> {
-    if (!this.configuracao || this.gravando) return false;
+    const configuracao = this.configuracao;
+    if (!configuracao || this.gravando) return false;
     this.gravando = true;
     try {
       for (let i = 1; i <= tentativas; i += 1) {
-        if (await this.ping()) {
-          const r = await this.ponte.executar({ cmd: 'gravar-configuracao', inner: this.inner });
-          if (r.tipo === 'retorno' && r.retorno === 0) {
-            this.logger.info({ ...this.configuracao }, 'configuracao de acesso gravada na catraca');
-            return true;
-          }
+        const r = await this.emExclusao(async () =>
+          (await this.ping())
+            ? this.ponte.executar({
+                cmd: 'enviar-config-online',
+                inner: this.inner,
+                tempoLiberadaS: this.tempoLiberadaS,
+                configuracao,
+              })
+            : null,
+        );
+        if (r?.tipo === 'retorno' && r.retorno === 0) {
+          this.logger.info({ ...configuracao }, 'configuracao de acesso gravada na catraca');
+          return true;
+        }
+        if (r) {
+          this.logger.warn(
+            { tentativa: i, razao: descreverFalha(r) },
+            'catraca recusou a configuracao de acesso',
+          );
         }
         if (i < tentativas) await new Promise((resolve) => setTimeout(resolve, esperaMs));
       }
@@ -146,7 +180,7 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
     }
   }
 
-  /** A catraca responde? `TestarConexaoInner`. */
+  /** A catraca discou e responde? `ReceberRelogio` (#658). */
   async testarConexao(): Promise<boolean> {
     const r = await this.ponte.executar({ cmd: 'testar-conexao', inner: this.inner });
     return r.tipo === 'retorno' && r.retorno === 0;
@@ -214,6 +248,14 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
     comandoId: string,
     timeoutMs: number = TIMEOUT_GIRO_MS,
     sentido: SentidoGiro = 'entrada',
+  ): Promise<ResultadoLiberacao> {
+    return this.emExclusao(() => this.liberarAgora(comandoId, timeoutMs, sentido));
+  }
+
+  private async liberarAgora(
+    comandoId: string,
+    timeoutMs: number,
+    sentido: SentidoGiro,
   ): Promise<ResultadoLiberacao> {
     // IDEMPOTENCIA -- e ela e so nossa. Ver o comentario do Map.
     const jaFeito = this.executados.get(comandoId);
@@ -351,9 +393,15 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
   }
 }
 
-function descreverFalha(r: { tipo: string; retorno?: number; mensagem?: string }): string {
+function descreverFalha(r: {
+  tipo: string;
+  retorno?: number;
+  mensagem?: string;
+  funcao?: string | undefined;
+}): string {
   if (r.tipo === 'falha-da-ponte') return r.mensagem ?? 'ponte falhou';
   if (typeof r.retorno === 'number') {
+    if (r.funcao) return `retorno ${r.retorno} da DLL em ${r.funcao}`;
     // 8 = GPF, e quase sempre ambiente e nao codigo. Dizer isso poupa horas
     // de quem esta na bancada procurando bug no lugar errado.
     if (r.retorno === 8) {

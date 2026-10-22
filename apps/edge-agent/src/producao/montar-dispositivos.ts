@@ -7,6 +7,7 @@ import type { FacialDeviceAdapter } from '../domain/facial-device.js';
 import type { TurnstileAdapter } from '../domain/turnstile.js';
 import { FacialSimulator } from '../adapters/facial-simulator.js';
 import { TurnstileSimulator } from '../adapters/turnstile-simulator.js';
+import { derivarConfiguracao } from '../adapters/topdata/configuracao-catraca.js';
 import type { ConfiguracaoAcesso } from '../adapters/topdata/easyinner-ponte.js';
 import { TopdataFacialAdapter } from '../adapters/topdata/topdata-facial-adapter.js';
 import {
@@ -88,8 +89,14 @@ export async function montarDispositivos(
   };
 }
 
-/** Os tres campos vem juntos ou nenhum -- `carregarConfig` ja garante (#507). */
-function configuracaoDeAcesso(config: Config): ConfiguracaoAcesso | undefined {
+/**
+ * `CATRACA_MODO` deriva pela tabela oficial (#658); sem ele, os tres numeros
+ * crus -- juntos ou nenhum, `carregarConfig` ja garante (#507).
+ */
+export function configuracaoDeAcesso(config: Config): ConfiguracaoAcesso | undefined {
+  if (config.CATRACA_MODO) {
+    return derivarConfiguracao(config.CATRACA_MODO, config.CATRACA_INVERTIDA);
+  }
   const { CATRACA_LEITOR1: leitor1, CATRACA_LEITOR2: leitor2, CATRACA_ACIONAMENTO1: acionamento1 } =
     config;
   if (leitor1 === undefined || leitor2 === undefined || acionamento1 === undefined) {

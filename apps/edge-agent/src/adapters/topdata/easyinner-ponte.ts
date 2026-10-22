@@ -87,6 +87,16 @@ export const TIPO_CONEXAO_TCP_PORTA_FIXA = 2;
 // --- o que a ponte ACEITA -------------------------------------------------
 
 /**
+ * Acionamento/leitor na numeracao da DLL (`ConfigurarLeitor` so aceita 0 a
+ * 4; fora disso a DLL devolve 128). Ver `derivarConfiguracao`.
+ */
+const esquemaConfiguracaoAcesso = z.object({
+  leitor1: z.number().int().min(0).max(4),
+  leitor2: z.number().int().min(0).max(4),
+  acionamento1: z.number().int().min(0).max(8),
+});
+
+/**
  * Comandos que o edge-agent manda para a ponte.
  *
  * Superficie minima de proposito: cada comando aqui e algo que pode mover
@@ -116,31 +126,33 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
      * antigos, que nunca chegaram ao equipamento (so `gravar-configuracao`
      * grava) e sao errados para a Arena Positiva.
      */
-    configuracao: z
-      .object({
-        leitor1: z.number().int().min(0).max(6),
-        leitor2: z.number().int().min(0).max(6),
-        acionamento1: z.number().int().min(0).max(8),
-      })
-      .optional(),
+    configuracao: esquemaConfiguracaoAcesso.optional(),
   }),
 
   /**
-   * Grava no EQUIPAMENTO a configuracao montada pelo `conectar`
-   * (`EnviarConfiguracoes`) -- #507. `Configurar*` so mexe na memoria da
-   * DLL; sem este comando a catraca segue com o que ja tinha, e volta de
-   * fabrica quando perde energia.
+   * Monta E grava no EQUIPAMENTO o bloco online (`EnviarConfiguracoes`) --
+   * #507, #658. Numa chamada so, porque o manual diz que `EnviarConfiguracoes`
+   * LIMPA o buffer da DLL depois de enviar: reenviar sem remontar mandava um
+   * buffer vazio. Sequencia do `MontaConfiguracaoInner` oficial:
+   * `DefinirPadraoCartao` -> `ConfigurarInnerOnLine` -> `ConfigurarAcionamento1`
+   * -> `ConfigurarLeitor1/2` -> `EnviarConfiguracoes`. Para no primeiro
+   * retorno != 0 e devolve `funcao` com o nome de quem falhou.
    *
-   * ⚠️ Grava o BLOCO inteiro (leitor, padrao de cartao etc.), nao so os tres
-   * campos: pode sobrescrever o que o modo offline usa. Por isso so e
-   * chamado quando a instalacao pede (`CATRACA_LEITOR1/2` + `CATRACA_ACIONAMENTO1`).
+   * ⚠️ Grava o BLOCO inteiro, nao so os tres campos. So e chamado quando a
+   * instalacao pede (`CATRACA_MODO` ou os tres numeros).
    */
   z.object({
-    cmd: z.literal('gravar-configuracao'),
+    cmd: z.literal('enviar-config-online'),
     inner: z.number().int().min(1).max(99),
+    tempoLiberadaS: z.number().int().min(1).max(50),
+    configuracao: esquemaConfiguracaoAcesso,
   }),
 
-  /** Testa se a catraca esta conectada. `TestarConexaoInner`. */
+  /**
+   * Testa se a catraca discou e responde: `ReceberRelogio`, como o
+   * `testaConexaoInner` do exemplo oficial (#658). Antes era
+   * `ConfigurarInnerOnLine`, que nao fala com a catraca.
+   */
   z.object({
     cmd: z.literal('testar-conexao'),
     inner: z.number().int().min(1).max(99),
@@ -190,9 +202,7 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
 export type ComandoPonte = z.infer<typeof esquemaComandoPonte>;
 
 /** Modo de acesso que o agente grava na catraca -- #507. */
-export type ConfiguracaoAcesso = NonNullable<
-  Extract<ComandoPonte, { cmd: 'conectar' }>['configuracao']
->;
+export type ConfiguracaoAcesso = z.infer<typeof esquemaConfiguracaoAcesso>;
 
 // --- o que a ponte DEVOLVE ------------------------------------------------
 
@@ -217,6 +227,8 @@ export const esquemaRespostaPonte = z.discriminatedUnion('tipo', [
   z.object({
     tipo: z.literal('retorno'),
     retorno: z.number().int(),
+    /** Funcao da DLL que devolveu o retorno, nos comandos de varias etapas. */
+    funcao: z.string().optional(),
   }),
 
   /** `ReceberDadosOnLine` trouxe evento. */

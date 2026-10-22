@@ -133,8 +133,39 @@ describe('CATRACA_LEITOR1 / CATRACA_LEITOR2 / CATRACA_ACIONAMENTO1', () => {
   });
 
   it('recusam valor fora do enum do firmware', () => {
-    expect(() => carregarConfig({ ...VALIDO, ...COMPLETO, CATRACA_LEITOR1: '7' })).toThrow();
+    // Leitor 5 e 6 eram aceitos e a DLL os rejeita (#658).
+    expect(() => carregarConfig({ ...VALIDO, ...COMPLETO, CATRACA_LEITOR1: '5' })).toThrow();
     expect(() => carregarConfig({ ...VALIDO, ...COMPLETO, CATRACA_ACIONAMENTO1: '9' })).toThrow();
+  });
+});
+
+/** #658 -- modo de operacao, derivado pela tabela oficial do SDK. */
+describe('CATRACA_MODO', () => {
+  it('fica indefinido por padrao, e vazio conta como ausente', () => {
+    expect(carregarConfig(VALIDO).CATRACA_MODO).toBeUndefined();
+    expect(carregarConfig({ ...VALIDO, CATRACA_MODO: '' }).CATRACA_MODO).toBeUndefined();
+  });
+
+  it('aceita saida-liberada (Arena Positiva)', () => {
+    expect(carregarConfig({ ...VALIDO, CATRACA_MODO: 'saida-liberada' }).CATRACA_MODO).toBe(
+      'saida-liberada',
+    );
+  });
+
+  it('recusa modo desconhecido', () => {
+    expect(() => carregarConfig({ ...VALIDO, CATRACA_MODO: 'livre' })).toThrow();
+  });
+
+  it('recusa junto com os tres numeros crus', () => {
+    expect(() =>
+      carregarConfig({
+        ...VALIDO,
+        CATRACA_MODO: 'saida-liberada',
+        CATRACA_LEITOR1: '2',
+        CATRACA_LEITOR2: '0',
+        CATRACA_ACIONAMENTO1: '7',
+      }),
+    ).toThrow(/um ou outro/);
   });
 });
 
