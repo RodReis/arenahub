@@ -306,8 +306,8 @@ describe('TopdataInnerAdapter -- keep-alive (#470)', () => {
   });
 });
 
-describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507)', () => {
-  const configuracao = { leitor1: 4, leitor2: 0, acionamento1: 6 };
+describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507, #658)', () => {
+  const configuracao = { leitor1: 2, leitor2: 0, acionamento1: 7 };
 
   class PonteQueSoAceitaDepois extends PonteFalsa {
     pingsAteResponder = 0;
@@ -319,7 +319,7 @@ describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507)', () => {
         this.pingsAteResponder -= 1;
         return Promise.resolve({ tipo: 'retorno', retorno: 1 });
       }
-      if (comando.cmd === 'gravar-configuracao') {
+      if (comando.cmd === 'enviar-config-online') {
         this.recebidos.push(comando);
         return Promise.resolve({ tipo: 'retorno', retorno: this.retornoDeGravar });
       }
@@ -327,7 +327,44 @@ describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507)', () => {
     }
   }
 
-  const gravacoes = (p: PonteFalsa) => p.recebidos.filter((c) => c.cmd === 'gravar-configuracao');
+  const gravacoes = (p: PonteFalsa) => p.recebidos.filter((c) => c.cmd === 'enviar-config-online');
+
+  it('cada envio leva a configuracao inteira, para a ponte remontar o buffer (#658)', async () => {
+    const ponte = new PonteFalsa();
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao);
+    await adapter.conectar(3570, 10, 8);
+
+    await adapter.gravarConfiguracao(1, 0);
+    await adapter.gravarConfiguracao(1, 0);
+
+    expect(gravacoes(ponte)).toEqual([
+      { cmd: 'enviar-config-online', inner: 1, tempoLiberadaS: 8, configuracao },
+      { cmd: 'enviar-config-online', inner: 1, tempoLiberadaS: 8, configuracao },
+    ]);
+  });
+
+  it('leva o bloco offline junto quando a instalacao define um (#658)', async () => {
+    const ponte = new PonteFalsa();
+    const offline = { acionamento1: 8, leitor1: 3, leitor2: 0 };
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, offline);
+
+    await adapter.gravarConfiguracao(1, 0);
+
+    expect(gravacoes(ponte)[0]).toMatchObject({ configuracao, configuracaoOffline: offline });
+  });
+
+  it('nao grava no meio de um giro: espera a liberacao terminar (#658)', async () => {
+    const ponte = new PonteFalsa();
+    ponte.programarEventos({ tipo: 'sem-evento' }, { tipo: 'evento', evento: { origem: ORIGEM.GIRO_CONFIRMADO } });
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao);
+
+    const liberacao = adapter.liberar('cmd-1', 10_000);
+    const gravacao = adapter.gravarConfiguracao(1, 0);
+    await Promise.all([liberacao, gravacao]);
+
+    const cmds = ponte.recebidos.map((c) => c.cmd);
+    expect(cmds.indexOf('enviar-config-online')).toBeGreaterThan(cmds.lastIndexOf('receber-evento'));
+  });
 
   it('manda a configuracao na conexao para a ponte montar na DLL', async () => {
     const ponte = new PonteFalsa();
@@ -353,7 +390,7 @@ describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507)', () => {
 
     expect(gravou).toBe(true);
     expect(gravacoes(ponte)).toHaveLength(1);
-    expect(ponte.recebidos.map((c) => c.cmd)).toEqual(['ping', 'ping', 'ping', 'gravar-configuracao']);
+    expect(ponte.recebidos.map((c) => c.cmd)).toEqual(['ping', 'ping', 'ping', 'enviar-config-online']);
   });
 
   it('desiste depois das tentativas se a catraca nunca aceita', async () => {

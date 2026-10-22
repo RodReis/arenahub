@@ -30,6 +30,8 @@ class EasyInnerBridge {
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte ConfigurarInnerOnLine();
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ConfigurarInnerOffLine();
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte HabilitarMudancaOnLineOffLine(byte Habilita, byte Tempo);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte DefinirPadraoCartao(byte Padrao);
@@ -57,6 +59,9 @@ class EasyInnerBridge {
     static extern byte LiberarCatracaSaidaInvertida(int Inner);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte PingOnLine(int Inner);
+    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
+    static extern byte ReceberRelogio(int Inner, ref byte Dia, ref byte Mes, ref byte Ano,
+        ref byte Hora, ref byte Minuto, ref byte Segundo);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte ReceberDadosOnLine(int Inner, ref byte Origem, ref byte Complemento,
         StringBuilder Cartao, ref byte Dia, ref byte Mes, ref byte Ano,
@@ -109,8 +114,8 @@ class EasyInnerBridge {
 
         switch (nome) {
             case "conectar":       return Conectar(cmd);
-            case "gravar-configuracao": return Retorno(EnviarConfiguracoes(inner));
-            case "testar-conexao": return Retorno(ConfigurarInnerOnLine());
+            case "enviar-config-online": return EnviarConfigOnline(cmd, inner);
+            case "testar-conexao": return TestarConexao(inner);
             case "ping":           return Retorno(PingOnLine(inner));
             case "liberar":        return Liberar(cmd, inner);
             case "receber-evento": return Receber(inner);
@@ -160,6 +165,64 @@ class EasyInnerBridge {
         pior = Math.Max(pior, ConfigurarLeitor1(leitor1));
         pior = Math.Max(pior, ConfigurarLeitor2(leitor2));
         return Retorno(pior);
+    }
+
+    /// <summary>
+    /// Monta E envia o bloco online numa chamada so (#658). O manual:
+    /// "EnviarConfiguracoes ... apos o envio esse buffer e limpo, sendo
+    /// necessario chamar novamente as funcoes acima para reconfigura-lo".
+    /// Ordem do MontaConfiguracaoInner oficial; para no primeiro retorno != 0
+    /// e diz qual funcao falhou.
+    ///
+    /// Com "configuracaoOffline", grava ANTES o bloco offline (o que a catraca
+    /// faz sozinha quando o agente cai) -- a ordem do exemplo oficial e
+    /// ENVIAR_CFG_OFFLINE antes de ENVIAR_CFG_ONLINE.
+    /// </summary>
+    static string EnviarConfigOnline(IDictionary<string, object> cmd, int inner) {
+        byte liberada = Convert.ToByte(cmd["tempoLiberadaS"]);
+
+        if (cmd.ContainsKey("configuracaoOffline") && cmd["configuracaoOffline"] != null) {
+            string falha = EnviarBloco((IDictionary<string, object>)cmd["configuracaoOffline"],
+                liberada, inner, false);
+            if (falha != null) return falha;
+        }
+        return EnviarBloco((IDictionary<string, object>)cmd["configuracao"], liberada, inner, true)
+            ?? Retorno(0);
+    }
+
+    /// Monta e envia um bloco (online ou offline). null = tudo 0.
+    static string EnviarBloco(IDictionary<string, object> cfg, byte liberada, int inner, bool online) {
+        byte acionamento1 = Convert.ToByte(cfg["acionamento1"]);
+        byte leitor1 = Convert.ToByte(cfg["leitor1"]);
+        byte leitor2 = Convert.ToByte(cfg["leitor2"]);
+        string modo = online ? "" : " (offline)";
+
+        var etapas = new KeyValuePair<string, Func<byte>>[] {
+            new KeyValuePair<string, Func<byte>>("DefinirPadraoCartao", () => DefinirPadraoCartao(0)),
+            online
+                ? new KeyValuePair<string, Func<byte>>("ConfigurarInnerOnLine", () => ConfigurarInnerOnLine())
+                : new KeyValuePair<string, Func<byte>>("ConfigurarInnerOffLine", () => ConfigurarInnerOffLine()),
+            new KeyValuePair<string, Func<byte>>("ConfigurarAcionamento1", () => ConfigurarAcionamento1(acionamento1, liberada)),
+            new KeyValuePair<string, Func<byte>>("ConfigurarLeitor1", () => ConfigurarLeitor1(leitor1)),
+            new KeyValuePair<string, Func<byte>>("ConfigurarLeitor2", () => ConfigurarLeitor2(leitor2)),
+            new KeyValuePair<string, Func<byte>>("EnviarConfiguracoes", () => EnviarConfiguracoes(inner)),
+        };
+        foreach (var etapa in etapas) {
+            byte r = etapa.Value();
+            if (r != 0) {
+                return J.Serialize(new Dictionary<string, object> {
+                    { "tipo", "retorno" }, { "retorno", (int)r }, { "funcao", etapa.Key + modo }
+                });
+            }
+        }
+        return null;
+    }
+
+    /// A catraca discou e responde? ReceberRelogio, como o testaConexaoInner
+    /// oficial (#658). O ConfigurarInnerOnLine de antes nao falava com ela.
+    static string TestarConexao(int inner) {
+        byte dia = 0, mes = 0, ano = 0, hora = 0, min = 0, seg = 0;
+        return Retorno(ReceberRelogio(inner, ref dia, ref mes, ref ano, ref hora, ref min, ref seg));
     }
 
     /// Diagnostico: le a versao de firmware. Se responder 0, a comunicacao
