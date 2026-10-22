@@ -39,6 +39,10 @@ export const ROTULO_DE_TIPO: Record<string, string> = {
   PROTEIN_PERCENT: 'Proteínas (%)',
   WAIST_HIP_RATIO: 'Relação cintura-quadril',
   HEART_RATE: 'Frequência cardíaca',
+  // Ficha do professor (F91).
+  BLOOD_PRESSURE_SYSTOLIC: 'Pressão sistólica',
+  BLOOD_PRESSURE_DIASTOLIC: 'Pressão diastólica',
+  VO2_MAX: 'VO₂máx',
 
   // Segmentares. O lado vem primeiro no rótulo curto da tabela porque a
   // coluna é estreita e o par esquerdo/direito é o que o avaliador compara.
@@ -94,6 +98,23 @@ const UMA_CASA = new Intl.NumberFormat('pt-BR', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
+
+const POR_CASAS = new Map<number, Intl.NumberFormat>();
+
+/** Número pt-BR com casas fixas — a ficha (F91) mostra IMC com 1, RCE com 2, bpm com 0. */
+export function numeroLegivel(valor: number, casas: number): string {
+  let formato = POR_CASAS.get(casas);
+
+  if (formato === undefined) {
+    formato = new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: casas,
+      maximumFractionDigits: casas,
+    });
+    POR_CASAS.set(casas, formato);
+  }
+
+  return formato.format(valor);
+}
 
 export function rotuloDeTipo(tipo: string): string {
   return ROTULO_DE_TIPO[tipo] ?? tipo;

@@ -98,6 +98,12 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
   */
   { href: '/classes', label: 'Aulas', exigePermissao: 'class.read' },
   /*
+    AVALIAÇÃO FÍSICA -- F91 (SPEC-091). A ficha mensal do professor: busca o
+    aluno e abre a ficha. `health.assess` porque a tela é de quem MEDE --
+    quem só lê saúde chega pelos gráficos de evolução na ficha do aluno.
+  */
+  { href: '/avaliacoes', label: 'Avaliação física', exigePermissao: 'health.assess' },
+  /*
     RELATÓRIOS -- F90. Mesma regra de quem lê aluno (`student.read`): o
     primeiro relatório é a lista de alunos exportável. Fica antes do
     Financeiro porque o grupo abaixo começa em "Cobrança" e carrega o rótulo.

@@ -35,7 +35,7 @@ import {
 
 /** Fuso FIXO, preservado de `dataLegivel` -- mesma divida das outras telas. */
 const FUSO_PROVISORIO = 'America/Sao_Paulo';
-import { FcClock, FcPortraitMode } from 'react-icons/fc';
+import { FcClock, FcInspection, FcPortraitMode } from 'react-icons/fc';
 
 import estilos from './ficha.module.css';
 
@@ -635,6 +635,14 @@ export default async function PaginaDaFicha({ params }: { params: Promise<{ id: 
                           <IconeBioimpedancia />
                         </span>
                         <span className={estilos['rotuloDaPorta']}>Evolução corporal</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a className={estilos['porta']} href={`/students/${aluno.id}/avaliacao`} data-testid="link-avaliacao">
+                        <span className={estilos['iconeDaPorta']} aria-hidden="true">
+                          <FcInspection size={22} aria-hidden />
+                        </span>
+                        <span className={estilos['rotuloDaPorta']}>Avaliação física</span>
                       </a>
                     </li>
                   </ul>

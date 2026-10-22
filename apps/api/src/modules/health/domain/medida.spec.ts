@@ -153,8 +153,9 @@ describe('arredondarParaExibicao', () => {
 });
 
 describe('tipos novos da avaliacao multiarquivo', () => {
-  it('cobre os 34 tipos, com os 10 segmentares', () => {
-    expect(TIPOS_DE_MEDIDA).toHaveLength(34);
+  it('cobre os 37 tipos, com os 10 segmentares', () => {
+    // 34 da avaliacao multiarquivo + PA (par) e VO2max da ficha do professor (F91).
+    expect(TIPOS_DE_MEDIDA).toHaveLength(37);
     expect(TIPOS_SEGMENTARES).toHaveLength(10);
   });
 
@@ -181,5 +182,22 @@ describe('tipos novos da avaliacao multiarquivo', () => {
     expect(UNIDADE_CANONICA.SUBCUTANEOUS_FAT_PERCENT).toBe('percent');
     expect(UNIDADE_CANONICA.HEART_RATE).toBeNull();
     expect(UNIDADE_CANONICA.WAIST_HIP_RATIO).toBeNull();
+  });
+});
+
+describe('tipos da ficha do professor (F91)', () => {
+  it('pressao e VO2max sao adimensionais: guardam o valor como veio', () => {
+    const sistolica = converterParaCanonica({ type: 'BLOOD_PRESSURE_SYSTOLIC', value: 132, unit: null });
+    const vo2 = converterParaCanonica({ type: 'VO2_MAX', value: 38.2, unit: null });
+
+    expect(sistolica.canonicalValue).toBe(132);
+    expect(sistolica.canonicalUnit).toBeNull();
+    expect(vo2.canonicalValue).toBeCloseTo(38.2, 4);
+  });
+
+  it('recusa digitacao impossivel (1320 no lugar de 132)', () => {
+    expect(() =>
+      converterParaCanonica({ type: 'BLOOD_PRESSURE_SYSTOLIC', value: 1320, unit: null }),
+    ).toThrow(MedidaInvalidaError);
   });
 });

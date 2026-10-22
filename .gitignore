@@ -140,3 +140,6 @@ Claude outputs/
 .agents/skills/
 .claude/skills/
 skills-lock.json
+
+# Artefatos locais do impeccable por app (capturas e briefs de revisao); so a config da raiz e versionada.
+apps/*/.impeccable/

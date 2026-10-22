@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import {
   Ausente,
   Breadcrumb,
+  Button,
   EmptyState,
+  Icon,
   PageHeader,
   ProblemDetail,
   SerieDeMedidas,
@@ -376,6 +378,14 @@ export default async function PaginaDaEvolucao({
     </>
   );
 
+  // F91: a ficha mensal do professor mora ao lado da evolução.
+  const acaoDaFicha = (
+    <Button href={`/students/${id}/avaliacao`} data-testid="nova-avaliacao">
+      <Icon name="file-text" />
+      Nova avaliação
+    </Button>
+  );
+
   const linkDaFicha = (
     <p>
       <a href={`/students/${id}`} data-testid="link-ficha">
@@ -398,6 +408,7 @@ export default async function PaginaDaEvolucao({
         <PageHeader
           id="titulo-evolucao"
           title={`Evolução corporal — ${aluno.fullName}`}
+          actions={acaoDaFicha}
           breadcrumb={
             <Breadcrumb
               trilha={[
@@ -432,12 +443,15 @@ export default async function PaginaDaEvolucao({
       studentId={id}
       sessionId={escolhida}
       cabecalho={
-        <SeletorDeMedicao
-          studentId={id}
-          medicoes={medicoes}
-          atual={escolhida}
-          timeZone={historico.timezone}
-        />
+        <>
+          <SeletorDeMedicao
+            studentId={id}
+            medicoes={medicoes}
+            atual={escolhida}
+            timeZone={historico.timezone}
+          />
+          {acaoDaFicha}
+        </>
       }
       rodape={
         <>

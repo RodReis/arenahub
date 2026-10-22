@@ -124,9 +124,11 @@ describe('rotuloDeTipo', () => {
       'SEGMENTAL_FAT_MASS_LEG_RIGHT', 'SEGMENTAL_MUSCLE_MASS_ARM_LEFT',
       'SEGMENTAL_MUSCLE_MASS_ARM_RIGHT', 'SEGMENTAL_MUSCLE_MASS_TRUNK',
       'SEGMENTAL_MUSCLE_MASS_LEG_LEFT', 'SEGMENTAL_MUSCLE_MASS_LEG_RIGHT',
+      // Ficha do professor (F91).
+      'BLOOD_PRESSURE_SYSTOLIC', 'BLOOD_PRESSURE_DIASTOLIC', 'VO2_MAX',
     ];
 
-    expect(TIPOS_DO_DOMINIO).toHaveLength(34);
+    expect(TIPOS_DO_DOMINIO).toHaveLength(37);
 
     const semRotulo = TIPOS_DO_DOMINIO.filter((tipo) => rotuloDeTipo(tipo) === tipo);
 

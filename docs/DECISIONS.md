@@ -4896,3 +4896,43 @@ lançamento"*.
   indevido, a saída é permissão própria (`billing.payment.cancel`) para o gerente.
 - **Não muda:** estorno de PIX/cartão (ADR-027/F16), INV-073 (a ação manual não apaga o evento
   original — aqui o `Payment` permanece) e a regra nº 6 (dinheiro continua inteiro em centavos).
+
+---
+
+## ADR-066 — Ficha do professor interpreta pela tabela de referência (F91)
+
+**Data:** 22/10/2026
+**Status:** aceito *(decisão do PI em 22/10/2026 — emenda o ADR-035 fora do ECG)*
+**Decisor:** Rodrigo Reis (PI)
+**Issue:** [#667](https://github.com/RodReis/arenahub/issues/667) · **Spec:** `docs/specs/SPEC-091-ficha-de-avaliacao-do-professor.md`
+
+**Contexto:** o PI entregou três páginas de *Indicadores antropométricos, cardiovasculares e
+perfusão* (IMC, cintura, RCE, RCQ, %GC, MG, MLG, PA, PAM, FC de repouso, FCmáx, RFC, Karvonen,
+VO₂máx) e pediu a ficha do professor "de acordo com as imagens". As tabelas classificam o valor
+(*Obesidade grau I*, *Hipertensão estágio 1*, *Taquicardia — avaliar contexto*). O ADR-035 fixava
+"guarda e cita, nunca interpreta" para dado cardíaco, e o `BodyMeasurementType.HEART_RATE` trazia
+"NUNCA interpretado". Perguntado, o PI escolheu mostrar a interpretação igual às imagens.
+
+### Decisão
+
+1. **A ficha de avaliação física classifica cada indicador pela faixa da tabela do PI**, inclusive
+   PA, PAM e FC de repouso. Faixas e textos são os das imagens, sem acréscimo.
+2. **Toda leitura é referência, não diagnóstico** — escrito na tela; a PA traz "uma única medida não
+   diagnostica hipertensão", como a folha.
+3. **Menor de 18 anos nunca recebe ponto de corte adulto**; a tela diz o que a tabela manda (usar
+   referência pediátrica). Faixa por sexo sem sexo no cadastro diz isso em vez de supor.
+4. **Classificação é determinística, em função pura** (`apps/admin-web/src/health/indicadores.ts`) —
+   sem IA, sem texto gerado.
+
+### Consequências
+
+- O ADR-035 **continua valendo para o ECG**: achado do aparelho citado, nunca reclassificado, e fora
+  do snapshot enviado à IA. Esta decisão cobre só a ficha manual do professor. As medidas novas
+  (PA, VO₂máx) seguem o caminho das demais medidas publicadas — inclusive o snapshot da análise
+  assistiva, como a FC de repouso já seguia.
+- No laudo do app do aluno a PA fica fora da lista de métricas (como a FC): a leitura dela é a da
+  ficha.
+- PA, FC de repouso e VO₂máx passam a existir **dentro** da `BodyAssessment`
+  (`BLOOD_PRESSURE_SYSTOLIC`, `BLOOD_PRESSURE_DIASTOLIC`, `VO2_MAX`; FC em `HEART_RATE`) e publicam
+  junto da avaliação (INV-102). `HealthMeasurement` segue como aferição avulsa.
+- Mudança de faixa é mudança de produto: entra por PR com o teste da faixa (`indicadores.test.ts`).

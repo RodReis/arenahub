@@ -10,8 +10,13 @@ interface Props {
   /** Overline do painel: o que o valor mede ("Situação atual", "Recebido no mês"). */
   readonly rotulo: string;
   readonly tom: TomDeEstado;
-  /** Glifo do selo. Decorativo -- quem informa e o `rotulo`. */
-  readonly icone: IconName;
+  /**
+   * Glifo do selo. Decorativo -- quem informa e o `rotulo`.
+   *
+   * Opcional desde a F91: numa grade de leituras da MESMA familia o selo
+   * repetia o mesmo glifo em todo cartao e nao distinguia nada.
+   */
+  readonly icone?: IconName;
   /**
    * Liga a intensidade de ALERTA: fundo inteiro tingido, degrade mais forte.
    * So quando o proprio numero e o problema -- divida em aberto, bloqueio
@@ -66,9 +71,11 @@ export function PainelDeEstado({
     >
       <div className={estilos['cabecalho']}>
         <p className={estilos['rotulo']}>{rotulo}</p>
-        <span className={estilos['selo']} aria-hidden="true">
-          <Icon name={icone} />
-        </span>
+        {icone !== undefined ? (
+          <span className={estilos['selo']} aria-hidden="true">
+            <Icon name={icone} />
+          </span>
+        ) : null}
       </div>
 
       <div className={estilos['corpo']}>{children}</div>

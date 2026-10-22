@@ -4446,8 +4446,16 @@ enum BodyMeasurementType {
   MUSCLE_MASS
   PROTEIN_PERCENT
   WAIST_HIP_RATIO
-  // Cardiaco. NUNCA interpretado (ADR-035).
+  // Cardiaco. Na ficha do professor (F91) e a FC de repouso, e a ficha
+  // INTERPRETA pela tabela de referencia (ADR-066, que emenda o ADR-035).
   HEART_RATE
+  // Ficha de avaliacao do professor (F91). PA e par sistolica/diastolica
+  // DENTRO da avaliacao: publicar a ficha leva a pressao junto, atomico.
+  // `HealthMeasurement.BLOOD_PRESSURE` continua sendo a afericao avulsa.
+  BLOOD_PRESSURE_SYSTOLIC
+  BLOOD_PRESSURE_DIASTOLIC
+  /// ml/kg/min -- grandeza que `MeasurementUnit` nao modela, como `HEART_RATE`.
+  VO2_MAX
 
   @@map("body_measurement_type")
 }
