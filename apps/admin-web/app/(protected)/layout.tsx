@@ -20,6 +20,8 @@ interface Perfil {
    * uma tela que vai recusar a pessoa.
    */
   permissions?: string[];
+  /** Papeis do usuario neste tenant (`OWNER`, `RECEPTION`...) -- issue #666. */
+  roles?: string[];
   /**
    * Elevação de suporte viva nesta sessão — F61.
    *
@@ -44,7 +46,21 @@ interface ItemDeMenu {
   readonly grupo?: string;
   /** Capacidade exigida para o item aparecer (F54). */
   readonly exigePermissao?: string;
+  /**
+   * Papeis que NAO veem o item, mesmo tendo a permissao -- issue #666.
+   *
+   * Some so quando TODOS os papeis do usuario estao na lista: quem acumula
+   * `RECEPTION` com `OWNER` continua vendo. Esconde o link, nao a rota.
+   */
+  readonly ocultoPara?: readonly string[];
 }
+
+/**
+ * Decisao do PI em 22/10/2026 (issue #666): a recepcao tem todas as
+ * permissoes desde o #656, mas o menu dela nao oferece Configuracao, Termo
+ * biometrico nem Usuarios -- configuracao que quem atende no balcao nao abre.
+ */
+const OCULTO_PARA_RECEPCAO = ['RECEPTION'] as const;
 
 /**
  * A ordem e a do turno: primeiro o que diz se a catraca esta de pe, depois a
@@ -150,7 +166,12 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     raro, mesmo grupo de Unidades. Quem lê cobrança vê; só
     `billing.settings.manage` edita (a página decide).
   */
-  { href: '/configuracao', label: 'Configuração', exigePermissao: 'billing.read' },
+  {
+    href: '/configuracao',
+    label: 'Configuração',
+    exigePermissao: 'billing.read',
+    ocultoPara: OCULTO_PARA_RECEPCAO,
+  },
   /*
     TERMO BIOMÉTRICO -- issue #491. Configuração de uso raro (publica-se uma
     vez, revisa-se de ano em ano), mesmo grupo de Dispositivos. Sem ele
@@ -161,6 +182,7 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     href: '/operations/biometric-term',
     label: 'Termo biométrico',
     exigePermissao: 'consent.manage',
+    ocultoPara: OCULTO_PARA_RECEPCAO,
   },
   /*
     USUÁRIOS -- issue #274. Mesmo grupo de Dispositivos e Unidades, mesmo
@@ -176,7 +198,12 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     resolve isso é `reancorarGrupos`, que reancora o rótulo no primeiro item
     VISÍVEL.
   */
-  { href: '/users', label: 'Usuários', exigePermissao: 'user.manage' },
+  {
+    href: '/users',
+    label: 'Usuários',
+    exigePermissao: 'user.manage',
+    ocultoPara: OCULTO_PARA_RECEPCAO,
+  },
   /*
     TIME -- F81 (issue #415). Mesmo grupo de Usuários, mesmo motivo: consultar
     o vinculo e a agenda de professor/staff/admin e configuracao de uso raro,
@@ -300,6 +327,15 @@ export function reancorarGrupos(
   });
 }
 
+/** Sem papel conhecido nada some: a permissao continua decidindo sozinha. */
+function ocultoParaOsPapeis(item: ItemDeMenu, papeis: readonly string[]): boolean {
+  const ocultoPara = item.ocultoPara;
+
+  if (ocultoPara === undefined || papeis.length === 0) return false;
+
+  return papeis.every((papel) => ocultoPara.includes(papel));
+}
+
 /**
  * Portao da area autenticada.
  *
@@ -352,10 +388,13 @@ export default async function LayoutProtegido({ children }: { children: ReactNod
    * lado de esconder e o unico erro barato aqui.
    */
   const permissoes = new Set(resposta.dados.permissions ?? []);
+  const papeis = resposta.dados.roles ?? [];
   const itensVisiveis = reancorarGrupos(
     NAVEGACAO,
     NAVEGACAO.filter(
-      (item) => item.exigePermissao === undefined || permissoes.has(item.exigePermissao),
+      (item) =>
+        (item.exigePermissao === undefined || permissoes.has(item.exigePermissao)) &&
+        !ocultoParaOsPapeis(item, papeis),
     ),
   );
 

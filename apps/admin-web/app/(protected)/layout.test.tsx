@@ -45,14 +45,14 @@ function unidade(nome: string, status = 'ACTIVE', timezone = 'America/Sao_Paulo'
   return { id: `id-${nome}`, name: nome, status, timezone };
 }
 
-function responder(unidades: unknown[], permissions?: string[]) {
+function responder(unidades: unknown[], permissions?: string[], roles?: string[]) {
   vi.mocked(chamarApi).mockImplementation((caminho: string) => {
     if (caminho === '/api/v1/units') {
       return Promise.resolve({ ok: true, dados: unidades, cookiesDaApi: [] });
     }
     return Promise.resolve({
       ok: true,
-      dados: permissions === undefined ? PERFIL : { ...PERFIL, permissions },
+      dados: permissions === undefined ? PERFIL : { ...PERFIL, permissions, roles },
       cookiesDaApi: [],
     });
   });
@@ -260,6 +260,33 @@ describe('seletor de unidade no topbar', () => {
       await renderizar();
 
       expect(screen.queryByRole('link', { name: 'Relatórios' })).toBeNull();
+    });
+
+    /*
+      Issue #666: a recepção tem as permissões, mas o menu não oferece as
+      três telas de configuração. Quem acumula outro papel continua vendo.
+    */
+    describe('menu da recepção', () => {
+      const PERMISSOES = ['billing.read', 'consent.manage', 'user.manage'];
+      const OCULTOS = ['Configuração', 'Termo biométrico', 'Usuários'];
+
+      it('esconde Configuração, Termo biométrico e Usuários de quem só é recepção', async () => {
+        responder([unidade('Matriz')], PERMISSOES, ['RECEPTION']);
+        await renderizar();
+
+        for (const nome of OCULTOS) {
+          expect(screen.queryByRole('link', { name: nome })).toBeNull();
+        }
+      });
+
+      it('mostra os três a quem é recepção e dono ao mesmo tempo', async () => {
+        responder([unidade('Matriz')], PERMISSOES, ['OWNER', 'RECEPTION']);
+        await renderizar();
+
+        for (const nome of OCULTOS) {
+          expect(screen.getByRole('link', { name: nome })).toBeInTheDocument();
+        }
+      });
     });
 
     /* O rótulo aparece UMA vez por grupo, não a cada item dele. */
