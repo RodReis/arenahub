@@ -343,6 +343,16 @@ describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507, #658)', (
     ]);
   });
 
+  it('leva o bloco offline junto quando a instalacao define um (#658)', async () => {
+    const ponte = new PonteFalsa();
+    const offline = { acionamento1: 8, leitor1: 3, leitor2: 0 };
+    const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, offline);
+
+    await adapter.gravarConfiguracao(1, 0);
+
+    expect(gravacoes(ponte)[0]).toMatchObject({ configuracao, configuracaoOffline: offline });
+  });
+
   it('nao grava no meio de um giro: espera a liberacao terminar (#658)', async () => {
     const ponte = new PonteFalsa();
     ponte.programarEventos({ tipo: 'sem-evento' }, { tipo: 'evento', evento: { origem: ORIGEM.GIRO_CONFIRMADO } });

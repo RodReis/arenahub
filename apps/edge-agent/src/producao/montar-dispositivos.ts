@@ -73,6 +73,7 @@ export async function montarDispositivos(
           config.CATRACA_INVERTIDA,
           config.CATRACA_TEMPO_LIBERADA_S,
           configuracaoDeAcesso(config),
+          configuracaoOffline(config),
         );
 
   const facial: FacialDeviceAdapter =
@@ -105,14 +106,31 @@ export function configuracaoDeAcesso(config: Config): ConfiguracaoAcesso | undef
   return { leitor1, leitor2, acionamento1 };
 }
 
+/**
+ * Bloco offline (plano B), so com `CATRACA_MODO`: com os numeros crus a
+ * instalacao ja escolheu gravar so o que pediu (#658).
+ */
+export function configuracaoOffline(config: Config): ConfiguracaoAcesso | undefined {
+  if (!config.CATRACA_MODO) return undefined;
+  return derivarConfiguracao(config.CATRACA_MODO_OFFLINE, config.CATRACA_INVERTIDA);
+}
+
 async function montarCatracaReal(
   logger: Logger,
   invertida: boolean,
   tempoLiberadaS: number,
   configuracao: ConfiguracaoAcesso | undefined,
+  offline: ConfiguracaoAcesso | undefined,
 ): Promise<TurnstileAdapter> {
   const ponte = PonteEasyInnerProcesso.lancar({ comando: CAMINHO_PONTE });
-  const adapter = new TopdataInnerAdapter(ponte, logger, INNER_PADRAO, invertida, configuracao);
+  const adapter = new TopdataInnerAdapter(
+    ponte,
+    logger,
+    INNER_PADRAO,
+    invertida,
+    configuracao,
+    offline,
+  );
 
   await conectarComRetry({
     dispositivo: 'catraca',

@@ -221,6 +221,12 @@ qual função da DLL recusou (`catraca recusou a configuracao de acesso`). Remov
 `atualizar-edge.cmd` (recompila a ponte). **Conferir na catraca:** entrada sem rosto **trava**, saída
 **gira livre**, entrada com rosto gira **só para dentro**.
 
+**Agente fora do ar = catraca liberada (decisão do PI, 22/10/2026):** junto com o bloco online, o
+agente grava o bloco **offline** como dois sentidos liberados (`CATRACA_MODO_OFFLINE`, padrão
+`dois-sentidos-liberados`). Parou o agente, em ~10 s a catraca cai para offline e gira livre nos dois
+sentidos. **Conferir:** `parar-edge.cmd`, esperar 20 s, a catraca gira para os dois lados; subir o
+agente de novo e a entrada volta a travar.
+
 **Sem a gravação automática (ou se ela falhar), corrigir à mão (~3 min, a recepção libera à mão enquanto isso):**
 
 1. `parar-edge.cmd` e esperar **20 s** — a catraca cai para o modo offline. Online, a página dela

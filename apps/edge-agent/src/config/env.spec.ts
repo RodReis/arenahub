@@ -156,6 +156,13 @@ describe('CATRACA_MODO', () => {
     expect(() => carregarConfig({ ...VALIDO, CATRACA_MODO: 'livre' })).toThrow();
   });
 
+  it('offline libera os dois sentidos por padrao -- agente fora, catraca libera (PI, 22/10/2026)', () => {
+    expect(carregarConfig(VALIDO).CATRACA_MODO_OFFLINE).toBe('dois-sentidos-liberados');
+    expect(
+      carregarConfig({ ...VALIDO, CATRACA_MODO_OFFLINE: 'saida-liberada' }).CATRACA_MODO_OFFLINE,
+    ).toBe('saida-liberada');
+  });
+
   it('recusa junto com os tres numeros crus', () => {
     expect(() =>
       carregarConfig({

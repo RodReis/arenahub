@@ -105,6 +105,11 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
      * nada -- a catraca fica com o que ja tem.
      */
     private readonly configuracao?: ConfiguracaoAcesso,
+    /**
+     * Bloco offline -- o que a catraca faz sozinha com o agente fora (#658).
+     * Gravado junto, antes do online. Sem ele o bloco offline fica como esta.
+     */
+    private readonly configuracaoOffline?: ConfiguracaoAcesso,
   ) {}
 
   /**
@@ -158,11 +163,15 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
                 inner: this.inner,
                 tempoLiberadaS: this.tempoLiberadaS,
                 configuracao,
+                ...(this.configuracaoOffline && { configuracaoOffline: this.configuracaoOffline }),
               })
             : null,
         );
         if (r?.tipo === 'retorno' && r.retorno === 0) {
-          this.logger.info({ ...configuracao }, 'configuracao de acesso gravada na catraca');
+          this.logger.info(
+            { ...configuracao, offline: this.configuracaoOffline ?? null },
+            'configuracao de acesso gravada na catraca',
+          );
           return true;
         }
         if (r) {

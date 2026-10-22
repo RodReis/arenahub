@@ -124,6 +124,16 @@ export const esquemaConfig = z.object({
   ),
 
   /**
+   * Modo do bloco OFFLINE: o que a catraca faz sozinha quando o agente cai
+   * (#658). So vale com `CATRACA_MODO`. Padrao `dois-sentidos-liberados` --
+   * decisao do PI, 22/10/2026: agente fora do ar, a catraca libera.
+   */
+  CATRACA_MODO_OFFLINE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(MODOS_CATRACA).default('dois-sentidos-liberados'),
+  ),
+
+  /**
    * Numeros crus da DLL -- #507. Prefira `CATRACA_MODO`: estes vao para a
    * placa como estao, sem a troca que a catraca invertida exige. Os tres
    * juntos ou nenhum, e nunca junto com `CATRACA_MODO`.

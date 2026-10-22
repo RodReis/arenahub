@@ -146,6 +146,12 @@ export const esquemaComandoPonte = z.discriminatedUnion('cmd', [
     inner: z.number().int().min(1).max(99),
     tempoLiberadaS: z.number().int().min(1).max(50),
     configuracao: esquemaConfiguracaoAcesso,
+    /**
+     * Bloco OFFLINE, gravado antes do online na mesma chamada: o que a
+     * catraca faz sozinha quando o agente cai (plano B). Sem ele, o bloco
+     * offline fica como esta.
+     */
+    configuracaoOffline: esquemaConfiguracaoAcesso.optional(),
   }),
 
   /**
