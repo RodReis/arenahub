@@ -446,12 +446,12 @@ describe('rotuloDoPeriodo', () => {
 describe('formatarData', () => {
   it('a data digitada nao anda um dia para tras', () => {
     // `new Date('2026-08-30')` seria UTC: num fuso negativo, dia 30 vira 29.
-    expect(formatarData('2026-08-30')).toBe('30 Ago');
+    expect(formatarData('2026-08-30')).toBe('30 ago');
   });
 
   it('primeiro e ultimo mes', () => {
-    expect(formatarData('2026-01-05')).toBe('05 Jan');
-    expect(formatarData('2026-12-31')).toBe('31 Dez');
+    expect(formatarData('2026-01-05')).toBe('05 jan');
+    expect(formatarData('2026-12-31')).toBe('31 dez');
   });
 
   it('string fora do formato volta como veio, sem quebrar a tela', () => {

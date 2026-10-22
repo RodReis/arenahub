@@ -17,7 +17,7 @@ import {
 import { BuscaDeAluno } from './busca-de-aluno';
 import estilos from './delinquency.module.css';
 
-/** Linha da aba "Inadimplentes Mes Anterior": UM ALUNO por linha, sem valor em R$. */
+/** Linha da aba "Inadimplentes mês anterior": UM ALUNO por linha, sem valor em R$. */
 export interface LinhaAnterior {
   studentId: string;
   studentName: string;

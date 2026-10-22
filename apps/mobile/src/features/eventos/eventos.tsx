@@ -65,7 +65,7 @@ function milhar(valor: number): string {
   return Math.trunc(valor).toString().replace(/\B(?=(\d{3})+(?!\d))/gu, '.');
 }
 
-/** `2026-09-27` -> `{ dia: '27', mes: 'SET' }`. Data civil, sem fuso. */
+/** `2026-09-27` -> `{ dia: '27', mes: 'Set' }`. Data civil, sem fuso. */
 function diaEMes(dataCivil: string): { dia: string; mes: string } {
   return { dia: dataCivil.slice(8, 10), mes: MESES_CURTOS[Number(dataCivil.slice(5, 7)) - 1] ?? '' };
 }

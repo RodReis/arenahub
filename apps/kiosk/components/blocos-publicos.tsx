@@ -695,13 +695,13 @@ export function FaixaDePatrocinio({
 }
 
 /**
- * `2026-08-30` vira `30 AGO`.
+ * `2026-08-30` vira `30 ago`.
  *
  * Sem `Intl` e sem `Date`: a string ja e a data local que o gerente digitou,
  * e `new Date('2026-08-30')` a interpretaria como UTC -- num fuso negativo,
  * o dia 30 vira 29 na tela. Fatiar a string nao tem esse problema.
  */
-const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 export function formatarData(iso: string): string {
   const [, mes, dia] = iso.split('-');

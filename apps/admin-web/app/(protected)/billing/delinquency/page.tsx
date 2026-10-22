@@ -67,7 +67,7 @@ interface PainelDeMesesAnteriores {
   proximoCursor: string | null;
 }
 
-/** Linha da aba "Pagantes Mes Atual" -- espelho de `Linha`, sem os campos de divida. */
+/** Linha da aba "Pagantes mês atual" -- espelho de `Linha`, sem os campos de divida. */
 interface LinhaPaga {
   invoiceId: string;
   invoiceNumber: number;
@@ -303,7 +303,7 @@ export default async function InadimplenciaPage({
 
       {/*
         BLOCO 2 -- A RECEPCAO, em abas, na ORDEM DEFINIDA PELO PI (19/10/2026):
-        Pagantes Mes Atual, Inadimplentes Mes Atual e Inadimplentes Mes
+        Pagantes mês atual, Inadimplentes mês atual e Inadimplentes Mes
         Anterior. As tres ficam montadas (ver docblock de `Tabs`), entao as
         chamadas de API acima nao atrasam a primeira renderizacao.
       */}

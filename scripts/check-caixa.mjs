@@ -108,12 +108,17 @@ const EXCECOES = [
 const PADROES = [
   { nome: 'text-transform em CSS', regex: /text-transform\s*:\s*(?:uppercase|capitalize)/, so: 'css' },
   { nome: 'textTransform em estilo', regex: /textTransform\s*:\s*['"](?:uppercase|capitalize)['"]/, so: 'ts' },
-  { nome: 'classe uppercase/capitalize do Tailwind', regex: /(?<=["'`\s])(?:uppercase|capitalize)(?=["'`\s])/, so: 'ts' },
+  { nome: 'classe uppercase/capitalize do Tailwind', regex: /(?<![\w-])(?:uppercase|capitalize)(?![\w-])/, so: 'ts' },
   { nome: 'toUpperCase em texto', regex: /\.to(?:Locale)?UpperCase\s*\(/, so: 'ts' },
   {
     nome: 'literal de tela em CAIXA ALTA',
     // Duas ou mais palavras em caixa alta entre aspas/crase/JSX; `·` separa.
     regex: /(?<=["'`>]\s*)[A-ZÀ-ÖØ-Ý]{3,}(?:\s+(?:·\s+)?[A-ZÀ-ÖØ-Ý]{2,})+(?=\s*(?:["'`<]|\$\{))/,
+    so: 'ts',
+  },
+  {
+    nome: 'texto JSX em CAIXA ALTA (linha propria)',
+    regex: /^\s*[A-ZÀ-ÖØ-Ý]{3,}(?:\s+(?:·\s+)?[A-ZÀ-ÖØ-Ý]{2,})+\s*$/,
     so: 'ts',
   },
 ];
@@ -135,7 +140,17 @@ function semComentarios(fonte, css) {
   return css ? semBloco : semBloco.replace(/(^|\s)\/\/[^\n]*/g, (m, ini) => ini + branco(m.slice(ini.length)));
 }
 
+function existe(caminho) {
+  try {
+    statSync(caminho);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const violacoes = [];
+const excecaoUsada = new Set();
 
 for (const base of VARRIDOS) {
   const dir = join(RAIZ, base);
@@ -155,10 +170,21 @@ for (const base of VARRIDOS) {
         if ((p.so === 'css') !== css) continue;
         if (!p.regex.test(linha)) continue;
         const textoDaLinha = bruto[i] ?? '';
-        if (EXCECOES.some((e) => e.arquivo === rel && textoDaLinha.includes(e.trecho))) continue;
+        const isenta = EXCECOES.find((e) => e.arquivo === rel && textoDaLinha.includes(e.trecho));
+        if (isenta) {
+          excecaoUsada.add(isenta);
+          continue;
+        }
         violacoes.push({ arquivo: rel, linha: i + 1, nome: p.nome, trecho: textoDaLinha.trim() });
       }
     });
+  }
+}
+
+// Excecao que nao isenta mais nada e lixo silencioso: o arquivo mudou e a lista nao.
+for (const e of EXCECOES) {
+  if (!excecaoUsada.has(e) && existe(join(RAIZ, e.arquivo))) {
+    violacoes.push({ arquivo: e.arquivo, linha: 0, nome: 'excecao obsoleta', trecho: e.trecho });
   }
 }
 

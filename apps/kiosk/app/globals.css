@@ -346,7 +346,6 @@ button {
 .kicker {
   font-size: var(--tt-kicker);
   font-weight: 800;
-  letter-spacing: 0.16em;
   color: var(--ah-totem-brand-200);
 }
 

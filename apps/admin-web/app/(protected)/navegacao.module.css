@@ -43,12 +43,9 @@
 
     A opacidade compõe a cor com o fundo antes de a régua medir: o token vale
     #A6AEB9 (8.24 sobre o #121417 da sidebar), e a 60% ele degrada para
-    #6b7078. Quem precisa de menos peso usa tamanho, que
-    não mexem no contraste.
-  */
-  /*
-    Sentence case, como o resto da interface (decisão do PI, 22/10/2026): o rótulo
-    se separa do link pelo tamanho e pela cor, não pela caixa.
+    #6b7078. Quem precisa de menos peso usa tamanho, que não mexe no
+    contraste. A caixa é sentence case, como o resto da interface (decisão do
+    PI, 22/10/2026): o rótulo se separa do link por tamanho e cor.
   */
 }
 

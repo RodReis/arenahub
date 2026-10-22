@@ -463,7 +463,7 @@ interface ResultadoDaInadimplenciaDto {
   direitosSuspensos: number;
 }
 
-/** A aba "Inadimplentes Mes Anterior": uma linha por aluno, sem valor em R$ (regra desta tela). */
+/** A aba "Inadimplentes mês anterior": uma linha por aluno, sem valor em R$ (regra desta tela). */
 interface PainelDeMesesAnterioresDto {
   total: number;
   linhas: {
@@ -1155,7 +1155,7 @@ export class BillingController {
   }
 
   /**
-   * A aba "Inadimplentes Mes Anterior": alunos com fatura vencida em aberto de
+   * A aba "Inadimplentes mês anterior": alunos com fatura vencida em aberto de
    * meses anteriores ao corrente, uma linha por aluno. Mesma permissao e mesmo
    * motivo de `billing/delinquency`; SO LE.
    */

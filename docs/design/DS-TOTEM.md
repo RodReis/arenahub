@@ -167,7 +167,7 @@ Contêiner de 1080 × 1920 px com borda metálica de 2 px (`linear-gradient(145d
 
 ### 3.2 Cabeçalho de marca (externo)
 
-Logo em bloco de 84 px (moldura em gradiente azul, símbolo halter + batimento), nome da academia em 32 px/800, slogan em 20 px/600 azul com tracking .04em, e à direita o botão de alto contraste. Altura total 84 px.
+Logo em bloco de 84 px (moldura em gradiente azul, símbolo halter + batimento), nome da academia em 32 px/800, slogan em 20 px/600 azul, e à direita o botão de alto contraste. Altura total 84 px.
 
 ### 3.3 Bloco hero
 
@@ -191,7 +191,7 @@ Card com título "Ranking do mês" 26 px/800 + chip de período/métrica ("AGOST
 
 ### 3.5 Card de evento
 
-Linha horizontal com bloco de data (64 px, `brand/tint`, dia em 24 px/800 + mês em 15 px/700 tracking .08em) seguido de título 24 px/700 e info 19 px.
+Linha horizontal com bloco de data (64 px, `brand/tint`, dia em 24 px/800 + mês em 15 px/700) seguido de título 24 px/700 e info 19 px.
 
 ### 3.6 Card de informação ao vivo
 
@@ -221,7 +221,7 @@ Borda 2 px `rgba(cor,.4)`, fundo `rgba(cor,.10)`, raio 28 px, padding 32×36 px.
 
 ### 3.12 Anel de pontuação
 
-`<svg>` 140 px: trilho `border/hairline` de 14 px, arco `brand/500` de 14 px com `stroke-linecap: round`, `stroke-dasharray` proporcional (perímetro 364), rotação −90°. Centro: valor 44 px/800 e rótulo "PONTOS" 17 px/700 tracking .1em. Ao lado: veredito na cor semântica e explicação secundária.
+`<svg>` 140 px: trilho `border/hairline` de 14 px, arco `brand/500` de 14 px com `stroke-linecap: round`, `stroke-dasharray` proporcional (perímetro 364), rotação −90°. Centro: valor 44 px/800 e rótulo "Pontos" 17 px/700. Ao lado: veredito na cor semântica e explicação secundária.
 
 ### 3.13 Card de métrica
 

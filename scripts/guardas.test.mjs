@@ -142,6 +142,8 @@ function rodarGuardaDeCaixa(arquivo, conteudo) {
 for (const [nome, arquivo, conteudo] of [
   ['uppercase em CSS', 'a.module.css', '.rotulo {\n  text-transform: uppercase;\n}\n'],
   ['uppercase do Tailwind', 'a.tsx', 'export const A = () => <span className="text-xs uppercase">x</span>;\n'],
+  ['uppercase com prefixo de variante do Tailwind', 'a.tsx', 'export const A = () => <span className="md:uppercase">x</span>;\n'],
+  ['texto JSX em caixa alta em linha propria', 'a.tsx', 'export const A = () => (\n  <p>\n    PLANO ATUAL\n  </p>\n);\n'],
   ['textTransform em estilo', 'a.tsx', "export const e = { textTransform: 'uppercase' };\n"],
   ['toUpperCase em texto', 'a.ts', 'export const t = (m: string) => `XP ${m.toUpperCase()}`;\n'],
   ['literal com varias palavras em caixa alta', 'a.tsx', "export const t = 'PLANO ATUAL';\n"],

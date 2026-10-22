@@ -462,7 +462,6 @@
   color: var(--ah-text-strong);
   font-size: var(--ah-type-caption-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-align: left;
   border-bottom: none;
 }
