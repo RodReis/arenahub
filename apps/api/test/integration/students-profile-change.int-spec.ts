@@ -137,6 +137,14 @@ describe('StudentsController PATCH /:id/profile (F82)', () => {
 
     expect(resposta.status).toBe(200);
     expect((resposta.body as { profile: string }).profile).toBe('TRAINER');
+
+    // #662: promover concede o direito de vinculo -- sem ele a ficha mostra
+    // "Sem plano vigente" e a catraca nega o professor.
+    const direitos = await db.entitlement.findMany({
+      where: { tenantId: conta.tenantId, studentId: aluno.id },
+    });
+    expect(direitos).toHaveLength(1);
+    expect(direitos[0]).toMatchObject({ source: 'PERSONAL_TRAINER', status: 'ACTIVE' });
   });
 
   it.each(['PERMUTA_TACIO', 'PERMUTA_DOUGLAS'])(
@@ -191,6 +199,13 @@ describe('StudentsController PATCH /:id/profile (F82)', () => {
 
     expect(resposta.status).toBe(201);
     expect((resposta.body as { profile?: string }).profile).toBe('TRAINER');
+
+    // #662: cadastrar como professor ja nasce com o direito de vinculo.
+    const direitos = await db.entitlement.findMany({
+      where: { tenantId: conta.tenantId, studentId: (resposta.body as { id: string }).id },
+    });
+    expect(direitos).toHaveLength(1);
+    expect(direitos[0]).toMatchObject({ source: 'PERSONAL_TRAINER', status: 'ACTIVE' });
 
     const ficha = await request(servidor())
       .get(`/api/v1/students/${(resposta.body as { id: string }).id}`)
