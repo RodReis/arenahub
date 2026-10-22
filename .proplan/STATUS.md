@@ -1,6 +1,6 @@
 ---
 proplan: v1
-updated: 2026-10-19
+updated: 2026-10-22
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
@@ -24,11 +24,22 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### Sem épico
+
+- [MVP1][FIX] Nome de aluno em caixa de nome próprio: gravar formatado e corrigir o banco (#671)
 
 ## Feito
 
-_(vazio)_
+### Sem épico
+
+- [FIX] Padroniza caixa do texto da interface em sentence case (#664)
+- [MVP1][FIX] professor cadastrado/promovido pelo painel fica "Sem plano vigente": o vínculo não gera o direito de acesso (#662)
+- [MVP1][FIX] botão "Liberar giro" no painel Operação: liberação manual nunca girava a catraca (#660)
+- [MVP1][FIX] catraca livre nos dois sentidos sem o TopAcademia: edge grava acionamento/leitor fora da tabela do SDK (#658)
+- [MVP2][INFRA] Recepção com todas as permissões, menos o Painel Financeiro (#656)
+- [MVP2][SPEC-083][FIX] Balcão: Vencimento é o da fatura que está sendo recebida (não o da seguinte) (#654)
+- [MVP2][SPEC-088][FIX] Fatura mensal nasce com vencimento na cobertura do último pagamento (#652)
+- [MVP2][SPEC-083][FIX] Balcão: Vencimento da próxima fatura e Cobertura até editáveis ao receber (#650)
 
 ## Finalizado
 
@@ -37,6 +48,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][INFRA] Menu: recepção não vê Configuração, Termo biométrico e Usuários (#666, finalizado em: 2026-10-22)
+- [MVP3][SPEC-091][F91] Ficha de avaliação física do professor (web) (#667, finalizado em: 2026-10-22)
 - [MVP2][FIX] Cobrança: abas Pagantes Mês Atual, Inadimplentes Mês Atual e Inadimplentes Mês Anterior (#647, finalizado em: 2026-10-19)
 - [MVP2][FIX] Cobrança e Pagantes contam só aluno Ativo + Aluno (bate com o Relatório de Alunos) (#639, finalizado em: 2026-10-19)
 - [MVP1][FIX] atualizar-edge.cmd garante o TopFace parado e desativado antes de subir o agente (#642, finalizado em: 2026-10-19)
@@ -193,8 +206,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
+- [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
