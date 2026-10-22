@@ -30,10 +30,7 @@ _(vazio)_
 
 ## Feito
 
-### Sem épico
-
-- [FIX] Padroniza caixa do texto da interface em sentence case (#664)
-- [MVP2][SPEC-083][FIX] Balcão: Vencimento da próxima fatura e Cobertura até editáveis ao receber (#650)
+_(vazio)_
 
 ## Finalizado
 
@@ -42,6 +39,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP2][SPEC-083][FIX] Balcão: Vencimento da próxima fatura e Cobertura até editáveis ao receber (#650, finalizado em: 2026-10-22)
+- [FIX] Padroniza caixa do texto da interface em sentence case (#664, finalizado em: 2026-10-22)
 - [MVP2][SPEC-088][FIX] Fatura mensal nasce com vencimento na cobertura do último pagamento (#652, finalizado em: 2026-10-22)
 - [MVP2][SPEC-083][FIX] Balcão: Vencimento é o da fatura que está sendo recebida (não o da seguinte) (#654, finalizado em: 2026-10-22)
 - [MVP2][INFRA] Recepção com todas as permissões, menos o Painel Financeiro (#656, finalizado em: 2026-10-22)
