@@ -278,4 +278,100 @@ describe('TeamRepository (F81)', () => {
     const assinatura = await db.entitlement.findUniqueOrThrow({ where: { id: direitoDeAssinatura.id } });
     expect(assinatura.status).toBe('ACTIVE');
   });
+
+  /** #662 -- o perfil origina o direito de vinculo; sem ele o professor fica "Sem plano vigente". */
+  describe('direito de vinculo ao trocar o perfil (#662)', () => {
+    const AGORA = new Date('2026-10-22T12:00:00Z');
+
+    async function criarAluno(numero: string, perfil: 'STUDENT' | 'TRAINER' = 'STUDENT') {
+      return db.student.create({
+        data: {
+          tenantId,
+          gymUnitId,
+          membershipNumber: numero,
+          fullName: `Pessoa ${numero}`,
+          birthDate: new Date('1990-01-01'),
+          profile: perfil,
+        },
+      });
+    }
+
+    const vinculos = (studentId: string) =>
+      db.entitlement.findMany({
+        where: { tenantId, studentId, subscriptionId: null },
+        include: { unitWindows: true },
+      });
+
+    const trocar = (id: string, versao: number, perfil: 'STUDENT' | 'TRAINER' | 'STAFF', correlacao: string) =>
+      comContexto({ kind: 'system', tenantId }, () =>
+        repo.alterarPerfil({ tenantId } as never, id, versao, perfil, correlacao, AGORA),
+      );
+
+    it('promover a professor concede PERSONAL_TRAINER vigente, com janela livre na unidade', async () => {
+      const aluno = await criarAluno('TEAM-0030');
+
+      await trocar(aluno.id, 0, 'TRAINER', 'corr-662-1');
+
+      const direitos = await vinculos(aluno.id);
+      expect(direitos).toHaveLength(1);
+      expect(direitos[0]).toMatchObject({ source: 'PERSONAL_TRAINER', status: 'ACTIVE', startsAt: AGORA });
+      expect(direitos[0]?.endsAt).toEqual(new Date('2027-10-22T12:00:00Z'));
+      // Sem janela o motor nega com WRONG_UNIT: sao 7 dias na unica unidade.
+      expect(direitos[0]?.unitWindows).toHaveLength(7);
+      expect(direitos[0]?.unitWindows.every((j) => j.gymUnitId === gymUnitId)).toBe(true);
+    });
+
+    it('staff recebe EMPLOYEE', async () => {
+      const aluno = await criarAluno('TEAM-0031');
+
+      await trocar(aluno.id, 0, 'STAFF', 'corr-662-2');
+
+      expect((await vinculos(aluno.id)).map((d) => d.source)).toEqual(['EMPLOYEE']);
+    });
+
+    it('rebaixar e promover de volta REATIVA o mesmo direito, sem duplicar', async () => {
+      const aluno = await criarAluno('TEAM-0032');
+
+      await trocar(aluno.id, 0, 'TRAINER', 'corr-662-3a');
+      await trocar(aluno.id, 1, 'STUDENT', 'corr-662-3b');
+
+      expect((await vinculos(aluno.id))[0]?.status).toBe('SUSPENDED');
+
+      await trocar(aluno.id, 2, 'TRAINER', 'corr-662-3c');
+
+      const direitos = await vinculos(aluno.id);
+      expect(direitos).toHaveLength(1);
+      expect(direitos[0]).toMatchObject({ status: 'ACTIVE', suspendedAt: null });
+    });
+
+    it('nao cria segundo direito quando ja ha um vigente (importado, por exemplo)', async () => {
+      const professor = await criarAluno('TEAM-0033', 'TRAINER');
+
+      await db.entitlement.create({
+        data: {
+          tenantId,
+          studentId: professor.id,
+          source: 'PERSONAL_TRAINER',
+          status: 'ACTIVE',
+          policySnapshot: {},
+          startsAt: new Date('2026-09-01T00:00:00Z'),
+          endsAt: new Date('2027-09-02T00:00:00Z'),
+        },
+      });
+
+      await trocar(professor.id, 0, 'TRAINER', 'corr-662-4');
+
+      expect(await vinculos(professor.id)).toHaveLength(1);
+    });
+
+    it('trocar de professor para staff suspende a origem antiga e concede a nova', async () => {
+      const aluno = await criarAluno('TEAM-0034');
+
+      await trocar(aluno.id, 0, 'TRAINER', 'corr-662-5a');
+      await trocar(aluno.id, 1, 'STAFF', 'corr-662-5b');
+
+      const porOrigem = Object.fromEntries((await vinculos(aluno.id)).map((d) => [d.source, d.status]));
+      expect(porOrigem).toEqual({ PERSONAL_TRAINER: 'SUSPENDED', EMPLOYEE: 'ACTIVE' });
+    });
+  });
 });

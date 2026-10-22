@@ -3,6 +3,7 @@ import type { EmploymentType, Prisma, StudentProfile } from '@arenahub/database'
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { garantirDireitoDeVinculo } from './direito-de-vinculo.js';
 
 /** Linha de leitura de time (TRAINER/STAFF/ADMIN) -- F81, issue #415. */
 export interface MembroDeTimeRow {
@@ -260,6 +261,17 @@ export class TeamRepository {
             status: { in: ['SCHEDULED', 'ACTIVE'] },
           },
           data: { status: 'SUSPENDED', suspendedAt: agora },
+        });
+      } else {
+        // O PERFIL NAO DECIDE ACESSO, o `Entitlement` decide: promover sem
+        // conceder o direito deixava o professor "Sem plano vigente" e barrado
+        // na catraca (#662).
+        await garantirDireitoDeVinculo(tx, {
+          tenantId: contexto.tenantId,
+          studentId: id,
+          perfil: novoPerfil,
+          agora,
+          grantedById: contexto.actorId,
         });
       }
 

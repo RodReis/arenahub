@@ -14,6 +14,7 @@ import type {
 
 import type { TenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../persistence/prisma.service.js';
+import { garantirDireitoDeVinculo } from '../team/direito-de-vinculo.js';
 import {
   calcularHashDeCpf,
   formatarMatricula,
@@ -412,6 +413,18 @@ export class StudentRepository {
           },
         },
       });
+
+      // Cadastro direto como professor/staff/admin: o direito de vinculo
+      // nasce junto, senao a ficha fica "Sem plano vigente" (#662).
+      if (dados.profile && dados.profile !== 'STUDENT') {
+        await garantirDireitoDeVinculo(tx, {
+          tenantId: contexto.tenantId,
+          studentId: aluno.id,
+          perfil: dados.profile,
+          agora: new Date(),
+          grantedById: contexto.actorId,
+        });
+      }
 
       await tx.studentTimelineEvent.create({
         data: {
