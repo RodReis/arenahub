@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { FacialDeviceAdapter } from '../domain/facial-device.js';
+import type { TurnstileAdapter } from '../domain/turnstile.js';
 import type { DeviceUserRepository } from '../persistence/device-user-repository.js';
 import {
   executarComando,
@@ -261,5 +262,78 @@ describe('executarLote', () => {
     // Comando sem resultado ficaria preso em PROCESSING na nuvem para sempre.
     expect(resultados).toHaveLength(1);
     expect(resultados[0]?.success).toBe(false);
+  });
+});
+
+/** #660 -- botao "Liberar giro" do painel Operacao. */
+describe('executarComando -- ACCESS_OVERRIDE_GRANT', () => {
+  const EVENTO = '22222222-2222-4222-8222-222222222222';
+
+  const override = (sobrescreve: Partial<ComandoDaNuvem> = {}): ComandoDaNuvem =>
+    comando({ id: 'cmd-ov', type: 'ACCESS_OVERRIDE_GRANT', payload: { accessEventId: EVENTO }, ...sobrescreve });
+
+  function catracaFalsa(desfecho: 'girou' | 'timeout' | 'desconhecido' = 'girou') {
+    const liberacoes: { comandoId: string; timeoutMs: number | undefined }[] = [];
+    const catraca = {
+      nome: 'catraca-falsa',
+      liberar: (comandoId: string, timeoutMs?: number) => {
+        liberacoes.push({ comandoId, timeoutMs });
+        return Promise.resolve({ desfecho, duracaoMs: 1 });
+      },
+      encerrar: () => Promise.resolve(),
+    } as unknown as TurnstileAdapter;
+    return { catraca, liberacoes };
+  }
+
+  function depsComCatraca(desfecho?: 'girou' | 'timeout' | 'desconhecido') {
+    const { catraca, liberacoes } = catracaFalsa(desfecho);
+    const passagens: { accessEventId: string; estado: string }[] = [];
+    const deps = {
+      ...montarDeps(dispositivoFalso()),
+      liberacaoManual: {
+        catraca,
+        reportarPassagem: (accessEventId: string, estado: 'CONFIRMED' | 'TIMED_OUT') => {
+          passagens.push({ accessEventId, estado });
+          return Promise.resolve(true);
+        },
+        timeoutGiroMs: 13_000,
+      },
+    };
+    return { deps, liberacoes, passagens };
+  }
+
+  it('libera UM giro com o accessEventId e reporta a passagem', async () => {
+    const { deps, liberacoes, passagens } = depsComCatraca('girou');
+
+    const resultado = await executarComando(deps, override(), AGORA);
+
+    expect(resultado).toMatchObject({ commandId: 'cmd-ov', success: true });
+    expect(liberacoes).toEqual([{ comandoId: EVENTO, timeoutMs: 13_000 }]);
+    expect(passagens).toEqual([{ accessEventId: EVENTO, estado: 'CONFIRMED' }]);
+  });
+
+  it('ninguem passou: reporta TIMED_OUT e o comando foi cumprido', async () => {
+    const { deps, passagens } = depsComCatraca('timeout');
+
+    const resultado = await executarComando(deps, override(), AGORA);
+
+    expect(resultado.success).toBe(true);
+    expect(passagens).toEqual([{ accessEventId: EVENTO, estado: 'TIMED_OUT' }]);
+  });
+
+  it('nunca gira duas vezes o mesmo comando, nem com a catraca recusando', async () => {
+    const { deps, liberacoes } = depsComCatraca('desconhecido');
+
+    const primeiro = await executarComando(deps, override(), AGORA);
+    await executarComando(deps, override(), AGORA);
+
+    expect(primeiro).toMatchObject({ success: false, errorCode: 'DEVICE_UNREACHABLE' });
+    expect(liberacoes).toHaveLength(1);
+  });
+
+  it('sem catraca ligada (bancada) recusa como nao suportado', async () => {
+    const resultado = await executarComando(montarDeps(dispositivoFalso()), override(), AGORA);
+
+    expect(resultado).toMatchObject({ success: false, errorCode: 'DEVICE_OPERATION_UNSUPPORTED' });
   });
 });

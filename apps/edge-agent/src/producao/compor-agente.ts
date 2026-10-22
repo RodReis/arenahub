@@ -120,6 +120,12 @@ export async function compor(
             registrarExecucao: (commandId, sucesso) =>
               inbox.registrarExecucao(commandId, sucesso),
             jaExecutado: (commandId) => inbox.jaExecutado(commandId),
+            // Botao "Liberar giro" do painel Operacao (#660).
+            liberacaoManual: {
+              catraca: dispositivos.catraca,
+              reportarPassagem,
+              timeoutGiroMs: (config.CATRACA_TEMPO_LIBERADA_S + 3) * 1_000,
+            },
           },
           estado: { ultimaSequencia: 0n },
           intervaloMs: config.SYNC_POLL_INTERVAL_MS,

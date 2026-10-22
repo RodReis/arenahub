@@ -155,3 +155,45 @@ export async function liberarAcessoManual(
     },
   };
 }
+
+export interface EstadoDoGiro {
+  erro?: string;
+  /** Muda a cada liberação aceita -- o toast de sucesso dispara de novo. */
+  liberadoEm?: string;
+}
+
+/**
+ * Botão "Liberar giro" do painel Operação -- #660, pedido do PI em
+ * 22/10/2026: UM giro da catraca, sem regra de acesso.
+ *
+ * Não é um caminho novo: é a mesma liberação manual de cima, sem aluno, com
+ * descrição e motivo fixos. Por isso continua auditada (`MANUAL_OVERRIDE`,
+ * quem clicou, quando) e exige a mesma permissão `access.override`.
+ */
+export async function liberarGiro(
+  _anterior: EstadoDoGiro,
+  formulario: FormData,
+): Promise<EstadoDoGiro> {
+  const resposta = await chamarApi<{ accessEventId: string }>('/api/v1/access/manual-overrides', {
+    metodo: 'POST',
+    corpo: {
+      gymUnitId: texto(formulario, 'gymUnitId'),
+      deviceId: texto(formulario, 'deviceId'),
+      visitorDescription: 'Giro avulso',
+      reason: 'Giro liberado pelo botão do painel Operação',
+      // Uma chave por clique: cada clique deliberado é um giro.
+      idempotencyKey: randomUUID(),
+      confirm: true,
+    },
+  });
+
+  if (!resposta.ok || !resposta.dados) {
+    const codigo = resposta.erro?.code ?? '';
+
+    return {
+      erro: MENSAGEM[codigo] ?? `Não foi possível liberar o giro (${codigo || 'erro'}).`,
+    };
+  }
+
+  return { liberadoEm: new Date().toISOString() };
+}

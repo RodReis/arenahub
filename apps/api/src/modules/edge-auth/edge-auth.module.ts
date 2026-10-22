@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
 import { TenantContextService } from '../../common/tenant/tenant-context.service.js';
+import { DevicesModule } from '../devices/devices.module.js';
 import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { EdgeAuthGuard } from './edge-auth.guard.js';
 import { EdgeAuthService } from './edge-auth.service.js';
@@ -27,7 +28,8 @@ import { PairingService } from './pairing.service.js';
   // `TenancyModule` porque a unidade do Edge tem de ser DESTE tenant antes de
   // o registro nascer -- `EdgeNode.gymUnitId` nao tem FK, entao a checagem e
   // do caso de uso (regra de arquitetura no 2).
-  imports: [TenancyModule],
+  // `DevicesModule` para o heartbeat reivindicar dispositivo sem dono (#660).
+  imports: [TenancyModule, DevicesModule],
   controllers: [EdgeController, PairingController, PairingCodesController, EdgeNodesController],
   providers: [
     EdgeAuthService,
