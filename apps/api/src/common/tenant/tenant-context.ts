@@ -14,6 +14,13 @@ export interface TenantContext {
   sessionId: string;
   permissions: ReadonlySet<string>;
   /**
+   * Nomes dos papeis nesta academia (`OWNER`, `RECEPTION`...) -- issue #666.
+   *
+   * So para o MENU decidir o que oferecer; quem barra continua sendo
+   * `permissions`. Ausente na elevacao de suporte, que nao tem papel proprio.
+   */
+  roles?: ReadonlySet<string>;
+  /**
    * `'ALL'` = papel vale no tenant inteiro. Conjunto = escopo restrito
    * aquelas unidades.
    */

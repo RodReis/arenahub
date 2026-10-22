@@ -66,6 +66,11 @@ describe('autenticacao', () => {
     });
 
     await db.tenantMembership.create({ data: { tenantId: tenant.id, userId: user.id } });
+
+    // Papel sem permissao nenhuma: so o NOME importa para o `/me` (issue #666).
+    const papel = await db.role.create({ data: { tenantId: tenant.id, name: 'RECEPTION' } });
+
+    await db.userRole.create({ data: { tenantId: tenant.id, userId: user.id, roleId: papel.id } });
   });
 
   afterAll(async () => {
@@ -279,6 +284,15 @@ describe('autenticacao', () => {
 
       expect(resposta.status).toBe(200);
       expect(resposta.body).toMatchObject({ email: EMAIL });
+    });
+
+    it('devolve os papeis do tenant -- o menu esconde itens da recepcao por eles (#666)', async () => {
+      const login = await logar();
+      const acesso = pegarCookie(login, 'arenahub_access') ?? '';
+
+      const resposta = await request(servidor()).get('/api/v1/auth/me').set('Cookie', acesso);
+
+      expect(resposta.body).toMatchObject({ roles: ['RECEPTION'] });
     });
 
     it('nunca devolve o hash da senha', async () => {
