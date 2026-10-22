@@ -26,7 +26,7 @@ _(vazio)_
 
 ### Sem épico
 
-- [MVP1][FIX] Nome de aluno em caixa de nome próprio: gravar formatado e corrigir o banco (#671)
+- [MVP2][INFRA] Menu lateral com grupos recolhíveis e grupo Academia (#674)
 
 ## Feito
 
@@ -39,6 +39,7 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] Nome de aluno em caixa de nome próprio: gravar formatado e corrigir o banco (#671, finalizado em: 2026-10-22)
 - [MVP2][SPEC-083][FIX] Balcão: Vencimento da próxima fatura e Cobertura até editáveis ao receber (#650, finalizado em: 2026-10-22)
 - [FIX] Padroniza caixa do texto da interface em sentence case (#664, finalizado em: 2026-10-22)
 - [MVP2][SPEC-088][FIX] Fatura mensal nasce com vencimento na cobertura do último pagamento (#652, finalizado em: 2026-10-22)
@@ -205,8 +206,8 @@ _(vazio)_
 - [MVP7][SPEC-066][F66] RLS fase 1 — role de runtime, contexto por transação e primeiras políticas (#289, finalizado em: 2026-09-10)
 - [MVP7][SPEC-065][F65] Gate de tenant no motor de decisão (carência e suspensão) (#288, finalizado em: 2026-09-10)
 - [MVP1][FIX] contador de matricula atrasado derruba todo cadastro novo (#268, finalizado em: 2026-09-09)
-- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP1][FIX] import-ativos nao gravava CPF de quem casava por nome (#266, finalizado em: 2026-09-09)
+- [MVP1][FIX] a lista de alunos volta sozinha para a primeira pagina ao paginar (#263, finalizado em: 2026-09-09)
 - [MVP7][SPEC-064][F64] Fatura da plataforma sobre o tenant (#287, finalizado em: 2026-09-09)
 - [MVP7][SPEC-063][F63] Plano SaaS e contrato do tenant (#286, finalizado em: 2026-09-09)
 - [MVP7][SPEC-062][F62] Identidade visual do tenant e login por slug (#285, finalizado em: 2026-09-09)
