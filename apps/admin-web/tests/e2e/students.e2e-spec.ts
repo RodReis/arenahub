@@ -527,6 +527,9 @@ test.describe('navegação da recepção', () => {
 
     const navegacao = page.getByRole('navigation', { name: 'Navegacao principal' });
 
+    // Grupo "Academia" é recolhível e nasce fechado fora das telas dele.
+    await navegacao.getByRole('button', { name: /Academia/ }).click();
+
     await expect(navegacao.getByRole('link', { name: 'Alunos' })).toBeVisible();
     await expect(navegacao.getByRole('link', { name: 'Planos' })).toBeVisible();
   });

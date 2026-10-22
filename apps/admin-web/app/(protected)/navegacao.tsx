@@ -1,13 +1,13 @@
 'use client';
 
-import { NavLink } from '@arenahub/ui';
+import { Icon, NavLink } from '@arenahub/ui';
 import { usePathname } from 'next/navigation';
-import { Fragment } from 'react';
+import { useEffect, useId, useState, useSyncExternalStore } from 'react';
 
 import estilos from './navegacao.module.css';
 
 /**
- * Navegação principal — F46, issue #99.
+ * Navegação principal — F46, issue #99; grupos recolhíveis desde 22/10/2026.
  *
  * `'use client'` num shell que é todo servidor precisa de justificativa, e a
  * daqui vem da documentação do Next: **ler o pathname no servidor não é
@@ -15,13 +15,11 @@ import estilos from './navegacao.module.css';
  * daria um valor congelado no primeiro carregamento — a sidebar marcaria a
  * tela de entrada para sempre, que é pior que não marcar nada.
  *
- * O custo está contido: só a lista de links vira cliente. Topbar, seletor de
- * unidade, cabeçalho e conteúdo seguem no servidor.
- *
- * Antes disto o `NavLink` recebia `current` em lugar nenhum. O componente
- * aceitava a prop, o CSS de item ativo existia, e o único lugar do repositório
- * que passava era o teste unitário — verde e morto. A recepcionista navega
- * entre quatro telas por atendimento e via sete links idênticos toda vez.
+ * GRUPOS RECOLHÍVEIS — pedido do PI (22/10/2026): o menu crescia na vertical
+ * a cada tela nova. Os itens soltos do topo (Dashboard, Operação, Eventos de
+ * acesso) ficam sempre à vista: são as telas de quando a catraca dá problema.
+ * Cada grupo abre e fecha; o da tela atual abre sozinho; o que a pessoa abrir
+ * ou fechar fica lembrado neste navegador.
  */
 interface Item {
   readonly href: string;
@@ -29,80 +27,230 @@ interface Item {
   /**
    * Rótulo do grupo que COMEÇA neste item.
    *
-   * Modelado no item e não numa lista aninhada de propósito: `itemAtual`
-   * precisa comparar todos os hrefs entre si para escolher o mais
-   * específico, e uma estrutura em dois níveis o obrigaria a achatar a
-   * árvore antes de cada comparação -- trabalho novo para resolver um
-   * problema que a lista plana não tem.
+   * Modelado no item e não numa lista aninhada de propósito: o layout filtra
+   * por permissão e reancora o rótulo (`reancorarGrupos`) numa lista plana.
+   * Aqui a lista vira seções só para desenhar.
    */
   readonly grupo?: string;
   /**
    * Capacidade que o usuario precisa ter para o item aparecer (F54).
    *
    * O FILTRO ACONTECE NO SERVIDOR, no layout -- este campo esta aqui so para
-   * o tipo bater. Filtrar no cliente mandaria o item para o navegador e o
-   * esconderia com CSS, o que nao esconde nada de quem abre o DevTools.
+   * o tipo bater.
    */
   readonly exigePermissao?: string;
+}
+
+interface Secao {
+  readonly grupo: string | null;
+  readonly itens: readonly Item[];
+}
+
+/** Onde a escolha de cada grupo (aberto/fechado) fica lembrada. */
+const CHAVE_DOS_GRUPOS = 'arenahub.menu.grupos';
+
+/** Mesmo corte do `AppShell`: abaixo dele a sidebar vira faixa horizontal. */
+const FAIXA_HORIZONTAL = '(max-width: 1279px)';
+
+// Sem `matchMedia` (ambiente sem layout, como o jsdom) vale o caso do balcão: vertical.
+function temMatchMedia(): boolean {
+  return typeof window.matchMedia === 'function';
+}
+
+function emFaixaHorizontal(): boolean {
+  return temMatchMedia() && window.matchMedia(FAIXA_HORIZONTAL).matches;
+}
+
+function assinarFaixa(aoMudar: () => void): () => void {
+  if (!temMatchMedia()) return () => undefined;
+
+  const consulta = window.matchMedia(FAIXA_HORIZONTAL);
+
+  consulta.addEventListener('change', aoMudar);
+
+  return () => consulta.removeEventListener('change', aoMudar);
+}
+
+function lerEscolhas(): Record<string, boolean> {
+  try {
+    const salvo = window.localStorage.getItem(CHAVE_DOS_GRUPOS);
+    const lido: unknown = salvo === null ? {} : JSON.parse(salvo);
+
+    return typeof lido === 'object' && lido !== null ? (lido as Record<string, boolean>) : {};
+  } catch {
+    // Armazenamento bloqueado ou corrompido: o menu segue com o padrão.
+    return {};
+  }
+}
+
+function gravarEscolhas(escolhas: Record<string, boolean>): void {
+  try {
+    window.localStorage.setItem(CHAVE_DOS_GRUPOS, JSON.stringify(escolhas));
+  } catch {
+    // Sem armazenamento a escolha vale só nesta página — o menu funciona igual.
+  }
+}
+
+/** A lista plana vira seções: itens antes do primeiro grupo ficam soltos. */
+function emSecoes(itens: readonly Item[]): Secao[] {
+  return itens.reduce<Secao[]>((secoes, item) => {
+    const ultima = secoes.at(-1);
+
+    if (item.grupo !== undefined || ultima === undefined) {
+      return [...secoes, { grupo: item.grupo ?? null, itens: [item] }];
+    }
+
+    return [...secoes.slice(0, -1), { ...ultima, itens: [...ultima.itens, item] }];
+  }, []);
 }
 
 export function Navegacao({ itens }: { readonly itens: readonly Item[] }) {
   const rota = usePathname();
   const atual = itemAtual(rota, itens);
+  const secoes = emSecoes(itens);
+  const grupoAtual =
+    secoes.find((secao) => secao.itens.some((item) => item.href === atual))?.grupo ?? null;
+
+  /*
+    Na faixa horizontal tudo fica aberto: recolher itens lado a lado esconderia
+    telas sem economizar o espaço que o recolher existe para poupar. No
+    servidor a resposta é "vertical" -- é o caso do balcão a 1280px.
+  */
+  const horizontal = useSyncExternalStore(assinarFaixa, emFaixaHorizontal, () => false);
+  const [escolhas, setEscolhas] = useState<Record<string, boolean>>({});
+
+  // O que ficou lembrado só existe no navegador: lê depois de montar.
+  useEffect(() => {
+    setEscolhas(lerEscolhas());
+  }, []);
+
+  /*
+    Entrar numa tela abre o grupo dela, mesmo que a pessoa o tenha fechado
+    antes -- o item marcado nunca fica escondido dentro de um grupo fechado.
+  */
+  useEffect(() => {
+    if (grupoAtual === null) return;
+
+    setEscolhas((anteriores) =>
+      anteriores[grupoAtual] === true ? anteriores : { ...anteriores, [grupoAtual]: true },
+    );
+  }, [grupoAtual]);
+
+  function alternar(grupo: string, aberto: boolean): void {
+    setEscolhas((anteriores) => {
+      const proximas = { ...anteriores, [grupo]: !aberto };
+
+      gravarEscolhas(proximas);
+
+      return proximas;
+    });
+  }
+
   return (
     <>
-      {itens.map((item) => {
-        return (
-          <Fragment key={item.href}>
-            {/*
-              O rótulo de grupo é `<h2>`, não um `<span>` com aparência de
-              título: quem navega por cabeçalho no leitor de tela usa isso
-              para pular direto a uma seção, e `role="navigation"` do shell
-              já dá o contexto em volta.
-            */}
-            {item.grupo === undefined ? null : (
-              <h2 className={estilos['grupo']}>{item.grupo}</h2>
-            )}
-            <NavLink href={item.href} label={item.label} current={item.href === atual} />
-          </Fragment>
-        );
-      })}
+      {secoes.map((secao) =>
+        secao.grupo === null ? (
+          secao.itens.map((item) => (
+            <NavLink key={item.href} href={item.href} label={item.label} current={item.href === atual} />
+          ))
+        ) : (
+          <Grupo
+            key={secao.grupo}
+            titulo={secao.grupo}
+            itens={secao.itens}
+            atual={atual}
+            aberto={horizontal || (escolhas[secao.grupo] ?? secao.grupo === grupoAtual)}
+            recolhivel={!horizontal}
+            contemAtual={secao.grupo === grupoAtual}
+            aoAlternar={alternar}
+          />
+        ),
+      )}
     </>
   );
 }
 
+interface PropsDoGrupo {
+  readonly titulo: string;
+  readonly itens: readonly Item[];
+  readonly atual: string | null;
+  readonly aberto: boolean;
+  readonly recolhivel: boolean;
+  readonly contemAtual: boolean;
+  readonly aoAlternar: (grupo: string, aberto: boolean) => void;
+}
+
 /**
- * Em que posição cada rótulo de grupo aparece.
+ * Um grupo do menu: cabeçalho que abre e fecha, e os links dele.
  *
- * O rótulo mora no item que abre o grupo (`Item.grupo`), e o layout FILTRA a
- * lista por permissão antes de ela chegar aqui. Se o item que declara o grupo
- * for o filtrado, o rótulo sumiria junto e os irmãos ficariam órfãos no meio
- * da lista, sem cabeçalho.
- *
- * Quem resolve isso é o layout, que reancora o `grupo` no primeiro item
- * SOBREVIVENTE antes de passar a lista (ver `reancorarGrupos`). Aqui a regra
- * é simples de propósito: **o rótulo aparece onde o campo estiver**. Tentar
- * consertar no cliente seria impossível — a informação do item removido já
- * não chega.
- *
- * Um segundo `grupo` com o mesmo nome, se a reancoragem falhar, apareceria
- * duas vezes; é ruído visível, não silêncio, e por isso o teste do layout
- * cobre a reancoragem.
+ * O rótulo continua `<h2>` — quem navega por cabeçalho no leitor de tela pula
+ * direto à seção — com um botão dentro (padrão de disclosure: `aria-expanded`
+ * e `aria-controls`). Fechado, o painel fica `inert`: os links saem da ordem
+ * de tabulação em vez de receber foco invisível.
  */
+function Grupo({ titulo, itens, atual, aberto, recolhivel, contemAtual, aoAlternar }: PropsDoGrupo) {
+  const idDoPainel = useId();
+  const idDoRotulo = useId();
+
+  return (
+    // `div` e não `section`: o painel tem regra global de `section` como cartão.
+    <div
+      role="group"
+      aria-labelledby={idDoRotulo}
+      className={estilos['grupo']}
+      data-aberto={aberto ? 'true' : undefined}
+    >
+      <h2 className={estilos['cabecalho']} id={idDoRotulo}>
+        {recolhivel ? (
+          <button
+            type="button"
+            className={estilos['alternar']}
+            aria-expanded={aberto}
+            aria-controls={idDoPainel}
+            onClick={() => aoAlternar(titulo, aberto)}
+          >
+            <span className={estilos['rotulo']}>{titulo}</span>
+            {/*
+              Fechado e com a tela atual dentro: o ponto diz "você está aqui",
+              e o texto acessível diz o mesmo -- cor nunca é canal único.
+            */}
+            {!aberto && contemAtual ? (
+              <span className={estilos['aqui']}>
+                <span className={estilos['oculto']}>(tela atual)</span>
+              </span>
+            ) : null}
+            <span className={estilos['seta']} aria-hidden="true">
+              <Icon name="chevron-down" />
+            </span>
+          </button>
+        ) : (
+          <span className={estilos['rotulo']}>{titulo}</span>
+        )}
+      </h2>
+      <div id={idDoPainel} className={estilos['painel']} inert={!aberto}>
+        <div className={estilos['itens']}>
+          {itens.map((item, indice) => (
+            <span
+              key={item.href}
+              className={estilos['item']}
+              style={{ '--ordem': indice } as React.CSSProperties}
+            >
+              <NavLink href={item.href} label={item.label} current={item.href === atual} />
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Qual item marcar como atual — **um só**.
  *
  * Casa por prefixo, e não por igualdade: a ficha do aluno é `/students/<id>` e
- * precisa acender "Alunos". Sidebar que apaga ao abrir um registro tira a
- * única âncora de lugar que a tela tem.
- *
- * Mas prefixo sozinho acenderia DOIS itens em `/operations/devices`, e
- * `aria-current="page"` duplicado afirma ao leitor de tela que a pessoa está
- * em duas páginas ao mesmo tempo. Por isso o mais específico vence: entre
- * `/operations` e `/operations/devices`, ganha quem casa com mais caracteres.
- *
- * O `/` no fim do prefixo impede que `/access-events` acenda `/access` por
- * acaso de string — são telas diferentes que compartilham o começo do caminho.
+ * precisa acender "Alunos". Mas prefixo sozinho acenderia DOIS itens em
+ * `/operations/devices`; o mais específico vence. O `/` no fim do prefixo
+ * impede que `/access-events` acenda `/access` por acaso de string.
  */
 function itemAtual(rota: string, itens: readonly Item[]): string | null {
   const candidatos = itens.filter(

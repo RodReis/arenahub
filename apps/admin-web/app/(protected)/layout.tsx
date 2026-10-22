@@ -88,7 +88,13 @@ const NAVEGACAO: readonly ItemDeMenu[] = [
     caso diferente, ver `botao-de-liberacao.tsx`), só não tem mais item fixo
     no menu.
   */
-  { href: '/students', label: 'Alunos' },
+  /*
+    ACADEMIA -- decisão do PI em 22/10/2026, junto dos grupos recolhíveis: o
+    dia a dia da academia (quem treina, o que compra, as aulas, as
+    avaliações, os relatórios) num grupo só. Dashboard, Operação e Eventos de
+    acesso ficam soltos acima: são as telas de quando a catraca dá problema.
+  */
+  { href: '/students', label: 'Alunos', grupo: 'Academia' },
   { href: '/plans', label: 'Planos' },
   /*
     AGENDA DE AULAS -- F77 (SPEC-077, ADR-061). Modulo operacional proprio,
