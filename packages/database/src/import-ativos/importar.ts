@@ -42,6 +42,7 @@
  *     no banco para a proxima leitura.
  */
 import type { PrismaClientArenaHub } from '../client.js';
+import { nomeProprio } from '../nome-proprio.js';
 import {
   calcularHashDeCpf,
   cpfEhValido,
@@ -551,7 +552,7 @@ async function criarPessoa(
       tenantId: alvo.tenantId,
       gymUnitId,
       membershipNumber,
-      fullName: registro.nome.trim(),
+      fullName: nomeProprio(registro.nome),
       birthDate: nascimentoBom ? nascimentoDoArquivo : NASCIMENTO_PLACEHOLDER,
       // `cpf` e `cpfHash` andam JUNTOS -- hash sem o campo em claro esconde
       // o dado, campo sem hash quebra a busca por duplicata.

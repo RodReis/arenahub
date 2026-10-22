@@ -525,6 +525,29 @@ describe('F45 -- cadastro completo de aluno', () => {
     });
   });
 
+  describe('nome em caixa de nome proprio (#671)', () => {
+    it('cadastro e edicao gravam o nome formatado, nao como foi digitado', async () => {
+      const criacao = await criar(contas.a, { fullName: 'BRUNA aires DE sousa' });
+
+      expect(criacao.status).toBe(201);
+      expect(corpo(criacao).fullName).toBe('Bruna Aires de Sousa');
+
+      const edicao = await request(servidor())
+        .patch(`/api/v1/students/${corpo(criacao).id}`)
+        .set('Cookie', contas.a.cookie)
+        .send({ version: corpo(criacao).version, fullName: 'ANDRE LUIZ VICENTE MENEZES' });
+
+      expect(edicao.status).toBe(200);
+
+      const gravado = await db.student.findUniqueOrThrow({
+        where: { id: corpo(criacao).id },
+        select: { fullName: true },
+      });
+
+      expect(gravado.fullName).toBe('Andre Luiz Vicente Menezes');
+    });
+  });
+
   describe('edicao (PATCH /students/:id)', () => {
     it('corrige dado cadastral e incrementa a versao', async () => {
       const criacao = await criar(contas.a, { fullName: 'Nome Errado' });
@@ -602,7 +625,7 @@ describe('F45 -- cadastro completo de aluno', () => {
     });
 
     it('nao edita aluno de outro tenant', async () => {
-      const alheio = await criar(contas.b, { fullName: 'Aluno Do Vizinho' });
+      const alheio = await criar(contas.b, { fullName: 'Aluno do Vizinho' });
 
       const invasao = await request(servidor())
         .patch(`/api/v1/students/${corpo(alheio).id}`)
@@ -615,7 +638,7 @@ describe('F45 -- cadastro completo de aluno', () => {
         .get(`/api/v1/students/${corpo(alheio).id}`)
         .set('Cookie', contas.b.cookie);
 
-      expect(ficha(fichaDoAluno).fullName).toBe('Aluno Do Vizinho');
+      expect(ficha(fichaDoAluno).fullName).toBe('Aluno do Vizinho');
     });
 
     it('recusa consultor de outro tenant', async () => {

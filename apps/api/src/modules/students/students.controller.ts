@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOkResponse } from '@nestjs/swagger';
-import type { Student } from '@arenahub/database';
+import { nomeProprio, type Student } from '@arenahub/database';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -126,7 +126,8 @@ const situacaoInicial = z.enum(['LEAD', 'TRIAL', 'ACTIVE']);
 // cliente escolher.
 const esquemaDeCriacao = z
   .object({
-    fullName: z.string().min(2).max(160),
+    // #671: grava em caixa de nome próprio -- o nome é dado, e toda tela o mostra como veio.
+    fullName: z.string().min(2).max(160).transform(nomeProprio),
     birthDate: dataSimples,
     /**
      * Unidade de ORIGEM. A F45 tornou obrigatorio -- decisao do PI de
@@ -214,7 +215,7 @@ const SITUACAO_COM_MOTIVO = new Set(['SUSPENDED', 'BLOCKED']);
 const esquemaDeEdicao = z
   .object({
     version: z.number().int().min(0),
-    fullName: z.string().min(2).max(160).optional(),
+    fullName: z.string().min(2).max(160).transform(nomeProprio).optional(),
     birthDate: dataSimples.optional(),
     gymUnitId: z.string().uuid().optional(),
     /**

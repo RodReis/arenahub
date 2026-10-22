@@ -38,6 +38,9 @@ export {
 } from './permissoes.js';
 export { PrismaPg } from '@prisma/adapter-pg';
 
+/** Nome de pessoa em caixa de nome próprio — issue #671. */
+export { nomeProprio } from './nome-proprio.js';
+
 /**
  * Contexto de tenant para RLS (F66, ADR-054) -- a camada 2 do isolamento.
  *

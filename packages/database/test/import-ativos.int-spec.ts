@@ -11,6 +11,7 @@ import {
   type RegistroDePessoaAtiva,
   type ResultadoDaAtivacao,
 } from '../src/import-ativos/importar.js';
+import { nomeProprio } from '../src/nome-proprio.js';
 
 /**
  * Integracao da F48 contra Postgres de verdade -- o que o unitario nao
@@ -325,7 +326,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criado = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'NILO VENCIDO CRIADO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('NILO VENCIDO CRIADO') },
     });
 
     for (const id of [casado.id, criado.id]) {
@@ -703,7 +704,9 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     const criadas = await db.student.findMany({
       where: {
         tenantId: alvo.tenantId,
-        fullName: { in: ['BENTO APOS CONTADOR ATRASADO', 'CELIA APOS CONTADOR ATRASADO'] },
+        fullName: {
+          in: ['BENTO APOS CONTADOR ATRASADO', 'CELIA APOS CONTADOR ATRASADO'].map(nomeProprio),
+        },
       },
       select: { membershipNumber: true },
     });
@@ -744,8 +747,11 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(await db.student.count({ where: { tenantId: alvo.tenantId } })).toBe(antes + 1);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'KARINA QUE NUNCA EXISTIU' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('KARINA QUE NUNCA EXISTIU') },
     });
+
+    // #671: o arquivo traz caixa alta; o cadastro grava em caixa de nome próprio.
+    expect(criada.fullName).toBe('Karina Que Nunca Existiu');
 
     // `AP-{ano}-{8 digitos}` -- o formato de `formatarMatricula`. Nao basta
     // "tem matricula": numero fora do formato quebra a leitura da recepcao e
@@ -797,7 +803,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(segunda.casadosPorCpf).toBe(1);
 
     const alunos = await db.student.findMany({
-      where: { tenantId: alvo.tenantId, fullName: 'LEO CRIADO UMA VEZ SO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('LEO CRIADO UMA VEZ SO') },
       select: { id: true },
     });
 
@@ -828,7 +834,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(resultado.criados).toBe(1);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'MIRA SEM NASCIMENTO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('MIRA SEM NASCIMENTO') },
     });
 
     // `birthDate` e NOT NULL: sem data no arquivo, o cadastro so existe com
@@ -876,7 +882,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     // E a data continua sendo o placeholder -- o aviso nao pode ser eco de
     // uma correcao que nao houve.
     const depois = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'MIRA SEM NASCIMENTO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('MIRA SEM NASCIMENTO') },
     });
 
     expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1900-01-01');
@@ -898,7 +904,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
 
     // A recepcao faz o que a pendencia pediu: poe a data de verdade.
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'VERA CORRIGIDA NA RECEPCAO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('VERA CORRIGIDA NA RECEPCAO') },
     });
 
     await db.student.update({
@@ -948,7 +954,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     });
 
     const depois = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'XENIA DATA CHEGOU DEPOIS' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('XENIA DATA CHEGOU DEPOIS') },
     });
 
     expect(depois.birthDate.toISOString().slice(0, 10)).toBe('1993-09-05');
@@ -966,7 +972,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'URSULA NASCIDA ONTEM' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('URSULA NASCIDA ONTEM') },
     });
 
     expect(criada.birthDate.toISOString().slice(0, 10)).toBe('1900-01-01');
@@ -992,7 +998,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(resultado.direitosPorPlano).toBe(0);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'NILO FUNCIONARIO NOVO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('NILO FUNCIONARIO NOVO') },
     });
 
     expect(criada.profile).toBe('STAFF');
@@ -1024,7 +1030,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(resultado.criados).toBe(1);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'OLGA PROFESSORA NOVA' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('OLGA PROFESSORA NOVA') },
     });
     const direito = await db.entitlement.findFirstOrThrow({ where: { studentId: criada.id } });
 
@@ -1054,7 +1060,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(resultado.direitosPorPlano).toBe(1);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'PEDRO CRIADO SEM PERIODO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('PEDRO CRIADO SEM PERIODO') },
     });
 
     expect(criada.status).toBe('ACTIVE');
@@ -1090,7 +1096,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     expect(primeira.criados).toBe(1);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'YAGO CRIADO COM DATA FORCADA' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('YAGO CRIADO COM DATA FORCADA') },
     });
 
     // Segunda execucao: MESMA pessoa (casa por CPF), CSV com data diferente.
@@ -1188,7 +1194,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     });
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'QUEZIA DUAS LINHAS' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('QUEZIA DUAS LINHAS') },
     });
 
     // A PRIMEIRA OCORRENCIA VENCE, INTEIRA. Se a segunda tivesse sido
@@ -1261,7 +1267,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'TULIO COM ENDERECO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('TULIO COM ENDERECO') },
     });
     const endereco = await db.studentAddress.findFirstOrThrow({
       where: { studentId: criada.id },
@@ -1288,7 +1294,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'WAGNER DE OUTRO ESTADO' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('WAGNER DE OUTRO ESTADO') },
     });
     const endereco = await db.studentAddress.findFirstOrThrow({
       where: { studentId: criada.id },
@@ -1313,7 +1319,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'YARA COM UF TORTA' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('YARA COM UF TORTA') },
     });
     const endereco = await db.studentAddress.findFirstOrThrow({
       where: { studentId: criada.id },
@@ -1334,7 +1340,7 @@ describe('importacao da base ativa do Pacto (F48)', () => {
     ]);
 
     const criada = await db.student.findFirstOrThrow({
-      where: { tenantId: alvo.tenantId, fullName: 'ZILDA SEM CEP' },
+      where: { tenantId: alvo.tenantId, fullName: nomeProprio('ZILDA SEM CEP') },
     });
     const endereco = await db.studentAddress.findFirstOrThrow({
       where: { studentId: criada.id },
