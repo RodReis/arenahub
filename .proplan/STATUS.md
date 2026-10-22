@@ -33,8 +33,6 @@ _(vazio)_
 ### Sem épico
 
 - [FIX] Padroniza caixa do texto da interface em sentence case (#664)
-- [MVP1][FIX] professor cadastrado/promovido pelo painel fica "Sem plano vigente": o vínculo não gera o direito de acesso (#662)
-- [MVP1][FIX] botão "Liberar giro" no painel Operação: liberação manual nunca girava a catraca (#660)
 - [MVP1][FIX] catraca livre nos dois sentidos sem o TopAcademia: edge grava acionamento/leitor fora da tabela do SDK (#658)
 - [MVP2][INFRA] Recepção com todas as permissões, menos o Painel Financeiro (#656)
 - [MVP2][SPEC-083][FIX] Balcão: Vencimento é o da fatura que está sendo recebida (não o da seguinte) (#654)
@@ -48,6 +46,8 @@ _(vazio)_
 - [MVP2][FIX] Fatura: correct-amount aceita qualquer valor, inclusive zero (#581, prio: baixa, finalizado em: 2026-10-06)
 - [MVP4][SPEC-023][FIX] Sessão do aluno: refresh concorrente com revogação ressuscita o elo revogado (#580, prio: baixa, finalizado em: 2026-10-06)
 - [MVP1][F47] Importação da base legada Pacto — 1.926 alunos como CANCELLED (#118, prio: baixa, finalizado em: 2026-08-20)
+- [MVP1][FIX] professor cadastrado/promovido pelo painel fica "Sem plano vigente": o vínculo não gera o direito de acesso (#662, finalizado em: 2026-10-22)
+- [MVP1][FIX] botão "Liberar giro" no painel Operação: liberação manual nunca girava a catraca (#660, finalizado em: 2026-10-22)
 - [MVP2][INFRA] Menu: recepção não vê Configuração, Termo biométrico e Usuários (#666, finalizado em: 2026-10-22)
 - [MVP3][SPEC-091][F91] Ficha de avaliação física do professor (web) (#667, finalizado em: 2026-10-22)
 - [MVP2][FIX] Cobrança: abas Pagantes Mês Atual, Inadimplentes Mês Atual e Inadimplentes Mês Anterior (#647, finalizado em: 2026-10-19)
