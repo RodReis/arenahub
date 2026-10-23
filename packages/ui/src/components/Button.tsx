@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'reac
 
 import estilos from './Button.module.css';
 
-type Variant = 'solid' | 'outline' | 'ghost' | 'destructive' | 'icon';
+type Variant = 'solid' | 'outline' | 'ghost' | 'destructive' | 'success' | 'icon';
 
 interface PropsBase extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly variant?: Exclude<Variant, 'icon'>;

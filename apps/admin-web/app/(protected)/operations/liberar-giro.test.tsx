@@ -31,6 +31,12 @@ describe('Liberar giro', () => {
     expect(container.querySelector('input[name="gymUnitId"]')).toHaveValue(UNIDADE);
   });
 
+  it('e verde cheio, para nao passar despercebido (#682)', () => {
+    renderizar();
+
+    expect(screen.getByTestId('liberar-giro')).toHaveAttribute('data-variant', 'success');
+  });
+
   it('avisa por toast que o giro foi liberado', async () => {
     liberarGiro.mockResolvedValueOnce({ liberadoEm: '2026-10-22T12:00:00.000Z' });
     renderizar();

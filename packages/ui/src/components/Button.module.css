@@ -158,6 +158,30 @@
 }
 
 /**
+ * Verde CHEIO -- a acao que a recepcao faz com alguem parado na frente da
+ * catraca ("Liberar giro", #682), a que nao pode passar despercebida.
+ *
+ * Cor chapada de proposito, ao contrario do `solid` (gradiente do accent do
+ * tenant): o verde aqui e o do ESTADO "liberado" (`--ah-state-success`), o
+ * mesmo do selo de plano valido, e nao muda com a marca da academia. O hover
+ * escurece em vez de clarear para manter o contraste do texto.
+ */
+.botao[data-variant='success'] {
+  background: var(--ah-state-success);
+  /*
+   * Texto com a superficie elevada, e nao `--ah-action-on-solid`: este ultimo
+   * segue o accent do tenant (um accent claro da texto escuro), e aqui o fundo
+   * e o verde do ESTADO. Branco no tema claro (5.9:1 sobre #13763A) e escuro
+   * no tema escuro, onde o verde clareia.
+   */
+  color: var(--ah-surface-raised);
+}
+
+.botao[data-variant='success']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ah-state-success) 85%, black);
+}
+
+/**
  * Disabled -- EXCECAO NOMEADA de contraste, decidida pelo PI (opcao A).
  *
  * `--ah-control-disabled-text` resolve para carbon-400 (3.78), abaixo do alvo
