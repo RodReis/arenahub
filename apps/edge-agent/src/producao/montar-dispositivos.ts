@@ -139,11 +139,21 @@ async function montarCatracaReal(
     esperar,
     tentar: async () => {
       await adapter.conectar(PORTA_CATRACA, TEMPO_CONECTAR_CATRACA_S, tempoLiberadaS);
-
-      const conectado = await adapter.testarConexao();
-      if (!conectado) throw new Error('testarConexao devolveu false');
     },
   });
+
+  // A catraca e CLIENTE: depois de abrir a porta ela leva alguns segundos para
+  // discar de volta, e `ReceberRelogio` so responde depois disso. Tratar o
+  // "ainda nao" como falha derrubava o agente em laco (22/10/2026, #678) --
+  // ele reiniciava antes de a catraca discar e a catraca nunca chegava a ser
+  // ligada. Aqui so avisa: `gravarConfiguracao` e o ping esperam a catraca.
+  const respondeu = await adapter.testarConexao();
+
+  if (!respondeu) {
+    logger.warn(
+      'catraca ainda nao respondeu ao relogio -- segue; a gravacao e o ping esperam ela discar',
+    );
+  }
 
   // O sucesso tambem vira log (#406): na Arena Positiva a catraca conectou e
   // nada disse -- so dava para deduzir pelo facial ter subido depois dela.
