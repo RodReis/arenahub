@@ -30,6 +30,12 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'destructive');
   });
 
+  it('success expoe a variante verde para o CSS (#682)', () => {
+    render(<Button variant="success">Liberar giro</Button>);
+
+    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'success');
+  });
+
   it('solid e a variante padrao -- acao primaria e o caso comum', () => {
     render(<Button>Salvar</Button>);
 

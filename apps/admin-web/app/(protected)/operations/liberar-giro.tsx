@@ -13,7 +13,7 @@ function Botao() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" variant="outline" disabled={pending} data-testid="liberar-giro">
+    <Button type="submit" variant="success" disabled={pending} data-testid="liberar-giro">
       {pending ? 'Liberando…' : 'Liberar giro'}
     </Button>
   );
