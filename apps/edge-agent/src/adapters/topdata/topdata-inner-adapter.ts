@@ -192,7 +192,13 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
   /** A catraca discou e responde? `ReceberRelogio` (#658). */
   async testarConexao(): Promise<boolean> {
     const r = await this.ponte.executar({ cmd: 'testar-conexao', inner: this.inner });
-    return r.tipo === 'retorno' && r.retorno === 0;
+    const ok = r.tipo === 'retorno' && r.retorno === 0;
+
+    // O codigo cru fica no log: "ainda nao discou" e "a DLL recusou" pedem
+    // acoes diferentes, e so o retorno distingue.
+    if (!ok) this.logger.warn({ razao: descreverFalha(r) }, 'ReceberRelogio nao respondeu');
+
+    return ok;
   }
 
   /** Keep-alive. Sem ele a catraca cai para offline e decide sozinha. */
