@@ -73,7 +73,7 @@ export async function montarDispositivos(
           config.CATRACA_INVERTIDA,
           config.CATRACA_TEMPO_LIBERADA_S,
           configuracaoDeAcesso(config),
-          configuracaoOffline(config),
+          configuracaoAoParar(config),
         );
 
   const facial: FacialDeviceAdapter =
@@ -85,6 +85,9 @@ export async function montarDispositivos(
     // Ordem inversa: facial primeiro (para de receber evento novo), depois catraca.
     encerrar: async () => {
       await facial.encerrar();
+      // Parada normal: deixa a catraca liberada (#658). Antes do `encerrar`,
+      // que fecha a ponte.
+      await catraca.liberarAoParar?.();
       await catraca.encerrar();
     },
   };
@@ -107,12 +110,12 @@ export function configuracaoDeAcesso(config: Config): ConfiguracaoAcesso | undef
 }
 
 /**
- * Bloco offline (plano B), so com `CATRACA_MODO`: com os numeros crus a
- * instalacao ja escolheu gravar so o que pediu (#658).
+ * O que a catraca recebe quando o agente PARA (#658), so com `CATRACA_MODO`:
+ * com os numeros crus a instalacao ja escolheu gravar so o que pediu.
  */
-export function configuracaoOffline(config: Config): ConfiguracaoAcesso | undefined {
+export function configuracaoAoParar(config: Config): ConfiguracaoAcesso | undefined {
   if (!config.CATRACA_MODO) return undefined;
-  return derivarConfiguracao(config.CATRACA_MODO_OFFLINE, config.CATRACA_INVERTIDA);
+  return derivarConfiguracao(config.CATRACA_MODO_AO_PARAR, config.CATRACA_INVERTIDA);
 }
 
 async function montarCatracaReal(

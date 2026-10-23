@@ -30,8 +30,6 @@ class EasyInnerBridge {
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte ConfigurarInnerOnLine();
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
-    static extern byte ConfigurarInnerOffLine();
-    [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte HabilitarMudancaOnLineOffLine(byte Habilita, byte Tempo);
     [DllImport("EasyInner.dll", CallingConvention = CallingConvention.Winapi)]
     static extern byte DefinirPadraoCartao(byte Padrao);
@@ -173,35 +171,17 @@ class EasyInnerBridge {
     /// necessario chamar novamente as funcoes acima para reconfigura-lo".
     /// Ordem do MontaConfiguracaoInner oficial; para no primeiro retorno != 0
     /// e diz qual funcao falhou.
-    ///
-    /// Com "configuracaoOffline", grava ANTES o bloco offline (o que a catraca
-    /// faz sozinha quando o agente cai) -- a ordem do exemplo oficial e
-    /// ENVIAR_CFG_OFFLINE antes de ENVIAR_CFG_ONLINE.
     /// </summary>
     static string EnviarConfigOnline(IDictionary<string, object> cmd, int inner) {
-        byte liberada = Convert.ToByte(cmd["tempoLiberadaS"]);
-
-        if (cmd.ContainsKey("configuracaoOffline") && cmd["configuracaoOffline"] != null) {
-            string falha = EnviarBloco((IDictionary<string, object>)cmd["configuracaoOffline"],
-                liberada, inner, false);
-            if (falha != null) return falha;
-        }
-        return EnviarBloco((IDictionary<string, object>)cmd["configuracao"], liberada, inner, true)
-            ?? Retorno(0);
-    }
-
-    /// Monta e envia um bloco (online ou offline). null = tudo 0.
-    static string EnviarBloco(IDictionary<string, object> cfg, byte liberada, int inner, bool online) {
+        var cfg = (IDictionary<string, object>)cmd["configuracao"];
         byte acionamento1 = Convert.ToByte(cfg["acionamento1"]);
         byte leitor1 = Convert.ToByte(cfg["leitor1"]);
         byte leitor2 = Convert.ToByte(cfg["leitor2"]);
-        string modo = online ? "" : " (offline)";
+        byte liberada = Convert.ToByte(cmd["tempoLiberadaS"]);
 
         var etapas = new KeyValuePair<string, Func<byte>>[] {
             new KeyValuePair<string, Func<byte>>("DefinirPadraoCartao", () => DefinirPadraoCartao(0)),
-            online
-                ? new KeyValuePair<string, Func<byte>>("ConfigurarInnerOnLine", () => ConfigurarInnerOnLine())
-                : new KeyValuePair<string, Func<byte>>("ConfigurarInnerOffLine", () => ConfigurarInnerOffLine()),
+            new KeyValuePair<string, Func<byte>>("ConfigurarInnerOnLine", () => ConfigurarInnerOnLine()),
             new KeyValuePair<string, Func<byte>>("ConfigurarAcionamento1", () => ConfigurarAcionamento1(acionamento1, liberada)),
             new KeyValuePair<string, Func<byte>>("ConfigurarLeitor1", () => ConfigurarLeitor1(leitor1)),
             new KeyValuePair<string, Func<byte>>("ConfigurarLeitor2", () => ConfigurarLeitor2(leitor2)),
@@ -211,11 +191,11 @@ class EasyInnerBridge {
             byte r = etapa.Value();
             if (r != 0) {
                 return J.Serialize(new Dictionary<string, object> {
-                    { "tipo", "retorno" }, { "retorno", (int)r }, { "funcao", etapa.Key + modo }
+                    { "tipo", "retorno" }, { "retorno", (int)r }, { "funcao", etapa.Key }
                 });
             }
         }
-        return null;
+        return Retorno(0);
     }
 
     /// A catraca discou e responde? ReceberRelogio, como o testaConexaoInner

@@ -222,11 +222,17 @@ qual função da DLL recusou (`catraca recusou a configuracao de acesso`). Remov
 `atualizar-edge.cmd` (recompila a ponte). **Conferir na catraca:** entrada sem rosto **trava**, saída
 **gira livre**, entrada com rosto gira **só para dentro**.
 
-**Agente fora do ar = catraca liberada (decisão do PI, 22/10/2026):** junto com o bloco online, o
-agente grava o bloco **offline** como dois sentidos liberados (`CATRACA_MODO_OFFLINE`, padrão
-`dois-sentidos-liberados`). Parou o agente, em ~10 s a catraca cai para offline e gira livre nos dois
-sentidos. **Conferir:** `parar-edge.cmd`, esperar 20 s, a catraca gira para os dois lados; subir o
-agente de novo e a entrada volta a travar.
+**Agente parado = catraca liberada (decisão do PI, 23/10/2026, #658):** a catraca guarda **uma
+configuração só** (a tela dela mostra o que o agente gravou: "Giro de entrada liberado", tempo 10). Um bloco
+"offline" separado, gravado junto, é sobrescrito pelo online e não vale: com o agente fora ela segue a
+última configuração, entrada bloqueada. Por isso a liberação é gravada **na hora de parar**: o
+`parar-edge.cmd` cria `appsedge-agentdataparar-edge.flag`, o agente vê o arquivo, grava a catraca como
+**dois sentidos liberados** (`CATRACA_MODO_AO_PARAR`, padrão `dois-sentidos-liberados`) e sai sozinho; se não sair
+em 25 s, é encerrado à força. No arranque seguinte o agente grava o modo normal (entrada bloqueada, saída livre).
+**Não cobre** queda de energia, PC desligado à força nem reinício do Windows: nesses casos a catraca fica
+na última configuração (entrada bloqueada) até o agente subir.
+**Conferir:** `parar-edge.cmd` diz "A catraca ficou liberada nos dois sentidos", a catraca gira para os dois
+lados; `schtasks /Run /TN "ArenaHub Edge"` e a entrada volta a travar. No log: "catraca liberada para o agente parar".
 
 **Sem a gravação automática (ou se ela falhar), corrigir à mão (~3 min, a recepção libera à mão enquanto isso):**
 

@@ -1,3 +1,4 @@
+import { existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { config as carregarEnv } from 'dotenv';
@@ -42,6 +43,9 @@ const { montarDevicesDoHeartbeat } = await import('./producao/montar-devices-do-
  */
 
 const INTERVALO_HEARTBEAT_MS = 30_000;
+
+/** Arquivo em `data/` que o `parar-edge.cmd` cria para pedir a parada normal (#658). */
+const ARQUIVO_DE_PARADA = 'parar-edge.flag';
 const VERSAO_DO_AGENTE = process.env['npm_package_version'] ?? '0.0.0';
 
 /** Raiz do monorepo -- dois niveis acima de `apps/edge-agent`. */
@@ -244,6 +248,22 @@ async function main(): Promise<void> {
 
   process.once('SIGINT', () => encerrar('SIGINT'));
   process.once('SIGTERM', () => encerrar('SIGTERM'));
+
+  /*
+   * PARADA PELO ARQUIVO-SINAL (#658). No Windows nao ha sinal de parada que um
+   * script mande a um processo Node sem janela: `Terminate` mata na hora, sem
+   * rodar nada. O `parar-edge.cmd` cria este arquivo e espera o agente sair
+   * sozinho -- e e nessa saida que a catraca fica liberada. Arquivo velho de
+   * uma parada que nao terminou e apagado na partida, senao o agente novo se
+   * mataria ao subir.
+   */
+  const arquivoDeParada = join(RAIZ_DO_PACOTE, 'data', ARQUIVO_DE_PARADA);
+
+  rmSync(arquivoDeParada, { force: true });
+
+  setInterval(() => {
+    if (existsSync(arquivoDeParada)) encerrar('arquivo-de-parada');
+  }, 1_000).unref();
 }
 
 main().catch((erro: unknown) => {

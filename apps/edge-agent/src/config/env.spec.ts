@@ -156,10 +156,10 @@ describe('CATRACA_MODO', () => {
     expect(() => carregarConfig({ ...VALIDO, CATRACA_MODO: 'livre' })).toThrow();
   });
 
-  it('offline libera os dois sentidos por padrao -- agente fora, catraca libera (PI, 22/10/2026)', () => {
-    expect(carregarConfig(VALIDO).CATRACA_MODO_OFFLINE).toBe('dois-sentidos-liberados');
+  it('ao parar libera os dois sentidos por padrao -- agente parado, catraca libera (PI, 23/10/2026)', () => {
+    expect(carregarConfig(VALIDO).CATRACA_MODO_AO_PARAR).toBe('dois-sentidos-liberados');
     expect(
-      carregarConfig({ ...VALIDO, CATRACA_MODO_OFFLINE: 'saida-liberada' }).CATRACA_MODO_OFFLINE,
+      carregarConfig({ ...VALIDO, CATRACA_MODO_AO_PARAR: 'saida-liberada' }).CATRACA_MODO_AO_PARAR,
     ).toBe('saida-liberada');
   });
 
