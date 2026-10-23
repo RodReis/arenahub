@@ -343,14 +343,46 @@ describe('TopdataInnerAdapter -- gravar configuracao na catraca (#507, #658)', (
     ]);
   });
 
-  it('leva o bloco offline junto quando a instalacao define um (#658)', async () => {
-    const ponte = new PonteFalsa();
-    const offline = { acionamento1: 8, leitor1: 3, leitor2: 0 };
-    const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, offline);
+  describe('liberar ao parar (#658)', () => {
+    const aoParar = { acionamento1: 8, leitor1: 3, leitor2: 0 };
 
-    await adapter.gravarConfiguracao(1, 0);
+    it('grava o modo liberado e para o ping, antes de a ponte encerrar', async () => {
+      const ponte = new PonteFalsa();
+      const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, aoParar);
+      await adapter.conectar(3570, 10, 8);
 
-    expect(gravacoes(ponte)[0]).toMatchObject({ configuracao, configuracaoOffline: offline });
+      const gravou = await adapter.liberarAoParar();
+
+      expect(gravou).toBe(true);
+      expect(gravacoes(ponte)).toEqual([
+        { cmd: 'enviar-config-online', inner: 1, tempoLiberadaS: 8, configuracao: aoParar },
+      ]);
+    });
+
+    it('sem configuracao ao parar nao grava nada', async () => {
+      const ponte = new PonteFalsa();
+
+      expect(await new TopdataInnerAdapter(ponte, logger, 1, true, configuracao).liberarAoParar()).toBe(false);
+      expect(gravacoes(ponte)).toHaveLength(0);
+    });
+
+    it('a catraca recusar nao lanca nem segura a parada', async () => {
+      const ponte = new PonteQueSoAceitaDepois();
+      ponte.retornoDeGravar = 1;
+      const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, aoParar);
+
+      await expect(adapter.liberarAoParar()).resolves.toBe(false);
+    });
+
+    it('no startup NAO grava o modo de parada, so a configuracao normal', async () => {
+      const ponte = new PonteFalsa();
+      const adapter = new TopdataInnerAdapter(ponte, logger, 1, true, configuracao, aoParar);
+
+      await adapter.gravarConfiguracao(1, 0);
+
+      expect(gravacoes(ponte)[0]).toMatchObject({ configuracao });
+      expect(gravacoes(ponte)[0]).not.toHaveProperty('configuracaoOffline');
+    });
   });
 
   it('nao grava no meio de um giro: espera a liberacao terminar (#658)', async () => {

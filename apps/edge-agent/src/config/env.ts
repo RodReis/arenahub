@@ -124,11 +124,14 @@ export const esquemaConfig = z.object({
   ),
 
   /**
-   * Modo do bloco OFFLINE: o que a catraca faz sozinha quando o agente cai
-   * (#658). So vale com `CATRACA_MODO`. Padrao `dois-sentidos-liberados` --
-   * decisao do PI, 22/10/2026: agente fora do ar, a catraca libera.
+   * Modo gravado na catraca quando o agente PARA normalmente (#658). So vale
+   * com `CATRACA_MODO`. Padrao `dois-sentidos-liberados` -- decisao do PI,
+   * 23/10/2026: agente parado, a catraca libera. A placa guarda uma
+   * configuracao so, entao isto e gravado na hora de parar (`parar-edge.cmd`,
+   * `atualizar-edge.cmd`); queda de energia ou PC desligado a forca nao passam
+   * por aqui.
    */
-  CATRACA_MODO_OFFLINE: z.preprocess(
+  CATRACA_MODO_AO_PARAR: z.preprocess(
     (v) => (v === '' ? undefined : v),
     z.enum(MODOS_CATRACA).default('dois-sentidos-liberados'),
   ),

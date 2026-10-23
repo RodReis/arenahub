@@ -67,5 +67,11 @@ export interface TurnstileAdapter {
    */
   readonly respondendo?: boolean;
 
+  /**
+   * Parada normal do agente: deixa a catraca no modo liberado (#658). Opcional:
+   * so o equipamento real tem configuracao gravada. Devolve se gravou.
+   */
+  liberarAoParar?(): Promise<boolean>;
+
   encerrar(): Promise<void>;
 }

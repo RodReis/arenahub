@@ -36,6 +36,9 @@ const JANELA_POLLING_MS = 500;
  */
 export const INTERVALO_KEEP_ALIVE_MS = 5_000;
 
+/** Quanto esperar a gravacao do modo liberado ao parar -- a parada nao pode travar. */
+const TETO_LIBERAR_AO_PARAR_MS = 8_000;
+
 /** Tentativas de gravar a configuracao e espera entre elas: a catraca leva segundos para discar (#507). */
 const TENTATIVAS_GRAVAR = 10;
 const ESPERA_GRAVAR_MS = 2_000;
@@ -106,10 +109,12 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
      */
     private readonly configuracao?: ConfiguracaoAcesso,
     /**
-     * Bloco offline -- o que a catraca faz sozinha com o agente fora (#658).
-     * Gravado junto, antes do online. Sem ele o bloco offline fica como esta.
+     * O que gravar na catraca quando o agente PARA normalmente (#658). A placa
+     * guarda UMA configuracao so, e com o agente fora ela segue a ultima
+     * gravada -- entao "agente parado = catraca liberada" so se consegue
+     * gravando o modo liberado na hora de parar. Ver `liberarAoParar`.
      */
-    private readonly configuracaoOffline?: ConfiguracaoAcesso,
+    private readonly configuracaoAoParar?: ConfiguracaoAcesso,
   ) {}
 
   /**
@@ -163,15 +168,11 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
                 inner: this.inner,
                 tempoLiberadaS: this.tempoLiberadaS,
                 configuracao,
-                ...(this.configuracaoOffline && { configuracaoOffline: this.configuracaoOffline }),
               })
             : null,
         );
         if (r?.tipo === 'retorno' && r.retorno === 0) {
-          this.logger.info(
-            { ...configuracao, offline: this.configuracaoOffline ?? null },
-            'configuracao de acesso gravada na catraca',
-          );
+          this.logger.info({ ...configuracao }, 'configuracao de acesso gravada na catraca');
           return true;
         }
         if (r) {
@@ -395,6 +396,56 @@ export class TopdataInnerAdapter implements TurnstileAdapter {
       cartao: r.evento.cartao,
       ocorridoEm: r.evento.ocorridoEm,
     };
+  }
+
+  /**
+   * Parada normal do agente: grava o modo liberado na catraca antes de sair
+   * (#658, decisao do PI em 23/10/2026: agente parado, a catraca libera).
+   *
+   * Para o ping primeiro e entra na fila da liberacao, para nao cortar um giro
+   * em curso. Nao cobre queda de energia nem PC desligado a forca: ai a catraca
+   * segue a ultima configuracao gravada (entrada bloqueada, saida livre).
+   * Nunca lanca e nunca segura a saida: no maximo `TETO_LIBERAR_AO_PARAR_MS`.
+   */
+  async liberarAoParar(): Promise<boolean> {
+    const configuracao = this.configuracaoAoParar;
+
+    if (!configuracao) return false;
+
+    if (this.keepAlive) clearInterval(this.keepAlive);
+    this.keepAlive = null;
+
+    const gravar = this.emExclusao(() =>
+      this.ponte.executar({
+        cmd: 'enviar-config-online',
+        inner: this.inner,
+        tempoLiberadaS: this.tempoLiberadaS,
+        configuracao,
+      }),
+    );
+
+    const teto = new Promise<null>((resolve) => setTimeout(() => resolve(null), TETO_LIBERAR_AO_PARAR_MS));
+
+    try {
+      const r = await Promise.race([gravar, teto]);
+
+      if (r?.tipo === 'retorno' && r.retorno === 0) {
+        this.logger.info({ ...configuracao }, 'catraca liberada para o agente parar');
+        return true;
+      }
+
+      this.logger.warn(
+        { razao: r ? descreverFalha(r) : 'sem resposta no prazo' },
+        'nao consegui liberar a catraca ao parar -- ela segue a ultima configuracao',
+      );
+    } catch (erro: unknown) {
+      this.logger.warn(
+        { erro: erro instanceof Error ? erro.message : erro },
+        'nao consegui liberar a catraca ao parar -- ela segue a ultima configuracao',
+      );
+    }
+
+    return false;
   }
 
   async encerrar(): Promise<void> {
